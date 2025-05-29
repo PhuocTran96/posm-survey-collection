@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POSM Survey System</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Khảo sát POSM</h1>
+            <p>Hệ thống khảo sát thiếu/cần thay thế POSM hỏng</p>
+        </header>
+
+        <main>
+            <!-- Step 1: Select Leader -->
+            <div id="step1" class="step active">
+                <h2>Bước 1: Chọn Leader của bạn</h2>
+                <div class="form-group">
+                    <label for="leaderSelect">Leader:</label>
+                    <select id="leaderSelect" class="form-control">
+                        <option value="">-- Chọn Leader --</option>
+                    </select>
+                </div>
+                <button id="nextToStep2" class="btn btn-primary" disabled>Tiếp theo</button>
+            </div>
+
+            <!-- Step 2: Select Shop -->
+            <div id="step2" class="step">
+                <h2>Bước 2: Chọn Shop của bạn</h2>
+                <div class="form-group">
+                    <label for="shopSelect">Shop Name:</label>
+                    <select id="shopSelect" class="form-control">
+                        <option value="">-- Chọn Shop --</option>
+                    </select>
+                </div>
+                <div class="button-group">
+                    <button id="backToStep1" class="btn btn-secondary">Quay lại</button>
+                    <button id="nextToStep3" class="btn btn-primary" disabled>Tiếp theo</button>
+                </div>
+            </div>
+
+            <!-- Step 3: POSM Selection -->
+            <div id="step3" class="step">
+                <h2>Bước 3: Chọn POSM thiếu/cần thay thế</h2>
+                <div class="selected-info">
+                    <p><strong>Leader:</strong> <span id="selectedLeader"></span></p>
+                    <p><strong>Shop:</strong> <span id="selectedShop"></span></p>
+                </div>
+                
+                <div id="modelsContainer" class="models-container">
+                    <!-- Models and POSM will be loaded here -->
+                </div>
+
+                <div class="button-group">
+                    <button id="backToStep2" class="btn btn-secondary">Quay lại</button>
+                    <button id="submitSurvey" class="btn btn-success">Gửi khảo sát</button>
+                </div>
+            </div>
+
+            <!-- Success Message -->
+            <div id="successMessage" class="step">
+                <div class="success-content">
+                    <h2>✅ Gửi thành công!</h2>
+                    <p>Cảm ơn bạn đã hoàn thành khảo sát POSM.</p>
+                    <p>Dữ liệu của bạn đã được lưu vào hệ thống.</p>
+                    <button id="startNewSurvey" class="btn btn-primary">Làm khảo sát mới</button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Loading overlay -->
+        <div id="loadingOverlay" class="loading-overlay">
+            <div class="loading-spinner"></div>
+            <p>Đang tải dữ liệu...</p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

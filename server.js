@@ -7,6 +7,7 @@ const cors = require('cors');
 const fs = require('fs');
 const csv = require('csv-parser');
 const path = require('path');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,6 +20,83 @@ app.use(express.static('public'));
 
 // MongoDB Atlas connection
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/posm_survey';
+
+// Tạo transporter cho Nodemailer
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: process.env.SMTP_PORT || 587,
+  secure: false, // true cho port 465, false cho các port khác
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
+  }
+});
+
+// Hàm gửi email thông báo
+async function sendSurveyNotification(surveyData) {
+  try {
+    // Chuyển đổi string thành mảng email
+    const emailList = process.env.EMAIL_TO.split(',').map(email => email.trim());
+    
+    const mailOptions = {
+      from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+      to: emailList.join(', '),
+      subject: '🔔 Có phản hồi survey POSM mới',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px;">
+            📋 Phản hồi Survey POSM Mới
+          </h2>
+          
+          <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <h3 style="color: #007bff; margin-top: 0;">Thông tin cơ bản:</h3>
+            <p><strong>👤 Leader:</strong> ${surveyData.leader}</p>
+            <p><strong>🏪 Tên shop:</strong> ${surveyData.shopName}</p>
+            <p><strong>⏰ Thời gian submit:</strong> ${new Date().toLocaleString('vi-VN')}</p>
+          </div>
+
+          <div style="background-color: #fff; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px;">
+            <h3 style="color: #28a745; margin-top: 0;">📊 Chi tiết phản hồi:</h3>
+            ${surveyData.responses.map((response, index) => `
+              <div style="margin-bottom: 15px; padding: 10px; background-color: #f1f3f4; border-radius: 3px;">
+                <h4 style="color: #495057; margin: 0 0 10px 0;">Model ${index + 1}: ${response.model}</h4>
+                <p><strong>Tất cả POSM được chọn:</strong> ${response.allSelected ? '✅ Có' : '❌ Không'}</p>
+                ${response.posmSelections && response.posmSelections.length > 0 ? `
+                  <p><strong>POSM được chọn:</strong></p>
+                  <ul style="margin: 5px 0;">
+                    ${response.posmSelections
+                      .filter(posm => posm.selected)
+                      .map(posm => `<li>${posm.posmName} (${posm.posmCode})</li>`)
+                      .join('')}
+                  </ul>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`📧 Email sent to ${emailList.length} recipients:`, info.messageId);
+    return { success: true, messageId: info.messageId, recipients: emailList.length };
+  } catch (error) {
+    console.error('❌ Error sending email notification:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+
+// Hàm test kết nối email
+async function testEmailConnection() {
+  try {
+    await transporter.verify();
+    console.log('✅ Email server connection verified');
+  } catch (error) {
+    console.error('❌ Email server connection failed:', error.message);
+    console.log('💡 Please check your SMTP credentials in .env file');
+  }
+}
 
 // MongoDB connection with retry logic
 const connectDB = async () => {
@@ -121,6 +199,9 @@ function loadCSVData() {
 // Load data on startup
 loadCSVData();
 
+// Test email connection on startup
+testEmailConnection();
+
 // API Routes
 
 // Get all leaders
@@ -162,7 +243,7 @@ app.get('/api/models/:leader/:shopName', (req, res) => {
   res.json(modelGroups);
 });
 
-// Submit survey response
+// Submit survey response với email notification
 app.post('/api/submit', async (req, res) => {
   try {
     const { leader, shopName, responses } = req.body;
@@ -182,15 +263,31 @@ app.post('/api/submit', async (req, res) => {
     });
     
     await surveyResponse.save();
-    console.log(`Survey submitted successfully: ${leader} - ${shopName}`);
+    console.log(`✅ Survey submitted successfully: ${leader} - ${shopName}`);
     
-    // Đảm bảo response đúng format
+    // Gửi email thông báo
+    const emailResult = await sendSurveyNotification({
+      leader,
+      shopName,
+      responses,
+      submittedAt: surveyResponse.submittedAt
+    });
+    
+    if (emailResult.success) {
+      console.log('📧 Email notification sent for survey:', surveyResponse._id);
+    } else {
+      console.error('❌ Failed to send email notification:', emailResult.error);
+    }
+    
+    // Trả về response thành công (không phụ thuộc vào email)
     res.status(200).json({ 
       success: true, 
       message: 'Survey submitted successfully',
       data: {
         id: surveyResponse._id,
-        submittedAt: surveyResponse.submittedAt
+        submittedAt: surveyResponse.submittedAt,
+        emailSent: emailResult.success,
+        emailError: emailResult.success ? null : emailResult.error
       }
     });
   } catch (error) {
@@ -261,12 +358,45 @@ app.delete('/api/responses/:id', async (req, res) => {
   }
 });
 
+// Test email endpoint (tùy chọn - để test email)
+app.post('/api/test-email', async (req, res) => {
+  try {
+    const testData = {
+      leader: 'Test Leader',
+      shopName: 'Test Shop',
+      responses: [{
+        model: 'Test Model',
+        allSelected: false,
+        posmSelections: [{
+          posmCode: 'TEST001',
+          posmName: 'Test POSM',
+          selected: true
+        }]
+      }]
+    };
+    
+    const result = await sendSurveyNotification(testData);
+    
+    res.json({
+      success: result.success,
+      message: result.success ? 'Test email sent successfully' : 'Failed to send test email',
+      error: result.error || null
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error sending test email',
+      error: error.message
+    });
+  }
+});
+
 // Serve main page
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Serve admin page - THÊM ROUTE NÀY
+// Serve admin page
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
@@ -308,7 +438,8 @@ const server = app.listen(PORT, () => {
   console.log(`🚀 POSM Survey Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 Survey URL: http://localhost:${PORT}`);
-  console.log(`⚙️  Admin URL: http://localhost:${PORT}/admin`);  // Cập nhật thông báo
+  console.log(`⚙️  Admin URL: http://localhost:${PORT}/admin`);
+  console.log(`📧 Email notifications: ${process.env.SMTP_USER ? 'Enabled' : 'Disabled (check .env)'}`);
 });
 
 // Handle server errors

@@ -300,21 +300,31 @@ class SurveyApp {
                 body: JSON.stringify(surveyData)
             });
 
+            // Kiểm tra status code trước khi parse JSON
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
             const result = await response.json();
             
             if (result.success) {
-                this.showStep('success');
+                // Ẩn tất cả steps trước
+                document.querySelectorAll('.step').forEach(step => {
+                    step.classList.remove('active');
+                });
+                // Hiển thị success message
                 document.getElementById('successMessage').classList.add('active');
             } else {
-                alert('Lỗi khi gửi khảo sát: ' + result.message);
+                alert('Lỗi khi gửi khảo sát: ' + (result.message || 'Unknown error'));
             }
         } catch (error) {
             console.error('Error submitting survey:', error);
-            alert('Lỗi khi gửi khảo sát. Vui lòng thử lại.');
+            alert('Lỗi khi gửi khảo sát: ' + error.message);
         } finally {
             this.hideLoading();
         }
     }
+
 
     collectResponses() {
         const responses = [];

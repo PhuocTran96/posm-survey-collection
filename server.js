@@ -182,11 +182,24 @@ app.post('/api/submit', async (req, res) => {
     });
     
     await surveyResponse.save();
-    console.log(`Survey submitted to MongoDB: ${leader} - ${shopName}`);
-    res.json({ success: true, message: 'Survey submitted successfully' });
+    console.log(`Survey submitted successfully: ${leader} - ${shopName}`);
+    
+    // Đảm bảo response đúng format
+    res.status(200).json({ 
+      success: true, 
+      message: 'Survey submitted successfully',
+      data: {
+        id: surveyResponse._id,
+        submittedAt: surveyResponse.submittedAt
+      }
+    });
   } catch (error) {
-    console.error('Error saving survey to MongoDB:', error);
-    res.status(500).json({ success: false, message: 'Error saving survey to database' });
+    console.error('Error saving survey:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error saving survey to database',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
@@ -205,9 +218,57 @@ app.get('/api/responses', async (req, res) => {
   }
 });
 
+// Delete survey response (for admin)
+app.delete('/api/responses/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid survey ID'
+      });
+    }
+    
+    const deletedResponse = await SurveyResponse.findByIdAndDelete(id);
+    
+    if (!deletedResponse) {
+      return res.status(404).json({
+        success: false,
+        message: 'Survey response not found'
+      });
+    }
+    
+    console.log(`Survey response deleted: ${id}`);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Survey response deleted successfully',
+      data: {
+        id: deletedResponse._id,
+        leader: deletedResponse.leader,
+        shopName: deletedResponse.shopName
+      }
+    });
+  } catch (error) {
+    console.error('Error deleting survey response:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting survey response',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 // Serve main page
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Serve admin page - THÊM ROUTE NÀY
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
 // Global error handler
@@ -247,7 +308,7 @@ const server = app.listen(PORT, () => {
   console.log(`🚀 POSM Survey Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 Survey URL: http://localhost:${PORT}`);
-  console.log(`⚙️  Admin URL: http://localhost:${PORT}/admin.html`);
+  console.log(`⚙️  Admin URL: http://localhost:${PORT}/admin`);  // Cập nhật thông báo
 });
 
 // Handle server errors

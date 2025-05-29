@@ -2,6 +2,7 @@ class AdminApp {
     constructor() {
         this.responses = [];
         this.filteredResponses = [];
+        this.deleteID = null;
         this.init();
     }
 
@@ -11,14 +12,69 @@ class AdminApp {
     }
 
     bindEvents() {
-        document.getElementById('applyFilters').addEventListener('click', () => this.applyFilters());
         document.getElementById('exportData').addEventListener('click', () => this.exportData());
         
-        // Auto-apply filters when filter values change
-        document.getElementById('leaderFilter').addEventListener('change', () => this.applyFilters());
+        // Handle leader filter change
+        document.getElementById('leaderFilter').addEventListener('change', () => {
+            // Clear shop selection when leader changes
+            document.getElementById('shopFilter').value = '';
+            // Repopulate the shop filter based on selected leader
+            this.populateFilters();
+            // Then apply filters
+            this.applyFilters();
+        });
+
+        // Handle other filter changes
         document.getElementById('shopFilter').addEventListener('change', () => this.applyFilters());
         document.getElementById('dateFromFilter').addEventListener('change', () => this.applyFilters());
         document.getElementById('dateToFilter').addEventListener('change', () => this.applyFilters());
+
+        // Handle delete confirmation
+        document.getElementById('btnConfirmDelete').addEventListener('click', () => this.confirmDelete());
+        document.getElementById('btnCancelDelete').addEventListener('click', () => this.cancelDelete());
+    }
+
+    // Add loading overlay methods
+    async deleteResponse(id, shopName, leader) {
+        this.deleteID = id;
+        document.querySelector('#confirmDeleteDialog p').textContent = 
+            `Bạn có chắc chắn muốn xóa khảo sát của shop "${shopName}" do leader "${leader}" thực hiện không?`;
+        document.getElementById('confirmDeleteDialog').style.display = 'flex';
+    }
+
+    // Confirm delete action
+    async confirmDelete() {
+        if (!this.deleteID) return;
+
+        try {
+            this.showLoading();
+            const response = await fetch(`/api/responses/${this.deleteID}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('Xóa khảo sát thành công.');
+                await this.loadResponses();
+            } else {
+                alert('Lỗi khi xóa khảo sát: ' + result.message);
+            }
+        } catch (error) {
+            console.error('Error deleting response:', error);
+            alert('Lỗi khi xóa khảo sát. Vui lòng thử lại.');
+        } finally {
+            this.hideLoading();
+            this.cancelDelete();
+        }
+    }
+
+    cancelDelete() {
+        this.deleteID = null;
+        document.getElementById('confirmDeleteDialog').style.display = 'none';
     }
 
     showLoading() {
@@ -48,22 +104,36 @@ class AdminApp {
     }
 
     populateFilters() {
+        const leaderFilter = document.getElementById('leaderFilter').value;
+        const leaderSelect = document.getElementById('leaderFilter');
+        
         // Populate leader filter
         const leaders = [...new Set(this.responses.map(r => r.leader))];
-        const leaderSelect = document.getElementById('leaderFilter');
+        const currentSelectedLeader = leaderSelect.value; // Store current selection
         leaderSelect.innerHTML = '<option value="">Tất cả Leader</option>';
         leaders.forEach(leader => {
             const option = document.createElement('option');
             option.value = leader;
             option.textContent = leader;
+            option.selected = leader === currentSelectedLeader; // Restore selection
             leaderSelect.appendChild(option);
         });
 
-        // Populate shop filter
-        const shops = [...new Set(this.responses.map(r => r.shopName))];
+        // Populate shop filter based on selected leader
+        let filteredShops;
+        if (leaderFilter) {
+            // If leader is selected, only show shops for that leader
+            filteredShops = [...new Set(this.responses
+                .filter(r => r.leader === leaderFilter)
+                .map(r => r.shopName))];
+        } else {
+            // If no leader selected, show all shops
+            filteredShops = [...new Set(this.responses.map(r => r.shopName))];
+        }
+
         const shopSelect = document.getElementById('shopFilter');
         shopSelect.innerHTML = '<option value="">Tất cả Shop</option>';
-        shops.forEach(shop => {
+        filteredShops.forEach(shop => {
             const option = document.createElement('option');
             option.value = shop;
             option.textContent = shop;
@@ -89,15 +159,19 @@ class AdminApp {
             }
 
             // Date filters
-            const responseDate = new Date(response.submittedAt).toDateString();
+            const responseDate = new Date(response.submittedAt);
+            
             if (dateFromFilter) {
-                const fromDate = new Date(dateFromFilter).toDateString();
+                const fromDate = new Date(dateFromFilter);
+                fromDate.setHours(0, 0, 0, 0); // Set to start of day
                 if (responseDate < fromDate) {
                     return false;
                 }
             }
+            
             if (dateToFilter) {
-                const toDate = new Date(dateToFilter).toDateString();
+                const toDate = new Date(dateToFilter);
+                toDate.setHours(23, 59, 59, 999); // Set to end of day
                 if (responseDate > toDate) {
                     return false;
                 }
@@ -165,8 +239,14 @@ class AdminApp {
                         <h3>${response.shopName}</h3>
                         <div class="response-meta">Leader: ${response.leader}</div>
                     </div>
-                    <div class="response-date">
-                        ${this.formatDate(response.submittedAt)}
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div class="response-date">
+                            ${this.formatDate(response.submittedAt)}
+                        </div>
+                        <button class="delete-btn"
+                            onclick="adminApp.deleteResponse('${response._id}', '${response.shopName}', '${response.leader}')">
+                            🗑️ Xóa
+                        </button>
                     </div>
                 </div>
                 <div class="response-details">
@@ -237,7 +317,10 @@ class AdminApp {
     }
 }
 
+// Global instance of AdminApp
+let adminApp;
+
 // Initialize the admin app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new AdminApp();
+    adminApp = new AdminApp();
 });

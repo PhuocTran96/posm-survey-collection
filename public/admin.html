@@ -60,7 +60,7 @@
         
         .response-item {
             border-bottom: 1px solid #eee;
-            padding: 20px;
+            padding: 15px;
         }
         
         .response-item:last-child {
@@ -69,9 +69,9 @@
         
         .response-header {
             display: flex;
-            justify-content: between;
+            justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             flex-wrap: wrap;
             gap: 10px;
         }
@@ -96,14 +96,14 @@
         }
         
         .response-details {
-            margin-top: 15px;
+            margin-top: 10px;
         }
         
         .model-response {
             background: #f8f9fa;
             border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 15px;
+            padding: 12px;
+            margin-bottom: 10px;
         }
         
         .model-response:last-child {
@@ -113,9 +113,10 @@
         .model-title {
             font-weight: 600;
             color: #495057;
-            margin-bottom: 10px;
-            padding-bottom: 5px;
+            margin-bottom: 8px;
+            padding-bottom: 3px;
             border-bottom: 1px solid #dee2e6;
+            font-size: 0.95rem;
         }
         
         .posm-selections {
@@ -177,11 +178,97 @@
         .export-btn:hover {
             background: #218838;
         }
+
+        .btn-primary.btn-green {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+        }
+        
+        .btn-primary.btn-green:hover {
+            background: linear-gradient(135deg, #218838 0%, #1ba97e 100%);
+        }
+        
+        .btn-export {
+            background-color: rgba(40, 167, 69, 0.2);
+            color: #28a745;
+            border: 1px solid #28a745;
+        }
+        
+        .btn-export:hover {
+            background-color: rgba(40, 167, 69, 0.3);
+        }
         
         .no-data {
             text-align: center;
             padding: 40px;
             color: #666;
+        }
+
+        .delete-btn {
+            background: #dc3545;
+            color: white;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-left: 10px;
+        }
+
+        .delete-btn:hover {
+            background: #c82333;
+        }
+
+        .confirm-dialog {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .confirm-content {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 400px;
+        }
+
+        .confirm-buttons {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .btn-confirm {
+            background: #dc3545;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .btn-cancel {
+            background: #6c757d;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .btn-confirm:hover {
+            background: #c82333;
         }
         
         @media (max-width: 768px) {
@@ -232,14 +319,9 @@
             <div class="filter-group">
                 <label>Đến ngày:</label>
                 <input type="date" id="dateToFilter">
-            </div>
-            <div class="filter-group">
+            </div>            <div class="filter-group">
                 <label>&nbsp;</label>
-                <button id="applyFilters" class="btn btn-primary">Lọc</button>
-            </div>
-            <div class="filter-group">
-                <label>&nbsp;</label>
-                <button id="exportData" class="export-btn">Xuất Excel</button>
+                <button id="exportData" class="btn btn-primary btn-green">Xuất Excel</button>
             </div>
         </div>
 
@@ -251,6 +333,18 @@
         <div id="loadingOverlay" class="loading-overlay">
             <div class="loading-spinner"></div>
             <p>Đang tải dữ liệu...</p>
+        </div>
+
+        <!-- Confirm delete dialog -->
+        <div id="confirmDeleteDialog" class="confirm-dialog">
+            <div class="confirm-content">
+                <h3>Xác nhận xóa</h3>
+                <p>Bạn có chắc chắn muốn xóa kết quả khảo sát này?</p>
+                <div class="confirm-buttons">
+                    <button id="btnConfirmDelete" class="btn-confirm">Xóa</button>
+                    <button id="btnCancelDelete" class="btn-cancel">Hủy</button>
+                </div>
+            </div>
         </div>
     </div>
 

@@ -281,39 +281,78 @@ class AdminApp {
             hour: '2-digit',
             minute: '2-digit'
         });
-    }
-
-    exportData() {
+    }    exportData() {
         if (this.filteredResponses.length === 0) {
             alert('Không có dữ liệu để xuất.');
             return;
         }
 
-        // Create CSV content
-        let csvContent = 'Leader,Shop Name,Model,POSM Code,POSM Name,All Selected,Submitted At\n';
+        // Prepare data for Excel export
+        const excelData = [];
         
+        // Add header row
+        excelData.push([
+            'Leader',
+            'Shop Name', 
+            'Model',
+            'POSM Code',
+            'POSM Name',
+            'All Selected',
+            'Submitted At'
+        ]);
+        
+        // Add data rows
         this.filteredResponses.forEach(response => {
             response.responses.forEach(modelResponse => {
                 if (modelResponse.allSelected) {
-                    csvContent += `"${response.leader}","${response.shopName}","${modelResponse.model}","ALL","TẤT CẢ POSM","Yes","${response.submittedAt}"\n`;
+                    excelData.push([
+                        response.leader,
+                        response.shopName,
+                        modelResponse.model,
+                        'ALL',
+                        'TẤT CẢ POSM',
+                        'Yes',
+                        this.formatDate(response.submittedAt)
+                    ]);
                 } else {
                     modelResponse.posmSelections.forEach(posm => {
-                        csvContent += `"${response.leader}","${response.shopName}","${modelResponse.model}","${posm.posmCode}","${posm.posmName}","No","${response.submittedAt}"\n`;
+                        excelData.push([
+                            response.leader,
+                            response.shopName,
+                            modelResponse.model,
+                            posm.posmCode,
+                            posm.posmName,
+                            'No',
+                            this.formatDate(response.submittedAt)
+                        ]);
                     });
                 }
             });
         });
 
-        // Create and download file
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', `posm_survey_results_${new Date().toISOString().split('T')[0]}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // Create Excel workbook and worksheet
+        const workbook = XLSX.utils.book_new();
+        const worksheet = XLSX.utils.aoa_to_sheet(excelData);
+        
+        // Auto-size columns
+        const maxWidths = [];
+        excelData.forEach(row => {
+            row.forEach((cell, colIndex) => {
+                const cellLength = cell ? cell.toString().length : 0;
+                maxWidths[colIndex] = Math.max(maxWidths[colIndex] || 0, cellLength + 2);
+            });
+        });
+        
+        worksheet['!cols'] = maxWidths.map(width => ({ width: Math.min(width, 50) }));
+        
+        // Add worksheet to workbook
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'POSM Survey Results');
+        
+        // Generate filename with current date
+        const filename = `posm_survey_results_${new Date().toISOString().split('T')[0]}.xlsx`;
+        
+        // Save the file
+        XLSX.writeFile(workbook, filename);
     }
 }
 

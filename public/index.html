@@ -48,11 +48,16 @@
                     <p><strong>Leader:</strong> <span id="selectedLeader"></span></p>
                     <p><strong>Shop:</strong> <span id="selectedShop"></span></p>
                 </div>
-                
+                <!-- Model search and add -->
+                <div class="form-group" style="position:relative;">
+                    <label for="modelSearchInput">Tìm kiếm Model:</label>
+                    <input type="text" id="modelSearchInput" class="form-control" placeholder="Nhập tên model..." autocomplete="off">
+                    <div id="modelSuggestions" class="autocomplete-suggestions"></div>
+                    <button id="addModelBtn" class="btn btn-primary" disabled>Thêm Model</button>
+                </div>
                 <div id="modelsContainer" class="models-container">
                     <!-- Models and POSM will be loaded here -->
                 </div>
-
                 <div class="button-group">
                     <button id="backToStep2" class="btn btn-secondary">Quay lại</button>
                     <button id="submitSurvey" class="btn btn-success">Gửi khảo sát</button>

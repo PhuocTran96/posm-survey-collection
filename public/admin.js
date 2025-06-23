@@ -3,6 +3,7 @@ class AdminApp {
         this.responses = [];
         this.filteredResponses = [];
         this.deleteID = null;
+        this.selectedIds = new Set();
         this.init();
     }
 
@@ -32,6 +33,9 @@ class AdminApp {
         // Handle delete confirmation
         document.getElementById('btnConfirmDelete').addEventListener('click', () => this.confirmDelete());
         document.getElementById('btnCancelDelete').addEventListener('click', () => this.cancelDelete());
+
+        // Bulk delete button
+        document.getElementById('bulkDeleteBtn').addEventListener('click', () => this.handleBulkDelete());
     }
 
     // Add loading overlay methods
@@ -222,6 +226,8 @@ class AdminApp {
     renderResponses() {
         const container = document.getElementById('responsesContainer');
         
+        // Bulk delete button
+        document.getElementById('bulkDeleteBtn').disabled = this.selectedIds.size === 0;
         if (this.filteredResponses.length === 0) {
             container.innerHTML = `
                 <div class="no-data">
@@ -231,10 +237,12 @@ class AdminApp {
             `;
             return;
         }
-
         container.innerHTML = this.filteredResponses.map(response => `
             <div class="response-item">
                 <div class="response-header">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" class="select-response-checkbox" data-id="${response._id}" ${this.selectedIds.has(response._id) ? 'checked' : ''}>
+                    </div>
                     <div class="response-info">
                         <h3>${response.shopName}</h3>
                         <div class="response-meta">Leader: ${response.leader}</div>
@@ -254,6 +262,18 @@ class AdminApp {
                 </div>
             </div>
         `).join('');
+        // Bind checkboxes
+        container.querySelectorAll('.select-response-checkbox').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                const id = e.target.dataset.id;
+                if (e.target.checked) {
+                    this.selectedIds.add(id);
+                } else {
+                    this.selectedIds.delete(id);
+                }
+                document.getElementById('bulkDeleteBtn').disabled = this.selectedIds.size === 0;
+            });
+        });
     }
 
     renderModelResponses(responses) {
@@ -268,6 +288,15 @@ class AdminApp {
                         ).join('')
                     }
                 </div>
+                ${modelResponse.images && modelResponse.images.length > 0 ? `
+                    <div class="admin-image-preview">
+                        ${modelResponse.images.map(url => `
+                            <a href="${url}" target="_blank">
+                                <img src="${url}" style="max-width:100px;max-height:100px;margin:5px;border:1px solid #ccc;border-radius:4px;">
+                            </a>
+                        `).join('')}
+                    </div>
+                ` : ''}
             </div>
         `).join('');
     }
@@ -298,12 +327,14 @@ class AdminApp {
             'POSM Code',
             'POSM Name',
             'All Selected',
+            'Image URL',
             'Submitted At'
         ]);
         
         // Add data rows
         this.filteredResponses.forEach(response => {
             response.responses.forEach(modelResponse => {
+                const imageUrl = (modelResponse.images && modelResponse.images.length > 0) ? modelResponse.images[0] : '';
                 if (modelResponse.allSelected) {
                     excelData.push([
                         response.leader,
@@ -312,6 +343,7 @@ class AdminApp {
                         'ALL',
                         'TẤT CẢ POSM',
                         'Yes',
+                        imageUrl,
                         this.formatDate(response.submittedAt)
                     ]);
                 } else {
@@ -323,6 +355,7 @@ class AdminApp {
                             posm.posmCode,
                             posm.posmName,
                             'No',
+                            imageUrl,
                             this.formatDate(response.submittedAt)
                         ]);
                     });
@@ -353,6 +386,32 @@ class AdminApp {
         
         // Save the file
         XLSX.writeFile(workbook, filename);
+    }
+
+    async handleBulkDelete() {
+        if (this.selectedIds.size === 0) return;
+        if (!confirm(`Bạn có chắc chắn muốn xóa ${this.selectedIds.size} khảo sát đã chọn?`)) return;
+        try {
+            this.showLoading();
+            const res = await fetch('/api/responses/bulk-delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: Array.from(this.selectedIds) })
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert(`Đã xóa ${data.deletedIds.length} khảo sát. ${data.errors.length ? 'Một số lỗi xảy ra, kiểm tra console.' : ''}`);
+                if (data.errors.length) console.error('Bulk delete errors:', data.errors);
+                this.selectedIds.clear();
+                await this.loadResponses();
+            } else {
+                alert('Lỗi khi xóa hàng loạt: ' + (data.message || 'Unknown error'));
+            }
+        } catch (error) {
+            alert('Lỗi khi xóa hàng loạt: ' + error.message);
+        } finally {
+            this.hideLoading();
+        }
     }
 }
 

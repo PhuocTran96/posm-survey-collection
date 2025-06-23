@@ -7,7 +7,8 @@ const cors = require('cors');
 const fs = require('fs');
 const csv = require('csv-parser');
 const path = require('path');
-const nodemailer = require('nodemailer');
+const { getS3SignedUrl, s3, reduceImageSize } = require('./s3');
+const multer = require('multer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -20,83 +21,6 @@ app.use(express.static('public'));
 
 // MongoDB Atlas connection
 const MONGODB_URI = process.env.MONGODB_URI;
-
-// Tạo transporter cho Nodemailer
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: process.env.SMTP_PORT || 587,
-  secure: false, // true cho port 465, false cho các port khác
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
-  }
-});
-
-// Hàm gửi email thông báo
-async function sendSurveyNotification(surveyData) {
-  try {
-    // Chuyển đổi string thành mảng email
-    const emailList = process.env.EMAIL_TO.split(',').map(email => email.trim());
-    
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || process.env.SMTP_USER,
-      to: emailList.join(', '),
-      subject: '🔔 Có phản hồi survey POSM mới',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px;">
-            📋 Phản hồi Survey POSM Mới
-          </h2>
-          
-          <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
-            <h3 style="color: #007bff; margin-top: 0;">Thông tin cơ bản:</h3>
-            <p><strong>👤 Leader:</strong> ${surveyData.leader}</p>
-            <p><strong>🏪 Tên shop:</strong> ${surveyData.shopName}</p>
-            <p><strong>⏰ Thời gian submit:</strong> ${new Date().toLocaleString('vi-VN')}</p>
-          </div>
-
-          <div style="background-color: #fff; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px;">
-            <h3 style="color: #28a745; margin-top: 0;">📊 Chi tiết phản hồi:</h3>
-            ${surveyData.responses.map((response, index) => `
-              <div style="margin-bottom: 15px; padding: 10px; background-color: #f1f3f4; border-radius: 3px;">
-                <h4 style="color: #495057; margin: 0 0 10px 0;">Model ${index + 1}: ${response.model}</h4>
-                <p><strong>Tất cả POSM được chọn:</strong> ${response.allSelected ? '✅ Có' : '❌ Không'}</p>
-                ${response.posmSelections && response.posmSelections.length > 0 ? `
-                  <p><strong>POSM được chọn:</strong></p>
-                  <ul style="margin: 5px 0;">
-                    ${response.posmSelections
-                      .filter(posm => posm.selected)
-                      .map(posm => `<li>${posm.posmName} (${posm.posmCode})</li>`)
-                      .join('')}
-                  </ul>
-                ` : ''}
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `
-    };
-
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`📧 Email sent to ${emailList.length} recipients:`, info.messageId);
-    return { success: true, messageId: info.messageId, recipients: emailList.length };
-  } catch (error) {
-    console.error('❌ Error sending email notification:', error);
-    return { success: false, error: error.message };
-  }
-}
-
-
-// Hàm test kết nối email
-async function testEmailConnection() {
-  try {
-    await transporter.verify();
-    console.log('✅ Email server connection verified');
-  } catch (error) {
-    console.error('❌ Email server connection failed:', error.message);
-    console.log('💡 Please check your SMTP credentials in .env file');
-  }
-}
 
 // MongoDB connection with retry logic
 const connectDB = async () => {
@@ -128,8 +52,6 @@ const connectDB = async () => {
 connectDB().then(() => {
   // Initialize data after successful MongoDB connection
   initializeData();
-  // Test email connection
-  testEmailConnection();
 });
 
 const db = mongoose.connection;
@@ -166,7 +88,10 @@ const surveyResponseSchema = new mongoose.Schema({
     allSelected: {
       type: Boolean,
       default: false
-    }
+    },
+    images: [{
+      type: String
+    }]
   }],
   submittedAt: {
     type: Date,
@@ -408,10 +333,10 @@ app.get('/api/models/:leader/:shopName', async (req, res) => {
   }
 });
 
-// Submit survey response với email notification
+// Submit survey response (email notification removed)
 app.post('/api/submit', async (req, res) => {
   try {
-    const { leader, shopName, responses } = req.body;
+    const { leader, shopName, responses, modelImages } = req.body;
     
     // Validate required fields
     if (!leader || !shopName || !responses || !Array.isArray(responses)) {
@@ -430,29 +355,13 @@ app.post('/api/submit', async (req, res) => {
     await surveyResponse.save();
     console.log(`✅ Survey submitted successfully: ${leader} - ${shopName}`);
     
-    // Gửi email thông báo
-    const emailResult = await sendSurveyNotification({
-      leader,
-      shopName,
-      responses,
-      submittedAt: surveyResponse.submittedAt
-    });
-    
-    if (emailResult.success) {
-      console.log('📧 Email notification sent for survey:', surveyResponse._id);
-    } else {
-      console.error('❌ Failed to send email notification:', emailResult.error);
-    }
-    
-    // Trả về response thành công (không phụ thuộc vào email)
+    // Only return success, no email notification
     res.status(200).json({ 
       success: true, 
       message: 'Survey submitted successfully',
       data: {
         id: surveyResponse._id,
-        submittedAt: surveyResponse.submittedAt,
-        emailSent: emailResult.success,
-        emailError: emailResult.success ? null : emailResult.error
+        submittedAt: surveyResponse.submittedAt
       }
     });
   } catch (error) {
@@ -484,7 +393,6 @@ app.get('/api/responses', async (req, res) => {
 app.delete('/api/responses/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    
     // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
@@ -492,21 +400,52 @@ app.delete('/api/responses/:id', async (req, res) => {
         message: 'Invalid survey ID'
       });
     }
-    
+    // Find the response first to get image URLs
+    const response = await SurveyResponse.findById(id);
+    if (!response) {
+      return res.status(404).json({
+        success: false,
+        message: 'Survey response not found'
+      });
+    }
+    // Collect all image URLs from all models
+    const imageUrls = [];
+    if (response.responses && Array.isArray(response.responses)) {
+      response.responses.forEach(modelResp => {
+        if (modelResp.images && Array.isArray(modelResp.images)) {
+          modelResp.images.forEach(url => imageUrls.push(url));
+        }
+      });
+    }
+    // Delete images from S3
+    for (const url of imageUrls) {
+      try {
+        // Parse the S3 key from the URL
+        const match = url.match(/https?:\/\/.+?\.amazonaws\.com\/(.+)$/);
+        if (match && match[1]) {
+          const Key = decodeURIComponent(match[1]);
+          await s3.deleteObject({
+            Bucket: process.env.AWS_S3_BUCKET,
+            Key
+          }).promise();
+        }
+      } catch (err) {
+        console.error('Failed to delete image from S3:', url, err);
+        // Continue deleting other images and the DB record
+      }
+    }
+    // Delete the survey response from DB
     const deletedResponse = await SurveyResponse.findByIdAndDelete(id);
-    
     if (!deletedResponse) {
       return res.status(404).json({
         success: false,
         message: 'Survey response not found'
       });
     }
-    
-    console.log(`Survey response deleted: ${id}`);
-    
+    console.log(`Survey response and images deleted: ${id}`);
     res.status(200).json({
       success: true,
-      message: 'Survey response deleted successfully',
+      message: 'Survey response and images deleted successfully',
       data: {
         id: deletedResponse._id,
         leader: deletedResponse.leader,
@@ -523,36 +462,65 @@ app.delete('/api/responses/:id', async (req, res) => {
   }
 });
 
-// Test email endpoint (tùy chọn - để test email)
-app.post('/api/test-email', async (req, res) => {
+// Bulk delete survey responses and their images
+app.post('/api/responses/bulk-delete', async (req, res) => {
   try {
-    const testData = {
-      leader: 'Test Leader',
-      shopName: 'Test Shop',
-      responses: [{
-        model: 'Test Model',
-        allSelected: false,
-        posmSelections: [{
-          posmCode: 'TEST001',
-          posmName: 'Test POSM',
-          selected: true
-        }]
-      }]
-    };
-    
-    const result = await sendSurveyNotification(testData);
-    
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, message: 'No IDs provided' });
+    }
+    const deletedIds = [];
+    const errors = [];
+    for (const id of ids) {
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        errors.push({ id, error: 'Invalid survey ID' });
+        continue;
+      }
+      try {
+        const response = await SurveyResponse.findById(id);
+        if (!response) {
+          errors.push({ id, error: 'Survey response not found' });
+          continue;
+        }
+        // Collect all image URLs from all models
+        const imageUrls = [];
+        if (response.responses && Array.isArray(response.responses)) {
+          response.responses.forEach(modelResp => {
+            if (modelResp.images && Array.isArray(modelResp.images)) {
+              modelResp.images.forEach(url => imageUrls.push(url));
+            }
+          });
+        }
+        // Delete images from S3
+        for (const url of imageUrls) {
+          try {
+            const match = url.match(/https?:\/\/.+?\.amazonaws\.com\/(.+)$/);
+            if (match && match[1]) {
+              const Key = decodeURIComponent(match[1]);
+              await s3.deleteObject({
+                Bucket: process.env.AWS_S3_BUCKET,
+                Key
+              }).promise();
+            }
+          } catch (err) {
+            errors.push({ id, error: 'Failed to delete image from S3', url });
+          }
+        }
+        // Delete the survey response from DB
+        await SurveyResponse.findByIdAndDelete(id);
+        deletedIds.push(id);
+      } catch (err) {
+        errors.push({ id, error: err.message });
+      }
+    }
     res.json({
-      success: result.success,
-      message: result.success ? 'Test email sent successfully' : 'Failed to send test email',
-      error: result.error || null
+      success: true,
+      deletedIds,
+      errors
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error sending test email',
-      error: error.message
-    });
+    console.error('Error in bulk delete:', error);
+    res.status(500).json({ success: false, message: 'Error in bulk delete', error: error.message });
   }
 });
 
@@ -605,6 +573,50 @@ app.get('/api/data-stats', async (req, res) => {
   }
 });
 
+// --- API: Model Autocomplete ---
+app.get('/api/model-autocomplete', async (req, res) => {
+  try {
+    const q = req.query.q || '';
+    // Find distinct models that match the query (case-insensitive, partial match)
+    const models = await ModelPosm.find({
+      model: { $regex: q, $options: 'i' }
+    }).distinct('model');
+    res.json(models);
+  } catch (error) {
+    console.error('Error in model autocomplete:', error);
+    res.status(500).json({ success: false, message: 'Error searching models' });
+  }
+});
+
+// New server-side upload endpoint
+app.post('/api/upload', multer({ storage: multer.memoryStorage() }).single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+    const file = req.file;
+    const fileExt = file.originalname.split('.').pop();
+    const s3Key = `uploads/${Date.now()}_${file.originalname}`;
+    let fileBuffer = file.buffer;
+    // Only resize if image type
+    if (['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
+      fileBuffer = await reduceImageSize(file.buffer, 1024, 80);
+    }
+    const params = {
+      Bucket: process.env.AWS_S3_BUCKET,
+      Key: s3Key,
+      Body: fileBuffer,
+      ContentType: file.mimetype
+    };
+    await s3.upload(params).promise();
+    const s3Url = `https://${process.env.AWS_S3_BUCKET}.s3-${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
+    res.json({ success: true, url: s3Url });
+  } catch (error) {
+    console.error('Error uploading file to S3:', error);
+    res.status(500).json({ success: false, message: 'Error uploading file to S3' });
+  }
+});
+
 // Serve main page
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -653,7 +665,6 @@ const server = app.listen(PORT, () => {
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 Survey URL: http://localhost:${PORT}`);
   console.log(`⚙️  Admin URL: http://localhost:${PORT}/admin`);
-  console.log(`📧 Email notifications: ${process.env.SMTP_USER ? 'Enabled' : 'Disabled (check .env)'}`);
 });
 
 // Handle server errors

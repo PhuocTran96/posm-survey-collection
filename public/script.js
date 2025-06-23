@@ -481,12 +481,12 @@ class SurveyApp {
         const container = document.getElementById(`image-upload-${this.sanitizeId(model)}`);
         const hasImage = !!this.modelImages[model];
         container.innerHTML = `
-            <div class="image-upload-attractive" style="border:2px dashed #4facfe;padding:16px;border-radius:10px;background:#f8fafd;display:flex;flex-direction:column;align-items:center;">
-                <label for="file-input-${this.sanitizeId(model)}" style="cursor:pointer;display:flex;align-items:center;gap:8px;font-weight:600;color:#4facfe;font-size:1.1em;">
-                    <span style="font-size:1.5em;">📷</span> <span>${hasImage ? 'Đã chọn ảnh' : 'Chụp ảnh hoặc chọn ảnh model bị thiếu POSM'}</span>
+            <div class="image-upload-attractive" style="border:2px dashed #4facfe;padding:18px 8px;border-radius:14px;background:#f8fafd;display:flex;flex-direction:column;align-items:center;max-width:400px;margin:0 auto;box-shadow:0 2px 8px rgba(79,172,254,0.08);">
+                <label for="file-input-${this.sanitizeId(model)}" style="cursor:pointer;display:flex;align-items:center;gap:10px;font-weight:600;color:#4facfe;font-size:1.15em;padding:10px 0;width:100%;justify-content:center;">
+                    <span style="font-size:2em;">📷</span> <span>${hasImage ? 'Đã chọn ảnh' : 'Chụp hoặc chọn ảnh model bị thiếu POSM'}</span>
                 </label>
-                <input type="file" accept="image/*" capture="environment" id="file-input-${this.sanitizeId(model)}" style="display:none;" ${hasImage ? 'disabled' : ''}>
-                <div class="image-preview" id="image-preview-${this.sanitizeId(model)}" style="margin-top:10px;width:100%;display:flex;justify-content:center;"></div>
+                <input type="file" accept="image/*" id="file-input-${this.sanitizeId(model)}" style="display:none;">
+                <div class="image-preview" id="image-preview-${this.sanitizeId(model)}" style="margin-top:12px;width:100%;display:flex;justify-content:center;"></div>
             </div>
         `;
         const fileInput = document.getElementById(`file-input-${this.sanitizeId(model)}`);
@@ -510,18 +510,21 @@ class SurveyApp {
         if (file) {
             const img = document.createElement('img');
             img.src = URL.createObjectURL(file);
-            img.style.maxWidth = '140px';
-            img.style.maxHeight = '120px';
+            img.style.maxWidth = '160px';
+            img.style.maxHeight = '130px';
             img.style.border = '2px solid #4facfe';
-            img.style.borderRadius = '8px';
+            img.style.borderRadius = '12px';
             img.style.marginRight = '10px';
             img.style.marginBottom = '10px';
+            img.style.boxShadow = '0 2px 8px rgba(79,172,254,0.12)';
             preview.appendChild(img);
             // Delete button
             const delBtn = document.createElement('button');
             delBtn.textContent = '🗑️ Xóa ảnh';
             delBtn.className = 'btn btn-secondary';
             delBtn.style.marginLeft = '10px';
+            delBtn.style.fontSize = '1.1em';
+            delBtn.style.padding = '8px 16px';
             delBtn.onclick = () => {
                 delete this.modelImages[model];
                 this.renderImageUpload(model);

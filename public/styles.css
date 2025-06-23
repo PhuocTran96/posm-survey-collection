@@ -93,16 +93,14 @@ main {
     box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.1);
 }
 
-.btn {
-    padding: 12px 25px;
-    border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+.btn, .btn-primary, .btn-danger, .btn-secondary {
+    padding: 12px 0 !important;
+    font-size: 1.08em !important;
+    border-radius: 8px !important;
+    width: 100%;
+    max-width: 400px;
+    margin: 8px auto;
+    display: block;
 }
 
 .btn:disabled {
@@ -159,19 +157,14 @@ main {
     font-size: 1.1rem;
 }
 
-.models-container {
-    max-height: 600px;
-    overflow-y: auto;
-    border: 1px solid #e1e5e9;
-    border-radius: 8px;
-    padding: 20px;
-}
-
-.model-group {
-    margin-bottom: 30px;
-    border: 1px solid #e9ecef;
-    border-radius: 8px;
-    overflow: hidden;
+.models-container, .model-group, .posm-list {
+    width: 100%;
+    max-width: 420px;
+    margin: 0 auto 18px auto;
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(79,172,254,0.08);
+    background: #fff;
+    padding: 10px 0 18px 0;
 }
 
 .model-header {
@@ -181,10 +174,6 @@ main {
     font-weight: 600;
     font-size: 1.1rem;
     color: #495057;
-}
-
-.posm-list {
-    padding: 20px;
 }
 
 .posm-item {
@@ -399,4 +388,33 @@ main {
 
 .admin-image-preview img:hover {
     box-shadow: 0 0 8px #007bff;
+}
+
+/* Mobile-friendly enhancements */
+body, input, button, select, label {
+    font-size: 1.08em;
+}
+
+.selected-model-item {
+    font-size: 1.08em;
+    padding: 8px 14px !important;
+    margin-bottom: 8px !important;
+}
+
+@media (max-width: 600px) {
+    body, input, button, select, label {
+        font-size: 1.13em;
+    }
+    .btn, .btn-primary, .btn-danger, .btn-secondary {
+        font-size: 1.13em !important;
+        padding: 14px 0 !important;
+    }
+    .models-container, .model-group, .posm-list {
+        max-width: 98vw;
+        padding: 8px 0 14px 0;
+    }
+    .selected-model-item {
+        font-size: 1.13em;
+        padding: 10px 10px !important;
+    }
 }

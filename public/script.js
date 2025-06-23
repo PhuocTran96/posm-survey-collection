@@ -482,16 +482,24 @@ class SurveyApp {
         const hasImage = !!this.modelImages[model];
         container.innerHTML = `
             <div class="image-upload-attractive" style="border:2px dashed #4facfe;padding:18px 8px;border-radius:14px;background:#f8fafd;display:flex;flex-direction:column;align-items:center;max-width:400px;margin:0 auto;box-shadow:0 2px 8px rgba(79,172,254,0.08);">
-                <label for="file-input-${this.sanitizeId(model)}" style="cursor:pointer;display:flex;align-items:center;gap:10px;font-weight:600;color:#4facfe;font-size:1.15em;padding:10px 0;width:100%;justify-content:center;">
-                    <span style="font-size:2em;">📷</span> <span>${hasImage ? 'Đã chọn ảnh' : 'Chụp hoặc chọn ảnh model bị thiếu POSM'}</span>
-                </label>
-                <input type="file" accept="image/*" id="file-input-${this.sanitizeId(model)}" style="display:none;">
+                <div style="display:flex;gap:12px;width:100%;justify-content:center;">
+                    <label for="file-input-camera-${this.sanitizeId(model)}" style="flex:1;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:600;color:#fff;background:#4facfe;border-radius:8px;padding:10px 0;font-size:1em;box-shadow:0 2px 8px rgba(79,172,254,0.10);">
+                        <span style="font-size:1.3em;">📷</span> <span>Chụp ảnh</span>
+                    </label>
+                    <label for="file-input-gallery-${this.sanitizeId(model)}" style="flex:1;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:600;color:#4facfe;background:#e3f0fc;border-radius:8px;padding:10px 0;font-size:1em;box-shadow:0 2px 8px rgba(79,172,254,0.06);">
+                        <span style="font-size:1.3em;">🖼️</span> <span>Chọn từ thư viện</span>
+                    </label>
+                </div>
+                <input type="file" accept="image/*" capture="environment" id="file-input-camera-${this.sanitizeId(model)}" style="display:none;" ${hasImage ? 'disabled' : ''}>
+                <input type="file" accept="image/*" id="file-input-gallery-${this.sanitizeId(model)}" style="display:none;" ${hasImage ? 'disabled' : ''}>
                 <div class="image-preview" id="image-preview-${this.sanitizeId(model)}" style="margin-top:12px;width:100%;display:flex;justify-content:center;"></div>
             </div>
         `;
-        const fileInput = document.getElementById(`file-input-${this.sanitizeId(model)}`);
+        const fileInputCamera = document.getElementById(`file-input-camera-${this.sanitizeId(model)}`);
+        const fileInputGallery = document.getElementById(`file-input-gallery-${this.sanitizeId(model)}`);
         if (!hasImage) {
-            fileInput.addEventListener('change', (e) => this.handleImageFiles(e, model));
+            fileInputCamera.addEventListener('change', (e) => this.handleImageFiles(e, model));
+            fileInputGallery.addEventListener('change', (e) => this.handleImageFiles(e, model));
         }
         this.updateImagePreview(model);
     }

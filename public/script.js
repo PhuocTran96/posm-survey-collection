@@ -690,7 +690,6 @@ class SurveyApp {
     }
 
     renderSelectedModels() {
-        console.log('🎨 renderSelectedModels called. selectedModels:', this.selectedModels);
         const container = document.getElementById('modelsContainer');
         container.innerHTML = '';
         // Render visible list of all added models
@@ -699,21 +698,20 @@ class SurveyApp {
             listDiv.innerHTML = '<em>Chưa có model nào được chọn.</em>';
         } else {
             listDiv.innerHTML = this.selectedModels.map(model => `
-                <span class="selected-model-item" style="display:inline-block;margin-right:10px;margin-bottom:5px;padding:5px 10px;background:#f1f3f4;border-radius:5px;">
+                <span class="selected-model-item" style="display:inline-block;position:relative;margin-right:10px;margin-bottom:5px;padding:5px 10px;background:#f1f3f4;border-radius:5px;">
                     <strong>${model}</strong>
-                    <button class="btn btn-sm btn-danger btn-remove-model-list" data-model="${model}" style="margin-left:5px;">X</button>
+                    <button class="btn-icon-delete" data-model="${model}" title="Xóa model này">×</button>
                 </span>
             `).join('');
         }
         // Render POSM selection for each model
         this.selectedModels.forEach(model => {
-            console.log('🎨 Rendering model:', model);
             const modelGroup = document.createElement('div');
             modelGroup.className = 'model-group';
             modelGroup.innerHTML = `
                 <div class="model-header">
                     Model: ${model}
-                    <button class="btn btn-secondary btn-remove-model" data-model="${model}" style="float:right;">X</button>
+                    <button class="btn-icon-delete" data-model="${model}" title="Xóa model này">×</button>
                 </div>
                 <div class="posm-list" id="posm-list-${this.sanitizeId(model)}">
                     ${this.renderPOSMItems(model)}
@@ -723,20 +721,18 @@ class SurveyApp {
             container.appendChild(modelGroup);
         });
         // Bind remove model buttons (in POSM area)
-        container.querySelectorAll('.btn-remove-model').forEach(btn => {
+        container.querySelectorAll('.btn-icon-delete').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const model = e.target.dataset.model;
-                console.log('🗑️ Removing model from POSM area:', model);
                 this.selectedModels = this.selectedModels.filter(m => m !== model);
                 delete this.modelImages[model];
                 this.renderSelectedModels();
             });
         });
         // Bind remove model buttons (in list)
-        document.querySelectorAll('.btn-remove-model-list').forEach(btn => {
+        document.querySelectorAll('.selected-model-item .btn-icon-delete').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const model = e.target.dataset.model;
-                console.log('🗑️ Removing model from list:', model);
                 this.selectedModels = this.selectedModels.filter(m => m !== model);
                 delete this.modelImages[model];
                 this.renderSelectedModels();
@@ -746,7 +742,6 @@ class SurveyApp {
         this.bindCheckboxEvents();
         // Render image upload for each model
         this.selectedModels.forEach(model => this.renderImageUpload(model));
-        console.log('✅ renderSelectedModels completed. Models rendered:', this.selectedModels.length);
     }
 }
 

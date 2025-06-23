@@ -418,3 +418,104 @@ body, input, button, select, label {
         padding: 10px 10px !important;
     }
 }
+
+/* --- Small Icon Button for Delete (X) --- */
+.btn-icon-delete {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    max-width: 32px;
+    max-height: 32px;
+    border-radius: 50%;
+    background: #dc3545;
+    color: #fff;
+    border: none;
+    font-size: 1.2em;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(220,53,69,0.08);
+    z-index: 2;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.2s;
+}
+.btn-icon-delete:hover {
+    background: #b91c1c;
+}
+
+.model-group {
+    position: relative;
+    padding-top: 18px !important;
+}
+
+.model-header {
+    position: relative;
+    padding-right: 40px !important;
+    font-size: 1.05em;
+}
+
+.selected-model-item .btn-icon-delete {
+    top: 4px;
+    right: 4px;
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    min-height: 26px;
+    max-width: 26px;
+    max-height: 26px;
+    font-size: 1em;
+}
+
+/* Reduce icon size globally */
+label[for^="file-input-"] span,
+label[for^="file-input-"] svg,
+.image-upload-attractive span {
+    font-size: 1.2em !important;
+}
+
+@media (max-width: 600px) {
+    .btn, .btn-primary, .btn-danger, .btn-secondary {
+        font-size: 1em !important;
+        padding: 10px 0 !important;
+    }
+    .model-header {
+        font-size: 1em;
+        padding-right: 36px !important;
+    }
+    .model-group {
+        padding-top: 12px !important;
+    }
+    .btn-icon-delete {
+        width: 26px;
+        height: 26px;
+        min-width: 26px;
+        min-height: 26px;
+        max-width: 26px;
+        max-height: 26px;
+        font-size: 1em;
+        top: 6px;
+        right: 6px;
+    }
+    .selected-model-item .btn-icon-delete {
+        width: 20px;
+        height: 20px;
+        min-width: 20px;
+        min-height: 20px;
+        max-width: 20px;
+        max-height: 20px;
+        font-size: 0.9em;
+        top: 2px;
+        right: 2px;
+    }
+    label[for^="file-input-"] span,
+    label[for^="file-input-"] svg,
+    .image-upload-attractive span {
+        font-size: 1em !important;
+    }
+}

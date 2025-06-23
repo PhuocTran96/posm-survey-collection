@@ -377,14 +377,26 @@ app.post('/api/submit', async (req, res) => {
 // Get survey responses (for admin)
 app.get('/api/responses', async (req, res) => {
   try {
+    console.log('📊 Fetching survey responses from MongoDB...');
     const responses = await SurveyResponse.find()
       .sort({ submittedAt: -1 })
       .lean();
     
-    console.log(`Retrieved ${responses.length} survey responses from MongoDB`);
+    console.log(`✅ Retrieved ${responses.length} survey responses from MongoDB`);
+    
+    // Log a sample response structure for debugging
+    if (responses.length > 0) {
+      console.log('📋 Sample response structure:', {
+        id: responses[0]._id,
+        leader: responses[0].leader,
+        shopName: responses[0].shopName,
+        responsesCount: responses[0].responses ? responses[0].responses.length : 0
+      });
+    }
+    
     res.json(responses);
   } catch (error) {
-    console.error('Error fetching responses from MongoDB:', error);
+    console.error('❌ Error fetching responses from MongoDB:', error);
     res.status(500).json({ success: false, message: 'Error fetching survey responses' });
   }
 });
@@ -393,21 +405,29 @@ app.get('/api/responses', async (req, res) => {
 app.delete('/api/responses/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    console.log(`🗑️ Delete request for survey ID: ${id}`);
+    
     // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
+      console.log(`❌ Invalid ObjectId format: ${id}`);
       return res.status(400).json({
         success: false,
         message: 'Invalid survey ID'
       });
     }
+    
     // Find the response first to get image URLs
     const response = await SurveyResponse.findById(id);
     if (!response) {
+      console.log(`❌ Survey response not found: ${id}`);
       return res.status(404).json({
         success: false,
         message: 'Survey response not found'
       });
     }
+    
+    console.log(`✅ Found survey response: ${response.leader} - ${response.shopName}`);
+    
     // Collect all image URLs from all models
     const imageUrls = [];
     if (response.responses && Array.isArray(response.responses)) {
@@ -417,6 +437,9 @@ app.delete('/api/responses/:id', async (req, res) => {
         }
       });
     }
+    
+    console.log(`📸 Found ${imageUrls.length} images to delete from S3`);
+    
     // Delete images from S3
     for (const url of imageUrls) {
       try {
@@ -428,21 +451,25 @@ app.delete('/api/responses/:id', async (req, res) => {
             Bucket: process.env.AWS_S3_BUCKET,
             Key
           }).promise();
+          console.log(`✅ Deleted S3 image: ${Key}`);
         }
       } catch (err) {
-        console.error('Failed to delete image from S3:', url, err);
+        console.error('❌ Failed to delete image from S3:', url, err);
         // Continue deleting other images and the DB record
       }
     }
+    
     // Delete the survey response from DB
     const deletedResponse = await SurveyResponse.findByIdAndDelete(id);
     if (!deletedResponse) {
+      console.log(`❌ Failed to delete survey response from DB: ${id}`);
       return res.status(404).json({
         success: false,
         message: 'Survey response not found'
       });
     }
-    console.log(`Survey response and images deleted: ${id}`);
+    
+    console.log(`✅ Survey response and images deleted successfully: ${id}`);
     res.status(200).json({
       success: true,
       message: 'Survey response and images deleted successfully',
@@ -453,7 +480,7 @@ app.delete('/api/responses/:id', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error deleting survey response:', error);
+    console.error('❌ Error deleting survey response:', error);
     res.status(500).json({
       success: false,
       message: 'Error deleting survey response',
@@ -585,6 +612,35 @@ app.get('/api/model-autocomplete', async (req, res) => {
   } catch (error) {
     console.error('Error in model autocomplete:', error);
     res.status(500).json({ success: false, message: 'Error searching models' });
+  }
+});
+
+// --- API: Get POSM for specific model ---
+app.get('/api/model-posm/:model', async (req, res) => {
+  try {
+    const { model } = req.params;
+    const modelPosmData = await ModelPosm.find({ model: model }).lean();
+    
+    if (modelPosmData.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Model not found' 
+      });
+    }
+    
+    // Format the response to match the expected structure
+    const posmList = modelPosmData.map(item => ({
+      posmCode: item.posm,
+      posmName: item.posmName
+    }));
+    
+    res.json(posmList);
+  } catch (error) {
+    console.error('Error fetching POSM for model:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching POSM data for model' 
+    });
   }
 });
 

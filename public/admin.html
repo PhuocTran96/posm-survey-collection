@@ -325,9 +325,13 @@
             </div>
         </div>
 
+        <!-- Bulk Delete and Select All Buttons -->
+        <div style="display:flex;gap:10px;align-items:center;margin: 15px 0;">
+            <button id="selectAllBtn" class="btn btn-primary" type="button">Chọn tất cả</button>
+            <button id="bulkDeleteBtn" class="btn btn-danger" disabled>Xóa các khảo sát đã chọn</button>
+        </div>
+
         <div class="responses-container" id="responsesContainer">
-            <!-- Bulk Delete Button -->
-            <button id="bulkDeleteBtn" class="btn btn-danger" disabled style="margin: 15px 0;">Xóa các khảo sát đã chọn</button>
             <!-- Responses will be loaded here -->
         </div>
 

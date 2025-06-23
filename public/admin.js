@@ -13,37 +13,79 @@ class AdminApp {
     }
 
     bindEvents() {
-        document.getElementById('exportData').addEventListener('click', () => this.exportData());
+        const exportDataBtn = document.getElementById('exportData');
+        if (exportDataBtn) {
+            exportDataBtn.addEventListener('click', () => this.exportData());
+        }
         
         // Handle leader filter change
-        document.getElementById('leaderFilter').addEventListener('change', () => {
-            // Clear shop selection when leader changes
-            document.getElementById('shopFilter').value = '';
-            // Repopulate the shop filter based on selected leader
-            this.populateFilters();
-            // Then apply filters
-            this.applyFilters();
-        });
+        const leaderFilter = document.getElementById('leaderFilter');
+        if (leaderFilter) {
+            leaderFilter.addEventListener('change', () => {
+                // Clear shop selection when leader changes
+                const shopFilter = document.getElementById('shopFilter');
+                if (shopFilter) {
+                    shopFilter.value = '';
+                }
+                // Repopulate the shop filter based on selected leader
+                this.populateFilters();
+                // Then apply filters
+                this.applyFilters();
+            });
+        }
 
         // Handle other filter changes
-        document.getElementById('shopFilter').addEventListener('change', () => this.applyFilters());
-        document.getElementById('dateFromFilter').addEventListener('change', () => this.applyFilters());
-        document.getElementById('dateToFilter').addEventListener('change', () => this.applyFilters());
+        const shopFilter = document.getElementById('shopFilter');
+        if (shopFilter) {
+            shopFilter.addEventListener('change', () => this.applyFilters());
+        }
+        
+        const dateFromFilter = document.getElementById('dateFromFilter');
+        if (dateFromFilter) {
+            dateFromFilter.addEventListener('change', () => this.applyFilters());
+        }
+        
+        const dateToFilter = document.getElementById('dateToFilter');
+        if (dateToFilter) {
+            dateToFilter.addEventListener('change', () => this.applyFilters());
+        }
 
         // Handle delete confirmation
-        document.getElementById('btnConfirmDelete').addEventListener('click', () => this.confirmDelete());
-        document.getElementById('btnCancelDelete').addEventListener('click', () => this.cancelDelete());
+        const btnConfirmDelete = document.getElementById('btnConfirmDelete');
+        if (btnConfirmDelete) {
+            btnConfirmDelete.addEventListener('click', () => this.confirmDelete());
+        }
+        
+        const btnCancelDelete = document.getElementById('btnCancelDelete');
+        if (btnCancelDelete) {
+            btnCancelDelete.addEventListener('click', () => this.cancelDelete());
+        }
 
         // Bulk delete button
-        document.getElementById('bulkDeleteBtn').addEventListener('click', () => this.handleBulkDelete());
+        const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+        if (bulkDeleteBtn) {
+            bulkDeleteBtn.addEventListener('click', () => this.handleBulkDelete());
+        }
+
+        // Select All button
+        const selectAllBtn = document.getElementById('selectAllBtn');
+        if (selectAllBtn) {
+            selectAllBtn.addEventListener('click', () => this.handleSelectAll());
+        }
     }
 
     // Add loading overlay methods
     async deleteResponse(id, shopName, leader) {
         this.deleteID = id;
-        document.querySelector('#confirmDeleteDialog p').textContent = 
-            `Bạn có chắc chắn muốn xóa khảo sát của shop "${shopName}" do leader "${leader}" thực hiện không?`;
-        document.getElementById('confirmDeleteDialog').style.display = 'flex';
+        const confirmDialog = document.querySelector('#confirmDeleteDialog p');
+        if (confirmDialog) {
+            confirmDialog.textContent = 
+                `Bạn có chắc chắn muốn xóa khảo sát của shop "${shopName}" do leader "${leader}" thực hiện không?`;
+        }
+        const dialog = document.getElementById('confirmDeleteDialog');
+        if (dialog) {
+            dialog.style.display = 'flex';
+        }
     }
 
     // Confirm delete action
@@ -59,17 +101,22 @@ class AdminApp {
                 }
             });
 
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+            }
+
             const result = await response.json();
             
             if (result.success) {
                 alert('Xóa khảo sát thành công.');
                 await this.loadResponses();
             } else {
-                alert('Lỗi khi xóa khảo sát: ' + result.message);
+                alert('Lỗi khi xóa khảo sát: ' + (result.message || 'Unknown error'));
             }
         } catch (error) {
             console.error('Error deleting response:', error);
-            alert('Lỗi khi xóa khảo sát. Vui lòng thử lại.');
+            alert('Lỗi khi xóa khảo sát: ' + error.message);
         } finally {
             this.hideLoading();
             this.cancelDelete();
@@ -78,42 +125,69 @@ class AdminApp {
 
     cancelDelete() {
         this.deleteID = null;
-        document.getElementById('confirmDeleteDialog').style.display = 'none';
+        const dialog = document.getElementById('confirmDeleteDialog');
+        if (dialog) {
+            dialog.style.display = 'none';
+        }
     }
 
     showLoading() {
-        document.getElementById('loadingOverlay').classList.add('show');
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) {
+            overlay.classList.add('show');
+        }
     }
 
     hideLoading() {
-        document.getElementById('loadingOverlay').classList.remove('show');
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) {
+            overlay.classList.remove('show');
+        }
     }
 
     async loadResponses() {
         try {
             this.showLoading();
             const response = await fetch('/api/responses');
-            this.responses = await response.json();
-            this.filteredResponses = [...this.responses];
             
-            this.populateFilters();
-            this.renderStats();
-            this.renderResponses();
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            
+            // Check if the response is an array (success) or an error object
+            if (Array.isArray(data)) {
+                this.responses = data;
+                this.filteredResponses = [...this.responses];
+                
+                this.populateFilters();
+                this.renderStats();
+                this.renderResponses();
+            } else if (data.success === false) {
+                throw new Error(data.message || 'Server returned an error');
+            } else {
+                throw new Error('Unexpected response format from server');
+            }
         } catch (error) {
             console.error('Error loading responses:', error);
-            alert('Lỗi khi tải dữ liệu. Vui lòng thử lại.');
+            alert('Lỗi khi tải dữ liệu: ' + error.message);
         } finally {
             this.hideLoading();
         }
     }
 
     populateFilters() {
-        const leaderFilter = document.getElementById('leaderFilter').value;
+        const leaderFilter = document.getElementById('leaderFilter');
         const leaderSelect = document.getElementById('leaderFilter');
+        
+        if (!leaderSelect) return;
+        
+        const currentSelectedLeader = leaderSelect.value; // Store current selection
         
         // Populate leader filter
         const leaders = [...new Set(this.responses.map(r => r.leader))];
-        const currentSelectedLeader = leaderSelect.value; // Store current selection
         leaderSelect.innerHTML = '<option value="">Tất cả Leader</option>';
         leaders.forEach(leader => {
             const option = document.createElement('option');
@@ -125,10 +199,10 @@ class AdminApp {
 
         // Populate shop filter based on selected leader
         let filteredShops;
-        if (leaderFilter) {
+        if (leaderFilter && leaderFilter.value) {
             // If leader is selected, only show shops for that leader
             filteredShops = [...new Set(this.responses
-                .filter(r => r.leader === leaderFilter)
+                .filter(r => r.leader === leaderFilter.value)
                 .map(r => r.shopName))];
         } else {
             // If no leader selected, show all shops
@@ -136,45 +210,47 @@ class AdminApp {
         }
 
         const shopSelect = document.getElementById('shopFilter');
-        shopSelect.innerHTML = '<option value="">Tất cả Shop</option>';
-        filteredShops.forEach(shop => {
-            const option = document.createElement('option');
-            option.value = shop;
-            option.textContent = shop;
-            shopSelect.appendChild(option);
-        });
+        if (shopSelect) {
+            shopSelect.innerHTML = '<option value="">Tất cả Shop</option>';
+            filteredShops.forEach(shop => {
+                const option = document.createElement('option');
+                option.value = shop;
+                option.textContent = shop;
+                shopSelect.appendChild(option);
+            });
+        }
     }
 
     applyFilters() {
-        const leaderFilter = document.getElementById('leaderFilter').value;
-        const shopFilter = document.getElementById('shopFilter').value;
-        const dateFromFilter = document.getElementById('dateFromFilter').value;
-        const dateToFilter = document.getElementById('dateToFilter').value;
+        const leaderFilter = document.getElementById('leaderFilter');
+        const shopFilter = document.getElementById('shopFilter');
+        const dateFromFilter = document.getElementById('dateFromFilter');
+        const dateToFilter = document.getElementById('dateToFilter');
 
         this.filteredResponses = this.responses.filter(response => {
             // Leader filter
-            if (leaderFilter && response.leader !== leaderFilter) {
+            if (leaderFilter && leaderFilter.value && response.leader !== leaderFilter.value) {
                 return false;
             }
 
             // Shop filter
-            if (shopFilter && response.shopName !== shopFilter) {
+            if (shopFilter && shopFilter.value && response.shopName !== shopFilter.value) {
                 return false;
             }
 
             // Date filters
             const responseDate = new Date(response.submittedAt);
             
-            if (dateFromFilter) {
-                const fromDate = new Date(dateFromFilter);
+            if (dateFromFilter && dateFromFilter.value) {
+                const fromDate = new Date(dateFromFilter.value);
                 fromDate.setHours(0, 0, 0, 0); // Set to start of day
                 if (responseDate < fromDate) {
                     return false;
                 }
             }
             
-            if (dateToFilter) {
-                const toDate = new Date(dateToFilter);
+            if (dateToFilter && dateToFilter.value) {
+                const toDate = new Date(dateToFilter.value);
                 toDate.setHours(23, 59, 59, 999); // Set to end of day
                 if (responseDate > toDate) {
                     return false;
@@ -226,8 +302,12 @@ class AdminApp {
     renderResponses() {
         const container = document.getElementById('responsesContainer');
         
-        // Bulk delete button
-        document.getElementById('bulkDeleteBtn').disabled = this.selectedIds.size === 0;
+        // Bulk delete button - add null check
+        const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+        if (bulkDeleteBtn) {
+            bulkDeleteBtn.disabled = this.selectedIds.size === 0;
+        }
+        
         if (this.filteredResponses.length === 0) {
             container.innerHTML = `
                 <div class="no-data">
@@ -271,9 +351,21 @@ class AdminApp {
                 } else {
                     this.selectedIds.delete(id);
                 }
-                document.getElementById('bulkDeleteBtn').disabled = this.selectedIds.size === 0;
+                // Add null check for bulkDeleteBtn
+                const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+                if (bulkDeleteBtn) {
+                    bulkDeleteBtn.disabled = this.selectedIds.size === 0;
+                }
             });
         });
+
+        // Update Select All button text after rendering
+        const selectAllBtn = document.getElementById('selectAllBtn');
+        if (selectAllBtn) {
+            const checkboxes = container.querySelectorAll('.select-response-checkbox');
+            const allSelected = checkboxes.length > 0 && Array.from(checkboxes).every(cb => cb.checked);
+            selectAllBtn.textContent = allSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả';
+        }
     }
 
     renderModelResponses(responses) {
@@ -398,6 +490,12 @@ class AdminApp {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ids: Array.from(this.selectedIds) })
             });
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.message || `HTTP ${res.status}: ${res.statusText}`);
+            }
+
             const data = await res.json();
             if (data.success) {
                 alert(`Đã xóa ${data.deletedIds.length} khảo sát. ${data.errors.length ? 'Một số lỗi xảy ra, kiểm tra console.' : ''}`);
@@ -408,9 +506,34 @@ class AdminApp {
                 alert('Lỗi khi xóa hàng loạt: ' + (data.message || 'Unknown error'));
             }
         } catch (error) {
+            console.error('Error in bulk delete:', error);
             alert('Lỗi khi xóa hàng loạt: ' + error.message);
         } finally {
             this.hideLoading();
+        }
+    }
+
+    handleSelectAll() {
+        const checkboxes = document.querySelectorAll('.select-response-checkbox');
+        const allSelected = Array.from(checkboxes).every(cb => cb.checked);
+        checkboxes.forEach(cb => {
+            cb.checked = !allSelected;
+            const id = cb.dataset.id;
+            if (!allSelected) {
+                this.selectedIds.add(id);
+            } else {
+                this.selectedIds.delete(id);
+            }
+        });
+        // Update bulk delete button state
+        const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+        if (bulkDeleteBtn) {
+            bulkDeleteBtn.disabled = this.selectedIds.size === 0;
+        }
+        // Update Select All button text
+        const selectAllBtn = document.getElementById('selectAllBtn');
+        if (selectAllBtn) {
+            selectAllBtn.textContent = allSelected ? 'Chọn tất cả' : 'Bỏ chọn tất cả';
         }
     }
 }

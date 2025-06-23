@@ -271,10 +271,23 @@ class SurveyApp {
         document.getElementById('selectedLeader').textContent = this.selectedLeader;
         document.getElementById('selectedShop').textContent = this.selectedShop;
         this.showStep(3);
-        // Clear modelsContainer and selectedModels at entry
-        this.selectedModels = [];
+        
+        // Clear the models container and selected models list
         document.getElementById('modelsContainer').innerHTML = '';
-        // Do NOT call this.loadModelsAndPOSM();
+        const listDiv = document.getElementById('selectedModelsList');
+        if (listDiv) {
+            listDiv.innerHTML = '<em>Chưa có model nào được chọn.</em>';
+        }
+        
+        // Reset selected models for this survey
+        this.selectedModels = [];
+        this.modelImages = {};
+        
+        // Clear model search
+        document.getElementById('modelSearchInput').value = '';
+        document.getElementById('addModelBtn').disabled = true;
+        this.modelSearchSelected = '';
+        this.hideModelSuggestions();
     }
 
     showStep(stepNumber) {
@@ -290,8 +303,23 @@ class SurveyApp {
 
     async submitSurvey() {
         try {
+            console.log('🚀 submitSurvey called. selectedModels:', this.selectedModels);
             this.showLoading();
             const responses = this.collectResponses();
+            console.log('📊 Responses collected:', responses);
+            
+            // Validation: must add at least one model
+            if (this.selectedModels.length === 0) {
+                alert('Vui lòng thêm ít nhất một model trước khi gửi khảo sát.');
+                this.hideLoading();
+                return;
+            }
+            // Validation: must select at least one POSM for each model
+            if (responses.length < this.selectedModels.length) {
+                alert('Vui lòng chọn ít nhất một POSM cho mỗi model đã thêm.');
+                this.hideLoading();
+                return;
+            }
             if (responses.length === 0) {
                 alert('Vui lòng chọn ít nhất một model và POSM.');
                 this.hideLoading();
@@ -329,6 +357,7 @@ class SurveyApp {
                 shopName: this.selectedShop,
                 responses: responses
             };
+            console.log('📤 Sending survey data to server:', surveyData);
             const response = await fetch('/api/submit', {
                 method: 'POST',
                 headers: {
@@ -340,6 +369,7 @@ class SurveyApp {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const result = await response.json();
+            console.log('📥 Server response:', result);
             if (result.success) {
                 document.querySelectorAll('.step').forEach(step => {
                     step.classList.remove('active');
@@ -351,7 +381,7 @@ class SurveyApp {
                 alert('Lỗi khi gửi khảo sát: ' + (result.message || 'Unknown error'));
             }
         } catch (error) {
-            console.error('Error submitting survey:', error);
+            console.error('❌ Error submitting survey:', error);
             alert('Lỗi khi gửi khảo sát: ' + error.message);
         } finally {
             this.hideLoading();
@@ -359,14 +389,24 @@ class SurveyApp {
     }
 
     collectResponses() {
+        console.log('📊 collectResponses called. selectedModels:', this.selectedModels);
         const responses = [];
         
         this.selectedModels.forEach(model => {
+            console.log('📊 Processing model for collection:', model);
             const modelContainer = document.getElementById(`posm-list-${this.sanitizeId(model)}`);
-            if (!modelContainer) return;
+            if (!modelContainer) {
+                console.log('❌ Model container not found for:', model);
+                return;
+            }
             
             const allCheckbox = modelContainer.querySelector('input[data-type="all"]');
             const individualCheckboxes = modelContainer.querySelectorAll('input[data-type="individual"]:checked');
+            
+            console.log('📊 Checkboxes found for model:', model, {
+                allChecked: allCheckbox ? allCheckbox.checked : false,
+                individualChecked: individualCheckboxes.length
+            });
             
             const modelResponse = {
                 model: model,
@@ -384,6 +424,7 @@ class SurveyApp {
                         selected: true
                     });
                 });
+                console.log('✅ Added all POSM items for model:', model);
             } else {
                 // Add only selected individual items
                 individualCheckboxes.forEach(checkbox => {
@@ -393,14 +434,19 @@ class SurveyApp {
                         selected: true
                     });
                 });
+                console.log('✅ Added individual POSM items for model:', model, modelResponse.posmSelections.length);
             }
 
             // Only add to responses if there are selections
             if (modelResponse.allSelected || modelResponse.posmSelections.length > 0) {
                 responses.push(modelResponse);
+                console.log('✅ Model response added to final responses:', model);
+            } else {
+                console.log('❌ Model response not added (no selections):', model);
             }
         });
 
+        console.log('📊 Final responses collected:', responses.length, responses.map(r => r.model));
         return responses;
     }
 
@@ -435,9 +481,13 @@ class SurveyApp {
         const container = document.getElementById(`image-upload-${this.sanitizeId(model)}`);
         const hasImage = !!this.modelImages[model];
         container.innerHTML = `
-            <label>Ảnh hiện trường (chỉ 1 ảnh):</label>
-            <input type="file" accept="image/*" capture="environment" id="file-input-${this.sanitizeId(model)}" style="display:block;margin-bottom:10px;" ${hasImage ? 'disabled' : ''}>
-            <div class="image-preview" id="image-preview-${this.sanitizeId(model)}"></div>
+            <div class="image-upload-attractive" style="border:2px dashed #4facfe;padding:16px;border-radius:10px;background:#f8fafd;display:flex;flex-direction:column;align-items:center;">
+                <label for="file-input-${this.sanitizeId(model)}" style="cursor:pointer;display:flex;align-items:center;gap:8px;font-weight:600;color:#4facfe;font-size:1.1em;">
+                    <span style="font-size:1.5em;">📷</span> <span>${hasImage ? 'Đã chọn ảnh' : 'Chụp ảnh hoặc chọn ảnh model bị thiếu POSM'}</span>
+                </label>
+                <input type="file" accept="image/*" capture="environment" id="file-input-${this.sanitizeId(model)}" style="display:none;" ${hasImage ? 'disabled' : ''}>
+                <div class="image-preview" id="image-preview-${this.sanitizeId(model)}" style="margin-top:10px;width:100%;display:flex;justify-content:center;"></div>
+            </div>
         `;
         const fileInput = document.getElementById(`file-input-${this.sanitizeId(model)}`);
         if (!hasImage) {
@@ -460,14 +510,18 @@ class SurveyApp {
         if (file) {
             const img = document.createElement('img');
             img.src = URL.createObjectURL(file);
-            img.style.maxWidth = '120px';
+            img.style.maxWidth = '140px';
+            img.style.maxHeight = '120px';
+            img.style.border = '2px solid #4facfe';
+            img.style.borderRadius = '8px';
             img.style.marginRight = '10px';
             img.style.marginBottom = '10px';
             preview.appendChild(img);
             // Delete button
             const delBtn = document.createElement('button');
-            delBtn.textContent = 'Xóa ảnh';
+            delBtn.textContent = '🗑️ Xóa ảnh';
             delBtn.className = 'btn btn-secondary';
+            delBtn.style.marginLeft = '10px';
             delBtn.onclick = () => {
                 delete this.modelImages[model];
                 this.renderImageUpload(model);
@@ -563,30 +617,94 @@ class SurveyApp {
     async onAddModel() {
         const model = this.modelSearchSelected;
         if (!model || this.selectedModels.includes(model)) return;
-        this.selectedModels.unshift(model); // Add to top
-        // Load POSM for this model
-        if (!this.surveyData[model]) {
-            // Fetch POSM for this model (simulate as if from all models)
-            // Use the same endpoint as before, but filter for this model
-            const response = await fetch(`/api/models/${encodeURIComponent(this.selectedLeader)}/${encodeURIComponent(this.selectedShop)}`);
-            const allModels = await response.json();
-            if (allModels[model]) {
-                this.surveyData[model] = allModels[model];
+        
+        console.log('🔄 Adding model:', model);
+        console.log('📋 Current selectedModels before adding:', this.selectedModels);
+        
+        try {
+            this.showLoading();
+            
+            // Add model to selected list
+            this.selectedModels.unshift(model); // Add to top
+            console.log('✅ Model added. Current selectedModels:', this.selectedModels);
+            
+            // Load POSM for this model if not already loaded
+            if (!this.surveyData[model]) {
+                console.log('🔍 Loading POSM data for model:', model);
+                // Fetch POSM for this specific model
+                const response = await fetch(`/api/models/${encodeURIComponent(this.selectedLeader)}/${encodeURIComponent(this.selectedShop)}`);
+                const allModels = await response.json();
+                
+                if (allModels[model]) {
+                    this.surveyData[model] = allModels[model];
+                    console.log('✅ POSM data loaded from shop data for model:', model);
+                } else {
+                    console.log('🔍 Model not found in shop data, trying general model list');
+                    // If model not found in shop data, try to get it from the general model list
+                    const modelResponse = await fetch(`/api/model-posm/${encodeURIComponent(model)}`);
+                    if (modelResponse.ok) {
+                        const modelData = await modelResponse.json();
+                        if (modelData && modelData.length > 0) {
+                            this.surveyData[model] = modelData;
+                            console.log('✅ POSM data loaded from general list for model:', model);
+                        } else {
+                            alert('Không tìm thấy POSM cho model này.');
+                            // Remove the model from selected list
+                            this.selectedModels = this.selectedModels.filter(m => m !== model);
+                            console.log('❌ Model removed due to no POSM data');
+                            return;
+                        }
+                    } else {
+                        alert('Không tìm thấy POSM cho model này.');
+                        // Remove the model from selected list
+                        this.selectedModels = this.selectedModels.filter(m => m !== model);
+                        console.log('❌ Model removed due to API error');
+                        return;
+                    }
+                }
             } else {
-                alert('Không tìm thấy POSM cho model này.');
-                return;
+                console.log('✅ POSM data already available for model:', model);
             }
+            
+            console.log('🎨 Rendering selected models. Count:', this.selectedModels.length);
+            // Render the updated models list
+            this.renderSelectedModels();
+            
+            // Clear the search input
+            document.getElementById('modelSearchInput').value = '';
+            document.getElementById('addModelBtn').disabled = true;
+            this.modelSearchSelected = '';
+            this.hideModelSuggestions();
+            
+        } catch (error) {
+            console.error('❌ Error adding model:', error);
+            alert('Lỗi khi thêm model. Vui lòng thử lại.');
+            // Remove the model from selected list if there was an error
+            this.selectedModels = this.selectedModels.filter(m => m !== model);
+        } finally {
+            this.hideLoading();
         }
-        this.renderSelectedModels();
-        document.getElementById('modelSearchInput').value = '';
-        document.getElementById('addModelBtn').disabled = true;
-        this.modelSearchSelected = '';
     }
 
     renderSelectedModels() {
+        console.log('🎨 renderSelectedModels called. selectedModels:', this.selectedModels);
         const container = document.getElementById('modelsContainer');
         container.innerHTML = '';
+        // Render visible list of all added models
+        const listDiv = document.getElementById('selectedModelsList');
+        if (this.selectedModels.length === 0) {
+            listDiv.innerHTML = '<em>Chưa có model nào được chọn.</em>';
+        } else {
+            listDiv.innerHTML = this.selectedModels.map(model => `
+                <span class="selected-model-item" style="display:inline-block;margin-right:10px;margin-bottom:5px;padding:5px 10px;background:#f1f3f4;border-radius:5px;">
+                    <strong>${model}</strong>
+                    <button class="btn btn-sm btn-danger btn-remove-model-list" data-model="${model}" style="margin-left:5px;">X</button>
+                </span>
+            `).join('');
+        }
+        // Render POSM selection for each model
         this.selectedModels.forEach(model => {
+            console.log('🎨 Rendering model:', model);
             const modelGroup = document.createElement('div');
             modelGroup.className = 'model-group';
             modelGroup.innerHTML = `
@@ -601,11 +719,23 @@ class SurveyApp {
             `;
             container.appendChild(modelGroup);
         });
-        // Bind remove model buttons
+        // Bind remove model buttons (in POSM area)
         container.querySelectorAll('.btn-remove-model').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const model = e.target.dataset.model;
+                console.log('🗑️ Removing model from POSM area:', model);
                 this.selectedModels = this.selectedModels.filter(m => m !== model);
+                delete this.modelImages[model];
+                this.renderSelectedModels();
+            });
+        });
+        // Bind remove model buttons (in list)
+        document.querySelectorAll('.btn-remove-model-list').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const model = e.target.dataset.model;
+                console.log('🗑️ Removing model from list:', model);
+                this.selectedModels = this.selectedModels.filter(m => m !== model);
+                delete this.modelImages[model];
                 this.renderSelectedModels();
             });
         });
@@ -613,6 +743,7 @@ class SurveyApp {
         this.bindCheckboxEvents();
         // Render image upload for each model
         this.selectedModels.forEach(model => this.renderImageUpload(model));
+        console.log('✅ renderSelectedModels completed. Models rendered:', this.selectedModels.length);
     }
 }
 

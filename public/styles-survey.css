@@ -399,4 +399,50 @@ html, body {
     .admin-container {
         padding-bottom: 110px !important;
     }
+}
+
+/* Model autocomplete suggestions styles */
+#modelSuggestions.autocomplete-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(79,172,254,0.13);
+    margin-top: 4px;
+    padding: 0;
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid #e1e5e9;
+}
+.autocomplete-suggestion {
+    padding: 14px 18px;
+    font-size: 1.08em;
+    color: #333;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f3f4;
+    background: #fff;
+    transition: background 0.15s, color 0.15s;
+}
+.autocomplete-suggestion:last-child {
+    border-bottom: none;
+}
+.autocomplete-suggestion.active,
+.autocomplete-suggestion:hover {
+    background: #e3f0fc;
+    color: #007bff;
+    font-weight: 600;
+}
+@media (max-width: 600px) {
+    #modelSuggestions.autocomplete-suggestions {
+        font-size: 1.13em;
+        border-radius: 12px;
+        box-shadow: 0 6px 18px rgba(79,172,254,0.16);
+    }
+    .autocomplete-suggestion {
+        padding: 16px 20px;
+        font-size: 1.13em;
+    }
 } 

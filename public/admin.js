@@ -410,28 +410,29 @@ class AdminApp {
 
         // Prepare data for Excel export
         const excelData = [];
-        
-        // Add header row
+          // Add header row
         excelData.push([
             'Leader',
             'Shop Name', 
             'Model',
+            'Quantity',
             'POSM Code',
             'POSM Name',
             'All Selected',
             'Image URL',
             'Submitted At'
         ]);
-        
-        // Add data rows
+          // Add data rows
         this.filteredResponses.forEach(response => {
             response.responses.forEach(modelResponse => {
                 const imageUrl = (modelResponse.images && modelResponse.images.length > 0) ? modelResponse.images[0] : '';
+                const quantity = modelResponse.quantity || 1; // Default to 1 if not specified
                 if (modelResponse.allSelected) {
                     excelData.push([
                         response.leader,
                         response.shopName,
                         modelResponse.model,
+                        quantity,
                         'ALL',
                         'TẤT CẢ POSM',
                         'Yes',
@@ -444,6 +445,7 @@ class AdminApp {
                             response.leader,
                             response.shopName,
                             modelResponse.model,
+                            quantity,
                             posm.posmCode,
                             posm.posmName,
                             'No',

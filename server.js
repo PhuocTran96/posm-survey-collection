@@ -74,11 +74,15 @@ const surveyResponseSchema = new mongoose.Schema({
   shopName: {
     type: String,
     required: true
-  },
-  responses: [{
+  },  responses: [{
     model: {
       type: String,
       required: true
+    },
+    quantity: {
+      type: Number,
+      default: 1,
+      min: 1
     },
     posmSelections: [{
       posmCode: String,

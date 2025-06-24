@@ -59,6 +59,7 @@ EWF1142R9SC,CARE_TL,Sticker Made in Thailand UC3
 EWF1142R9SC,CARE_AI,Sticker AI Wifi UC3
 EWF1142R9SC,CARE_45I,Drum Máy giặt UC3 Fullwash 45 IntelliQuick
 EWF1142R9SC,CARE_SDA01,Tentcard gia dụng chữ L
+EWF1343R7WC,CARE_W7002,Sticker Máy giặt UC3  700
 EWF1343R7WC,CARE_NEW,Sticker Mới UC3
 EWF1343R7WC,CARE_TL,Sticker Made in Thailand UC3
 EWF1343R7WC,CARE_AI,Sticker AI Wifi UC3
@@ -287,9 +288,13 @@ ETG7266GKR,CARE_SDA01,Tentcard gia dụng chữ L
 ETG7286GKR,TASTE_G06,Sticker Bếp gas âm
 ETG7286GKR,CARE_SDA01,Tentcard gia dụng chữ L
 EOT3218XG,TASTE_O01,Sticker Lò nướng để bàn
+EOT3218XG,TASTE_M01,Sticker LVS đa chức năng
 EOT4022XFG,TASTE_O01,Sticker Lò nướng để bàn
+EOT4022XFG,TASTE_M01,Sticker LVS đa chức năng
 EOT40DBD,TASTE_O01,Sticker Lò nướng để bàn
+EOT40DBD,TASTE_M01,Sticker LVS đa chức năng
 EOT5622XFG,TASTE_O01,Sticker Lò nướng để bàn
+EOT5622XFG,TASTE_M01,Sticker LVS đa chức năng
 KOIGH00KA,TASTE_O01,Sticker Lò nướng để bàn
 RZB2110AAXA,TASTE_O01,Sticker Lò nướng để bàn
 EMG20K22B,TASTE_M02,Sticker LVS kết hợp nướng
@@ -351,11 +356,10 @@ EWE451RB-G6,WB_WH9003,Sticker bơm trợ lực
 EWE451SB-G6,WB_WH9001,Máy tắm nóng UH900
 EWE451SB-G6,WB_WH9002,Decal nhiệt độ máy tắm nóng UH900
 EWE451SB-G6,WB_WH9003,Sticker bơm trợ lực
-EDH12TRBD2,WB_DH01,"Máy hút ẩm 20L
-EDH10TRBW1"
+EDH12TRBD2,WB_DH01,Máy hút ẩm 20L EDH10TRBW1
 EDH10TRBW1,WB_DH02,Máy hút ẩm 24L 27L EDH12TRBD2
 EDH14TRBD2,WB_DH02,Máy hút ẩm 24L 27L EDH12TRBD2
-EDBMFACWF,WB_WD01,TBU
+EDBMFACWF,WB_WD01,Sticker bình nước nóng lạnh
 ETD29MKB,CARE_SDA01,Tentcard gia dụng chữ L
 ETD29MKC,CARE_SDA01,Tentcard gia dụng chữ L
 ETD42SKA,CARE_SDA01,Tentcard gia dụng chữ L
@@ -380,3 +384,8 @@ E2EK1-100W,CARE_SDA01,Tentcard gia dụng chữ L
 EEK3505,CARE_SDA01,Tentcard gia dụng chữ L
 E7TB1-50CW,CARE_SDA01,Tentcard gia dụng chữ L
 E7CB1-86SM,CARE_SDA01,Tentcard gia dụng chữ L
+E5GS1 - 4MN,CARE_SDA01,Tentcard gia dụng chữ L
+EMSB30XCF,TASTE_SDA11,Tentcard lò vi sóng DMX
+EMSB30XCF,TASTE_M02,Sticker LVS kết hợp nướng
+EOT38MXC,TASTE_O01,Sticker Lò nướng để bàn
+ESTM5417S,CARE_SDA01,Tentcard gia dụng chữ L

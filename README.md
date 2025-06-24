@@ -103,10 +103,10 @@ Gửi kết quả khảo sát
 ```json
 {
   "leader": "Tên leader",
-  "shopName": "Tên shop",
-  "responses": [
+  "shopName": "Tên shop",  "responses": [
     {
       "model": "Model name",
+      "quantity": 1,
       "posmSelections": [
         {
           "posmCode": "POSM code",
@@ -129,9 +129,9 @@ Lấy tất cả kết quả khảo sát (cho admin)
 ```javascript
 {
   leader: String,
-  shopName: String,
-  responses: [{
+  shopName: String,  responses: [{
     model: String,
+    quantity: Number,
     posmSelections: [{
       posmCode: String,
       posmName: String,

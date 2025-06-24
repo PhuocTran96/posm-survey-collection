@@ -407,9 +407,13 @@ class SurveyApp {
                 allChecked: allCheckbox ? allCheckbox.checked : false,
                 individualChecked: individualCheckboxes.length
             });
-            
+              // Get quantity value for this model
+            const quantityInput = document.getElementById(`quantity-${this.sanitizeId(model)}`);
+            const quantity = quantityInput ? parseInt(quantityInput.value) || 1 : 1;
+
             const modelResponse = {
                 model: model,
+                quantity: quantity,
                 posmSelections: [],
                 allSelected: allCheckbox ? allCheckbox.checked : false,
                 images: this.modelImages[model] ? [URL.createObjectURL(this.modelImages[model])] : []
@@ -715,11 +719,22 @@ class SurveyApp {
         // Render POSM selection for each model
         this.selectedModels.forEach(model => {
             const modelGroup = document.createElement('div');
-            modelGroup.className = 'model-group';
-            modelGroup.innerHTML = `
+            modelGroup.className = 'model-group';            modelGroup.innerHTML = `
                 <div class="model-header">
-                    Model: ${model}
-                    <button class="btn-icon-delete" data-model="${model}" title="Xóa model này">×</button>
+                    <div class="model-header-content">
+                        <span class="model-name">Model: ${model}</span>
+                        <div class="quantity-group">
+                            <label for="quantity-${this.sanitizeId(model)}">Số lượng:</label>
+                            <input type="number" 
+                                   id="quantity-${this.sanitizeId(model)}" 
+                                   class="quantity-input" 
+                                   value="1" 
+                                   min="1" 
+                                   max="999"
+                                   data-model="${model}">
+                        </div>
+                        <button class="btn-icon-delete" data-model="${model}" title="Xóa model này">×</button>
+                    </div>
                 </div>
                 <div class="posm-list" id="posm-list-${this.sanitizeId(model)}">
                     ${this.renderPOSMItems(model)}

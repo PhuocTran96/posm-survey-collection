@@ -3,75 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - POSM Survey Results</title>
-    <link rel="stylesheet" href="styles-admin.css">
+    <title>Redirecting - POSM Survey Management</title>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f1f5f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .redirect-container {
+            text-align: center;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #2563eb;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        h1 {
+            color: #2563eb;
+            margin-bottom: 10px;
+        }
+        p {
+            color: #64748b;
+            margin-bottom: 20px;
+        }
+        .redirect-links {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .redirect-links a {
+            padding: 12px 24px;
+            background: #2563eb;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .redirect-links a:hover {
+            background: #1d4ed8;
+            transform: translateY(-2px);
+        }
+        .redirect-links a.secondary {
+            background: #64748b;
+        }
+        .redirect-links a.secondary:hover {
+            background: #475569;
+        }
+    </style>
+    <script>
+        // Auto redirect to survey results after 3 seconds
+        setTimeout(() => {
+            window.location.href = 'survey-results.html';
+        }, 3000);
+    </script>
 </head>
 <body>
-    <div class="admin-container">
-        <div class="admin-header">
-            <h1>📊 POSM Survey - Kết quả khảo sát</h1>
-            <p>Quản lý và xem kết quả khảo sát POSM</p>
+    <div class="redirect-container">
+        <div class="spinner"></div>
+        <h1>📊 POSM Survey Management</h1>
+        <p>Hệ thống admin đã được tách thành hai trang riêng biệt:</p>
+        <div class="redirect-links">
+            <a href="survey-results.html">📋 Kết quả khảo sát</a>
+            <a href="data-upload.html" class="secondary">📤 Quản lý dữ liệu</a>
         </div>
+        <p style="margin-top: 20px; font-size: 0.9rem;">
+            Đang tự động chuyển đến trang Kết quả khảo sát trong 3 giây...
+        </p>
 
-        <div class="stats-container" id="statsContainer">
-            <!-- Stats will be loaded here -->
-        </div>
-
-        <div class="filters">
-            <div class="filter-group">
-                <label>Leader:</label>
-                <select id="leaderFilter">
-                    <option value="">Tất cả Leader</option>
-                </select>
-            </div>
-            <div class="filter-group">
-                <label>Shop:</label>
-                <select id="shopFilter">
-                    <option value="">Tất cả Shop</option>
-                </select>
-            </div>
-            <div class="filter-group">
-                <label>Từ ngày:</label>
-                <input type="date" id="dateFromFilter">
-            </div>
-            <div class="filter-group">
-                <label>Đến ngày:</label>
-                <input type="date" id="dateToFilter">
-            </div>            <div class="filter-group">
-                <label>&nbsp;</label>
-                <button id="exportData" class="btn btn-primary btn-green">Xuất Excel</button>
-            </div>
-        </div>
-
-        <!-- Bulk Delete and Select All Buttons -->
-        <div style="display:flex;gap:10px;align-items:center;margin: 15px 0;">
-            <button id="selectAllBtn" class="btn btn-primary" type="button">Chọn tất cả</button>
-            <button id="bulkDeleteBtn" class="btn btn-danger" disabled>Xóa các khảo sát đã chọn</button>
-        </div>
-
-        <div class="responses-container" id="responsesContainer">
-            <!-- Responses will be loaded here -->
-        </div>
-
-        <!-- Loading overlay -->
-        <div id="loadingOverlay" class="loading-overlay">
-            <div class="loading-spinner"></div>
-            <p>Đang tải dữ liệu...</p>
-        </div>
-
-        <!-- Confirm delete dialog -->
-        <div id="confirmDeleteDialog" class="confirm-dialog">
-            <div class="confirm-content">
-                <h3>Xác nhận xóa</h3>
-                <p>Bạn có chắc chắn muốn xóa kết quả khảo sát này?</p>
-                <div class="confirm-buttons">
-                    <button id="btnConfirmDelete" class="btn-confirm">Xóa</button>
-                    <button id="btnCancelDelete" class="btn-cancel">Hủy</button>
-                </div>
-            </div>
-        </div>    </div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="admin.js"></script>
+    </div>
 </body>
 </html>

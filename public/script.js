@@ -8,6 +8,8 @@ class SurveyApp {
         this.modelImages = {}; // { model: File }
         this.modelSearchValue = '';
         this.modelSearchSelected = '';
+        this.checkboxStates = {}; // { model: { checkboxId: boolean } }
+        this.modelQuantities = {}; // { model: number }
         this.init();
     }
 
@@ -209,6 +211,13 @@ class SurveyApp {
         const checkbox = e.target;
         const model = checkbox.dataset.model;
         const type = checkbox.dataset.type;
+        const checkboxId = checkbox.id;
+
+        // Save checkbox state
+        if (!this.checkboxStates[model]) {
+            this.checkboxStates[model] = {};
+        }
+        this.checkboxStates[model][checkboxId] = checkbox.checked;
 
         if (type === 'all') {
             this.handleAllCheckboxChange(model, checkbox.checked);
@@ -222,10 +231,18 @@ class SurveyApp {
         const individualItems = modelContainer.querySelectorAll('.posm-item:not(.all-option)');
         const individualCheckboxes = modelContainer.querySelectorAll('input[data-type="individual"]');
 
+        // Initialize checkbox states for model if not exists
+        if (!this.checkboxStates[model]) {
+            this.checkboxStates[model] = {};
+        }
+
         if (isChecked) {
             // Hide individual items and uncheck them
             individualItems.forEach(item => item.classList.add('hidden'));
-            individualCheckboxes.forEach(cb => cb.checked = false);
+            individualCheckboxes.forEach(cb => {
+                cb.checked = false;
+                this.checkboxStates[model][cb.id] = false;
+            });
         } else {
             // Show individual items
             individualItems.forEach(item => item.classList.remove('hidden'));
@@ -241,12 +258,78 @@ class SurveyApp {
         const anyIndividualChecked = Array.from(individualCheckboxes).some(cb => cb.checked);
         if (anyIndividualChecked && allCheckbox.checked) {
             allCheckbox.checked = false;
+            // Save the all checkbox state
+            if (!this.checkboxStates[model]) {
+                this.checkboxStates[model] = {};
+            }
+            this.checkboxStates[model][allCheckbox.id] = false;
             this.handleAllCheckboxChange(model, false);
         }
     }
 
     sanitizeId(str) {
         return str.replace(/[^a-zA-Z0-9]/g, '_');
+    }
+
+    // Save current checkbox states and quantities before re-rendering
+    saveCurrentStates() {
+        console.log('💾 Saving current checkbox states and quantities');
+        
+        // Save checkbox states
+        this.selectedModels.forEach(model => {
+            const modelContainer = document.getElementById(`posm-list-${this.sanitizeId(model)}`);
+            if (modelContainer) {
+                const checkboxes = modelContainer.querySelectorAll('input[type="checkbox"]');
+                if (!this.checkboxStates[model]) {
+                    this.checkboxStates[model] = {};
+                }
+                
+                checkboxes.forEach(checkbox => {
+                    this.checkboxStates[model][checkbox.id] = checkbox.checked;
+                });
+                
+                console.log('💾 Saved states for model', model, this.checkboxStates[model]);
+            }
+            
+            // Save quantity values
+            const quantityInput = document.getElementById(`quantity-${this.sanitizeId(model)}`);
+            if (quantityInput) {
+                this.modelQuantities[model] = parseInt(quantityInput.value) || 1;
+                console.log('💾 Saved quantity for model', model, this.modelQuantities[model]);
+            }
+        });
+    }
+
+    // Restore checkbox states and quantities after re-rendering
+    restoreStates() {
+        console.log('🔄 Restoring checkbox states and quantities');
+        
+        this.selectedModels.forEach(model => {
+            // Restore checkbox states
+            if (this.checkboxStates[model]) {
+                Object.keys(this.checkboxStates[model]).forEach(checkboxId => {
+                    const checkbox = document.getElementById(checkboxId);
+                    if (checkbox) {
+                        checkbox.checked = this.checkboxStates[model][checkboxId];
+                        console.log('🔄 Restored checkbox', checkboxId, checkbox.checked);
+                        
+                        // Handle visual state for "all" checkboxes
+                        if (checkbox.dataset.type === 'all' && checkbox.checked) {
+                            this.handleAllCheckboxChange(model, true);
+                        }
+                    }
+                });
+            }
+            
+            // Restore quantity values
+            if (this.modelQuantities[model]) {
+                const quantityInput = document.getElementById(`quantity-${this.sanitizeId(model)}`);
+                if (quantityInput) {
+                    quantityInput.value = this.modelQuantities[model];
+                    console.log('🔄 Restored quantity for model', model, this.modelQuantities[model]);
+                }
+            }
+        });
     }
 
     goToStep1() {
@@ -258,6 +341,13 @@ class SurveyApp {
             alert('Vui lòng chọn leader trước.');
             return;
         }
+        
+        // Save current state before navigating away from step 3
+        if (this.currentStep === 3 && this.selectedModels.length > 0) {
+            this.saveCurrentStates();
+            console.log('💾 Saved state before navigating from step 3 to step 2');
+        }
+        
         this.showStep(2);
         this.loadShops();
     }
@@ -267,27 +357,41 @@ class SurveyApp {
             alert('Vui lòng chọn shop trước.');
             return;
         }
+        
         // Update selected info display
         document.getElementById('selectedLeader').textContent = this.selectedLeader;
         document.getElementById('selectedShop').textContent = this.selectedShop;
         this.showStep(3);
         
-        // Clear the models container and selected models list
-        document.getElementById('modelsContainer').innerHTML = '';
-        const listDiv = document.getElementById('selectedModelsList');
-        if (listDiv) {
-            listDiv.innerHTML = '<em>Chưa có model nào được chọn.</em>';
+        // Only reset if this is the first time visiting step 3 or if leader/shop changed
+        const shouldReset = this.selectedModels.length === 0;
+        
+        if (shouldReset) {
+            // Clear the models container and selected models list
+            document.getElementById('modelsContainer').innerHTML = '';
+            const listDiv = document.getElementById('selectedModelsList');
+            if (listDiv) {
+                listDiv.innerHTML = '<em>Chưa có model nào được chọn.</em>';
+            }
+            
+            // Reset selected models for this survey
+            this.selectedModels = [];
+            this.modelImages = {};
+            this.checkboxStates = {};
+            this.modelQuantities = {};
+            
+            // Clear model search
+            document.getElementById('modelSearchInput').value = '';
+            document.getElementById('addModelBtn').disabled = true;
+            this.modelSearchSelected = '';
+            this.hideModelSuggestions();
+        } else {
+            // Preserve existing state - just re-render to show current models
+            console.log('🔄 Preserving existing models on step 3 navigation:', this.selectedModels);
+            if (this.selectedModels.length > 0) {
+                this.renderSelectedModels();
+            }
         }
-        
-        // Reset selected models for this survey
-        this.selectedModels = [];
-        this.modelImages = {};
-        
-        // Clear model search
-        document.getElementById('modelSearchInput').value = '';
-        document.getElementById('addModelBtn').disabled = true;
-        this.modelSearchSelected = '';
-        this.hideModelSuggestions();
     }
 
     showStep(stepNumber) {
@@ -461,6 +565,8 @@ class SurveyApp {
         this.surveyData = {};
         this.selectedModels = [];
         this.modelImages = {};
+        this.checkboxStates = {};
+        this.modelQuantities = {};
         this.modelSearchValue = '';
         this.modelSearchSelected = '';
         
@@ -702,8 +808,16 @@ class SurveyApp {
     }
 
     renderSelectedModels() {
+        console.log('🎨 Starting renderSelectedModels. Current models:', this.selectedModels);
+        
+        // Save current states before re-rendering (except for the first model being added)
+        if (document.getElementById('modelsContainer').children.length > 0) {
+            this.saveCurrentStates();
+        }
+        
         const container = document.getElementById('modelsContainer');
         container.innerHTML = '';
+        
         // Render visible list of all added models
         const listDiv = document.getElementById('selectedModelsList');
         if (this.selectedModels.length === 0) {
@@ -719,7 +833,12 @@ class SurveyApp {
         // Render POSM selection for each model
         this.selectedModels.forEach(model => {
             const modelGroup = document.createElement('div');
-            modelGroup.className = 'model-group';            modelGroup.innerHTML = `
+            modelGroup.className = 'model-group';
+            
+            // Get saved quantity or default to 1
+            const savedQuantity = this.modelQuantities[model] || 1;
+            
+            modelGroup.innerHTML = `
                 <div class="model-header">
                     <div class="model-header-content">
                         <span class="model-name">Model: ${model}</span>
@@ -728,7 +847,7 @@ class SurveyApp {
                             <input type="number" 
                                    id="quantity-${this.sanitizeId(model)}" 
                                    class="quantity-input" 
-                                   value="1" 
+                                   value="${savedQuantity}" 
                                    min="1" 
                                    max="999"
                                    data-model="${model}">
@@ -749,6 +868,9 @@ class SurveyApp {
                 const model = e.target.dataset.model;
                 this.selectedModels = this.selectedModels.filter(m => m !== model);
                 delete this.modelImages[model];
+                delete this.checkboxStates[model];
+                delete this.modelQuantities[model];
+                console.log('🗿 Removed model and cleaned up state:', model);
                 this.renderSelectedModels();
             });
         });
@@ -758,11 +880,31 @@ class SurveyApp {
                 const model = e.target.dataset.model;
                 this.selectedModels = this.selectedModels.filter(m => m !== model);
                 delete this.modelImages[model];
+                delete this.checkboxStates[model];
+                delete this.modelQuantities[model];
+                console.log('🗿 Removed model and cleaned up state:', model);
                 this.renderSelectedModels();
             });
         });
         // Bind POSM checkboxes
         this.bindCheckboxEvents();
+        
+        // Bind quantity input events to save state
+        this.selectedModels.forEach(model => {
+            const quantityInput = document.getElementById(`quantity-${this.sanitizeId(model)}`);
+            if (quantityInput) {
+                quantityInput.addEventListener('input', (e) => {
+                    this.modelQuantities[model] = parseInt(e.target.value) || 1;
+                });
+            }
+        });
+        
+        // Restore checkbox states and quantities after rendering
+        setTimeout(() => {
+            this.restoreStates();
+            console.log('🎨 Completed renderSelectedModels with state restoration');
+        }, 0);
+        
         // Render image upload for each model
         this.selectedModels.forEach(model => this.renderImageUpload(model));
     }

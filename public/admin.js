@@ -4,12 +4,18 @@ class AdminApp {
         this.filteredResponses = [];
         this.deleteID = null;
         this.selectedIds = new Set();
+        this.currentPage = 1;
+        this.itemsPerPage = 20;
+        this.totalPages = 1;
+        this.totalCount = 0;
+        this.pagination = null;
         this.init();
     }
 
     init() {
         this.bindEvents();
         this.loadResponses();
+        this.initUploadFunctionality();
     }
 
     bindEvents() {
@@ -27,27 +33,35 @@ class AdminApp {
                 if (shopFilter) {
                     shopFilter.value = '';
                 }
-                // Repopulate the shop filter based on selected leader
-                this.populateFilters();
-                // Then apply filters
-                this.applyFilters();
+                // Reset to page 1 and reload with filters
+                this.currentPage = 1;
+                this.loadResponses(1);
             });
         }
 
         // Handle other filter changes
         const shopFilter = document.getElementById('shopFilter');
         if (shopFilter) {
-            shopFilter.addEventListener('change', () => this.applyFilters());
+            shopFilter.addEventListener('change', () => {
+                this.currentPage = 1;
+                this.loadResponses(1);
+            });
         }
         
         const dateFromFilter = document.getElementById('dateFromFilter');
         if (dateFromFilter) {
-            dateFromFilter.addEventListener('change', () => this.applyFilters());
+            dateFromFilter.addEventListener('change', () => {
+                this.currentPage = 1;
+                this.loadResponses(1);
+            });
         }
         
         const dateToFilter = document.getElementById('dateToFilter');
         if (dateToFilter) {
-            dateToFilter.addEventListener('change', () => this.applyFilters());
+            dateToFilter.addEventListener('change', () => {
+                this.currentPage = 1;
+                this.loadResponses(1);
+            });
         }
 
         // Handle delete confirmation
@@ -71,6 +85,16 @@ class AdminApp {
         const selectAllBtn = document.getElementById('selectAllBtn');
         if (selectAllBtn) {
             selectAllBtn.addEventListener('click', () => this.handleSelectAll());
+        }
+
+        // Page size selector
+        const pageSizeSelector = document.getElementById('pageSizeSelector');
+        if (pageSizeSelector) {
+            pageSizeSelector.addEventListener('change', (e) => {
+                this.itemsPerPage = parseInt(e.target.value);
+                this.currentPage = 1;
+                this.loadResponses(1);
+            });
         }
     }
 
@@ -145,28 +169,71 @@ class AdminApp {
         }
     }
 
-    async loadResponses() {
+    async loadResponses(page = 1) {
         try {
             this.showLoading();
-            const response = await fetch('/api/responses');
+            
+            // Build query parameters for pagination and filters
+            const params = new URLSearchParams({
+                page: page.toString(),
+                limit: this.itemsPerPage.toString()
+            });
+            
+            // Add filter parameters
+            const leaderFilter = document.getElementById('leaderFilter');
+            const shopFilter = document.getElementById('shopFilter');
+            const dateFromFilter = document.getElementById('dateFromFilter');
+            const dateToFilter = document.getElementById('dateToFilter');
+            
+            if (leaderFilter && leaderFilter.value) {
+                params.append('leader', leaderFilter.value);
+            }
+            if (shopFilter && shopFilter.value) {
+                params.append('shopName', shopFilter.value);
+            }
+            if (dateFromFilter && dateFromFilter.value) {
+                params.append('dateFrom', dateFromFilter.value);
+            }
+            if (dateToFilter && dateToFilter.value) {
+                params.append('dateTo', dateToFilter.value);
+            }
+            
+            const response = await fetch(`/api/responses?${params}`);
             
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
             }
 
-            const data = await response.json();
+            const responseData = await response.json();
             
-            // Check if the response is an array (success) or an error object
-            if (Array.isArray(data)) {
-                this.responses = data;
+            // Handle new paginated response format
+            if (responseData.data && responseData.pagination) {
+                this.responses = responseData.data;
+                this.filteredResponses = [...this.responses];
+                this.pagination = responseData.pagination;
+                this.currentPage = responseData.pagination.currentPage;
+                this.totalPages = responseData.pagination.totalPages;
+                this.totalCount = responseData.pagination.totalCount;
+                
+                // Load all responses for filters (only on initial load or filter changes)
+                if (page === 1) {
+                    await this.loadAllResponsesForFilters();
+                }
+                
+                this.renderStats();
+                this.renderResponses();
+                this.renderPagination();
+            } else if (Array.isArray(responseData)) {
+                // Fallback for old response format
+                this.responses = responseData;
                 this.filteredResponses = [...this.responses];
                 
                 this.populateFilters();
                 this.renderStats();
                 this.renderResponses();
-            } else if (data.success === false) {
-                throw new Error(data.message || 'Server returned an error');
+            } else if (responseData.success === false) {
+                throw new Error(responseData.message || 'Server returned an error');
             } else {
                 throw new Error('Unexpected response format from server');
             }
@@ -178,7 +245,24 @@ class AdminApp {
         }
     }
 
-    populateFilters() {
+    async loadAllResponsesForFilters() {
+        try {
+            // Load all responses without pagination for filter population
+            const response = await fetch('/api/responses?limit=10000');
+            if (response.ok) {
+                const data = await response.json();
+                const allResponses = data.data || data;
+                this.populateFilters(allResponses);
+            }
+        } catch (error) {
+            console.error('Error loading responses for filters:', error);
+            // Use current page responses as fallback
+            this.populateFilters(this.responses);
+        }
+    }
+
+    populateFilters(responses = null) {
+        const responsesToUse = responses || this.responses;
         const leaderFilter = document.getElementById('leaderFilter');
         const leaderSelect = document.getElementById('leaderFilter');
         
@@ -187,7 +271,7 @@ class AdminApp {
         const currentSelectedLeader = leaderSelect.value; // Store current selection
         
         // Populate leader filter
-        const leaders = [...new Set(this.responses.map(r => r.leader))];
+        const leaders = [...new Set(responsesToUse.map(r => r.leader))];
         leaderSelect.innerHTML = '<option value="">Tất cả Leader</option>';
         leaders.forEach(leader => {
             const option = document.createElement('option');
@@ -201,12 +285,12 @@ class AdminApp {
         let filteredShops;
         if (leaderFilter && leaderFilter.value) {
             // If leader is selected, only show shops for that leader
-            filteredShops = [...new Set(this.responses
+            filteredShops = [...new Set(responsesToUse
                 .filter(r => r.leader === leaderFilter.value)
                 .map(r => r.shopName))];
         } else {
             // If no leader selected, show all shops
-            filteredShops = [...new Set(this.responses.map(r => r.shopName))];
+            filteredShops = [...new Set(responsesToUse.map(r => r.shopName))];
         }
 
         const shopSelect = document.getElementById('shopFilter');
@@ -222,58 +306,25 @@ class AdminApp {
     }
 
     applyFilters() {
-        const leaderFilter = document.getElementById('leaderFilter');
-        const shopFilter = document.getElementById('shopFilter');
-        const dateFromFilter = document.getElementById('dateFromFilter');
-        const dateToFilter = document.getElementById('dateToFilter');
-
-        this.filteredResponses = this.responses.filter(response => {
-            // Leader filter
-            if (leaderFilter && leaderFilter.value && response.leader !== leaderFilter.value) {
-                return false;
-            }
-
-            // Shop filter
-            if (shopFilter && shopFilter.value && response.shopName !== shopFilter.value) {
-                return false;
-            }
-
-            // Date filters
-            const responseDate = new Date(response.submittedAt);
-            
-            if (dateFromFilter && dateFromFilter.value) {
-                const fromDate = new Date(dateFromFilter.value);
-                fromDate.setHours(0, 0, 0, 0); // Set to start of day
-                if (responseDate < fromDate) {
-                    return false;
-                }
-            }
-            
-            if (dateToFilter && dateToFilter.value) {
-                const toDate = new Date(dateToFilter.value);
-                toDate.setHours(23, 59, 59, 999); // Set to end of day
-                if (responseDate > toDate) {
-                    return false;
-                }
-            }
-
-            return true;
-        });
-
-        this.renderStats();
-        this.renderResponses();
+        // With pagination, filters are now applied server-side
+        // This method is deprecated but kept for compatibility
+        this.currentPage = 1;
+        this.loadResponses(1);
     }
 
     renderStats() {
         const container = document.getElementById('statsContainer');
         
-        const totalResponses = this.filteredResponses.length;
-        const totalLeaders = new Set(this.filteredResponses.map(r => r.leader)).size;
-        const totalShops = new Set(this.filteredResponses.map(r => r.shopName)).size;
+        // Use totalCount from pagination for filtered results, or current page results as fallback
+        const totalResponses = this.pagination ? this.totalCount : this.filteredResponses.length;
+        const currentPageResponses = this.filteredResponses.length > 0 ? this.filteredResponses : this.responses;
         
-        // Calculate total POSM issues
+        const totalLeaders = new Set(currentPageResponses.map(r => r.leader)).size;
+        const totalShops = new Set(currentPageResponses.map(r => r.shopName)).size;
+        
+        // Calculate total POSM issues from current page
         let totalPOSMIssues = 0;
-        this.filteredResponses.forEach(response => {
+        currentPageResponses.forEach(response => {
             response.responses.forEach(modelResponse => {
                 totalPOSMIssues += modelResponse.posmSelections.length;
             });
@@ -282,19 +333,19 @@ class AdminApp {
         container.innerHTML = `
             <div class="stat-card">
                 <div class="stat-number">${totalResponses}</div>
-                <div class="stat-label">Tổng số khảo sát</div>
+                <div class="stat-label">Tổng số khảo sát${this.pagination ? ' (đã lọc)' : ''}</div>
             </div>
             <div class="stat-card">
                 <div class="stat-number">${totalLeaders}</div>
-                <div class="stat-label">Số Leader</div>
+                <div class="stat-label">Số Leader${this.pagination && this.currentPage > 1 ? ' (trang hiện tại)' : ''}</div>
             </div>
             <div class="stat-card">
                 <div class="stat-number">${totalShops}</div>
-                <div class="stat-label">Số Shop</div>
+                <div class="stat-label">Số Shop${this.pagination && this.currentPage > 1 ? ' (trang hiện tại)' : ''}</div>
             </div>
             <div class="stat-card">
                 <div class="stat-number">${totalPOSMIssues}</div>
-                <div class="stat-label">Tổng POSM cần thay thế</div>
+                <div class="stat-label">POSM cần thay thế${this.pagination && this.currentPage > 1 ? ' (trang hiện tại)' : ''}</div>
             </div>
         `;
     }
@@ -402,28 +453,63 @@ class AdminApp {
             hour: '2-digit',
             minute: '2-digit'
         });
-    }    exportData() {
-        if (this.filteredResponses.length === 0) {
-            alert('Không có dữ liệu để xuất.');
-            return;
-        }
+    }    async exportData() {
+        try {
+            this.showLoading();
+            
+            // Get all filtered data for export (not just current page)
+            const params = new URLSearchParams({
+                limit: '10000' // Large limit to get all data
+            });
+            
+            // Add current filter parameters
+            const leaderFilter = document.getElementById('leaderFilter');
+            const shopFilter = document.getElementById('shopFilter');
+            const dateFromFilter = document.getElementById('dateFromFilter');
+            const dateToFilter = document.getElementById('dateToFilter');
+            
+            if (leaderFilter && leaderFilter.value) {
+                params.append('leader', leaderFilter.value);
+            }
+            if (shopFilter && shopFilter.value) {
+                params.append('shopName', shopFilter.value);
+            }
+            if (dateFromFilter && dateFromFilter.value) {
+                params.append('dateFrom', dateFromFilter.value);
+            }
+            if (dateToFilter && dateToFilter.value) {
+                params.append('dateTo', dateToFilter.value);
+            }
+            
+            const response = await fetch(`/api/responses?${params}`);
+            if (!response.ok) {
+                throw new Error('Failed to fetch export data');
+            }
+            
+            const data = await response.json();
+            const exportResponses = data.data || data;
+            
+            if (exportResponses.length === 0) {
+                alert('Không có dữ liệu để xuất.');
+                return;
+            }
 
-        // Prepare data for Excel export
-        const excelData = [];
-          // Add header row
-        excelData.push([
-            'Leader',
-            'Shop Name', 
-            'Model',
-            'Quantity',
-            'POSM Code',
-            'POSM Name',
-            'All Selected',
-            'Image URL',
-            'Submitted At'
-        ]);
-          // Add data rows
-        this.filteredResponses.forEach(response => {
+            // Prepare data for Excel export
+            const excelData = [];
+            // Add header row
+            excelData.push([
+                'Leader',
+                'Shop Name', 
+                'Model',
+                'Quantity',
+                'POSM Code',
+                'POSM Name',
+                'All Selected',
+                'Image URL',
+                'Submitted At'
+            ]);
+            // Add data rows
+            exportResponses.forEach(response => {
             response.responses.forEach(modelResponse => {
                 const imageUrl = (modelResponse.images && modelResponse.images.length > 0) ? modelResponse.images[0] : '';
                 const quantity = modelResponse.quantity || 1; // Default to 1 if not specified
@@ -478,8 +564,14 @@ class AdminApp {
         // Generate filename with current date
         const filename = `posm_survey_results_${new Date().toISOString().split('T')[0]}.xlsx`;
         
-        // Save the file
-        XLSX.writeFile(workbook, filename);
+            // Save the file
+            XLSX.writeFile(workbook, filename);
+        } catch (error) {
+            console.error('Error exporting data:', error);
+            alert('Lỗi khi xuất dữ liệu: ' + error.message);
+        } finally {
+            this.hideLoading();
+        }
     }
 
     async handleBulkDelete() {
@@ -537,6 +629,405 @@ class AdminApp {
         if (selectAllBtn) {
             selectAllBtn.textContent = allSelected ? 'Chọn tất cả' : 'Bỏ chọn tất cả';
         }
+    }
+
+    renderPagination() {
+        if (!this.pagination) return;
+
+        const container = document.getElementById('responsesContainer');
+        let paginationHTML = '';
+
+        if (this.pagination.totalPages > 1) {
+            paginationHTML = `
+                <div class="pagination-container">
+                    <div class="pagination-info">
+                        Hiển thị ${((this.currentPage - 1) * this.itemsPerPage) + 1} - ${Math.min(this.currentPage * this.itemsPerPage, this.totalCount)} 
+                        trong tổng số ${this.totalCount} kết quả
+                    </div>
+                    <div class="pagination-controls">
+                        ${this.pagination.hasPrevPage ? 
+                            `<button class="pagination-btn" onclick="adminApp.goToPage(${this.currentPage - 1})">
+                                ← Trang trước
+                            </button>` : 
+                            '<button class="pagination-btn disabled">← Trang trước</button>'
+                        }
+                        
+                        ${this.generatePageNumbers()}
+                        
+                        ${this.pagination.hasNextPage ? 
+                            `<button class="pagination-btn" onclick="adminApp.goToPage(${this.currentPage + 1})">
+                                Trang sau →
+                            </button>` : 
+                            '<button class="pagination-btn disabled">Trang sau →</button>'
+                        }
+                    </div>
+                </div>
+            `;
+        }
+
+        container.insertAdjacentHTML('beforeend', paginationHTML);
+    }
+
+    generatePageNumbers() {
+        let pageNumbers = '';
+        const maxVisiblePages = 5;
+        let startPage = Math.max(1, this.currentPage - Math.floor(maxVisiblePages / 2));
+        let endPage = Math.min(this.totalPages, startPage + maxVisiblePages - 1);
+
+        // Adjust start page if we're near the end
+        if (endPage - startPage + 1 < maxVisiblePages) {
+            startPage = Math.max(1, endPage - maxVisiblePages + 1);
+        }
+
+        // Add first page and ellipsis if needed
+        if (startPage > 1) {
+            pageNumbers += `<button class="pagination-btn page-number" onclick="adminApp.goToPage(1)">1</button>`;
+            if (startPage > 2) {
+                pageNumbers += '<span class="pagination-ellipsis">...</span>';
+            }
+        }
+
+        // Add visible page numbers
+        for (let i = startPage; i <= endPage; i++) {
+            const isActive = i === this.currentPage ? 'active' : '';
+            pageNumbers += `<button class="pagination-btn page-number ${isActive}" onclick="adminApp.goToPage(${i})">${i}</button>`;
+        }
+
+        // Add last page and ellipsis if needed
+        if (endPage < this.totalPages) {
+            if (endPage < this.totalPages - 1) {
+                pageNumbers += '<span class="pagination-ellipsis">...</span>';
+            }
+            pageNumbers += `<button class="pagination-btn page-number" onclick="adminApp.goToPage(${this.totalPages})">${this.totalPages}</button>`;
+        }
+
+        return pageNumbers;
+    }
+
+    goToPage(page) {
+        if (page >= 1 && page <= this.totalPages && page !== this.currentPage) {
+            this.currentPage = page;
+            this.loadResponses(page);
+        }
+    }
+
+    // Upload Functionality
+    initUploadFunctionality() {
+        this.initUploadTabs();
+        this.initFileUpload('stores');
+        this.initFileUpload('posm');
+        this.bindUploadEvents();
+        this.loadUploadStats();
+    }
+
+    initUploadTabs() {
+        const tabs = document.querySelectorAll('.upload-tab');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                const tabName = e.target.dataset.tab;
+                this.switchUploadTab(tabName);
+            });
+        });
+    }
+
+    switchUploadTab(tabName) {
+        // Remove active class from all tabs and panels
+        document.querySelectorAll('.upload-tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        document.querySelectorAll('.upload-panel').forEach(panel => {
+            panel.classList.remove('active');
+        });
+
+        // Add active class to selected tab and panel
+        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+        document.getElementById(`${tabName}Panel`).classList.add('active');
+
+        // Load stats when switching to stats tab
+        if (tabName === 'stats') {
+            this.loadUploadStats();
+        }
+    }
+
+    initFileUpload(type) {
+        const dropZone = document.getElementById(`${type}DropZone`);
+        const fileInput = document.getElementById(`${type}FileInput`);
+        const browseLink = dropZone.querySelector('.file-browse-link');
+        const selectedFileDiv = document.getElementById(`${type}SelectedFile`);
+        const uploadBtn = document.querySelector(`#${type}UploadForm .upload-btn`);
+
+        // Click to browse files
+        browseLink.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        dropZone.addEventListener('click', (e) => {
+            if (e.target === dropZone || e.target.closest('.file-drop-content')) {
+                fileInput.click();
+            }
+        });
+
+        // File input change
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                this.handleFileSelection(type, file);
+            }
+        });
+
+        // Drag and drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            if (!dropZone.contains(e.relatedTarget)) {
+                dropZone.classList.remove('dragover');
+            }
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            
+            const file = e.dataTransfer.files[0];
+            if (file && file.type === 'text/csv') {
+                fileInput.files = e.dataTransfer.files;
+                this.handleFileSelection(type, file);
+            } else {
+                alert('Vui lòng chọn file CSV');
+            }
+        });
+
+        // Remove file button
+        const removeBtn = selectedFileDiv.querySelector('.file-remove');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', () => {
+                this.removeSelectedFile(type);
+            });
+        }
+    }
+
+    handleFileSelection(type, file) {
+        if (!file.name.toLowerCase().endsWith('.csv')) {
+            alert('Vui lòng chọn file CSV');
+            return;
+        }
+
+        if (file.size > 10 * 1024 * 1024) { // 10MB limit
+            alert('File quá lớn. Vui lòng chọn file nhỏ hơn 10MB.');
+            return;
+        }
+
+        const dropZone = document.getElementById(`${type}DropZone`);
+        const selectedFileDiv = document.getElementById(`${type}SelectedFile`);
+        const uploadBtn = document.querySelector(`#${type}UploadForm .upload-btn`);
+
+        // Hide drop zone and show selected file
+        dropZone.style.display = 'none';
+        selectedFileDiv.style.display = 'flex';
+        selectedFileDiv.querySelector('.file-name').textContent = file.name;
+
+        // Enable upload button
+        uploadBtn.disabled = false;
+    }
+
+    removeSelectedFile(type) {
+        const dropZone = document.getElementById(`${type}DropZone`);
+        const selectedFileDiv = document.getElementById(`${type}SelectedFile`);
+        const fileInput = document.getElementById(`${type}FileInput`);
+        const uploadBtn = document.querySelector(`#${type}UploadForm .upload-btn`);
+
+        // Clear file input
+        fileInput.value = '';
+
+        // Show drop zone and hide selected file
+        dropZone.style.display = 'block';
+        selectedFileDiv.style.display = 'none';
+
+        // Disable upload button
+        uploadBtn.disabled = true;
+
+        // Clear any previous results
+        const resultDiv = document.getElementById(`${type}Result`);
+        if (resultDiv) {
+            resultDiv.style.display = 'none';
+        }
+    }
+
+    bindUploadEvents() {
+        // Stores upload form
+        const storesForm = document.getElementById('storesUploadForm');
+        storesForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleUpload('stores');
+        });
+
+        // POSM upload form
+        const posmForm = document.getElementById('posmUploadForm');
+        posmForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleUpload('posm');
+        });
+
+        // Refresh stats button
+        const refreshBtn = document.getElementById('refreshStats');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                this.loadUploadStats();
+            });
+        }
+    }
+
+    async handleUpload(type) {
+        const form = document.getElementById(`${type}UploadForm`);
+        const fileInput = document.getElementById(`${type}FileInput`);
+        const uploadBtn = form.querySelector('.upload-btn');
+        const resultDiv = document.getElementById(`${type}Result`);
+
+        if (!fileInput.files[0]) {
+            alert('Vui lòng chọn file CSV');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('csvFile', fileInput.files[0]);
+
+        // Add options
+        const clearExisting = form.querySelector('[name="clearExisting"]').checked;
+        const skipDuplicates = form.querySelector('[name="skipDuplicates"]').checked;
+        formData.append('clearExisting', clearExisting);
+        formData.append('skipDuplicates', skipDuplicates);
+
+        if (type === 'posm') {
+            const updateMode = form.querySelector('[name="updateMode"]').value;
+            formData.append('updateMode', updateMode);
+        }
+
+        try {
+            // Show loading state
+            uploadBtn.classList.add('loading');
+            uploadBtn.disabled = true;
+            resultDiv.style.display = 'none';
+
+            console.log(`📤 Starting ${type} upload...`);
+
+            const response = await fetch(`/api/data-upload/${type}`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showUploadResult(type, 'success', result);
+                // Refresh stats after successful upload
+                this.loadUploadStats();
+                // Refresh survey results to show updated data
+                this.loadResponses();
+            } else {
+                this.showUploadResult(type, 'error', result);
+            }
+
+        } catch (error) {
+            console.error(`❌ ${type} upload failed:`, error);
+            this.showUploadResult(type, 'error', {
+                message: 'Lỗi kết nối mạng hoặc server: ' + error.message
+            });
+        } finally {
+            // Hide loading state
+            uploadBtn.classList.remove('loading');
+            uploadBtn.disabled = false;
+        }
+    }
+
+    showUploadResult(type, status, result) {
+        const resultDiv = document.getElementById(`${type}Result`);
+        resultDiv.className = `upload-result ${status}`;
+        resultDiv.style.display = 'block';
+
+        let html = '';
+        if (status === 'success') {
+            const stats = result.stats;
+            html = `
+                <div><strong>✅ Upload thành công!</strong></div>
+                <div class="result-stats">
+                    ${stats.uploaded ? `<div>🎆 Bản ghi mới: <strong>${stats.uploaded}</strong></div>` : ''}
+                    ${stats.updated ? `<div>🔄 Bản ghi cập nhật: <strong>${stats.updated}</strong></div>` : ''}
+                    ${stats.errors ? `<div>⚠️ Lỗi/Trùng lặp: <strong>${stats.errors}</strong></div>` : ''}
+                    <div>📊 Tổng trong database: <strong>${stats.totalInDatabase}</strong></div>
+                    ${stats.uniqueModels ? `<div>📋 Model duy nhất: <strong>${stats.uniqueModels}</strong></div>` : ''}
+                    ${stats.uniqueLeaders ? `<div>👥 Leader duy nhất: <strong>${stats.uniqueLeaders}</strong></div>` : ''}
+                </div>
+            `;
+            
+            if (stats.parseErrors && stats.parseErrors.length > 0) {
+                html += `
+                    <div class="result-errors">
+                        <strong>Cảnh báo khi đọc file:</strong>
+                        ${stats.parseErrors.map(error => `<div>• ${error}</div>`).join('')}
+                    </div>
+                `;
+            }
+        } else {
+            html = `
+                <div><strong>❌ Lỗi upload!</strong></div>
+                <div>${result.message}</div>
+            `;
+            
+            if (result.errors && result.errors.length > 0) {
+                html += `
+                    <div class="result-errors">
+                        <strong>Chi tiết lỗi:</strong>
+                        ${result.errors.map(error => `<div>• ${error}</div>`).join('')}
+                    </div>
+                `;
+            }
+        }
+
+        resultDiv.innerHTML = html;
+
+        // Auto-scroll to result
+        resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    async loadUploadStats() {
+        try {
+            const response = await fetch('/api/data-upload/stats');
+            const result = await response.json();
+
+            if (result.success) {
+                this.renderUploadStats(result.stats);
+            } else {
+                console.error('Failed to load upload stats:', result.message);
+            }
+        } catch (error) {
+            console.error('Error loading upload stats:', error);
+        }
+    }
+
+    renderUploadStats(stats) {
+        const statsContainer = document.getElementById('uploadStats');
+        if (!statsContainer) return;
+
+        const html = `
+            <div class="upload-stats">
+                <div class="stats-card">
+                    <div class="stats-number">${stats.stores.total}</div>
+                    <div class="stats-label">Tổng Stores</div>
+                    <div class="stats-sublabel">${stats.stores.uniqueLeaders} Leader</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-number">${stats.posm.total}</div>
+                    <div class="stats-label">Tổng POSM</div>
+                    <div class="stats-sublabel">${stats.posm.uniqueModels} Model</div>
+                </div>
+            </div>
+        `;
+
+        statsContainer.innerHTML = html;
     }
 }
 

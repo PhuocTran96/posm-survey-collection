@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survey Results - POSM Survey Management</title>
+    <link rel="stylesheet" href="styles-admin.css">
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Navigation -->
+        <nav class="admin-nav">
+            <div class="nav-brand">
+                <h1>📊 POSM Survey Management</h1>
+            </div>
+            <div class="nav-menu">
+                <a href="survey-results.html" class="nav-item active">
+                    📋 Kết quả khảo sát
+                </a>
+                <a href="data-upload.html" class="nav-item">
+                    📤 Quản lý dữ liệu
+                </a>
+            </div>
+            <div class="nav-mobile-toggle" id="navMobileToggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </nav>
+
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="page-header-content">
+                <h1>📋 Kết quả khảo sát POSM</h1>
+                <p>Xem, lọc và xuất kết quả khảo sát từ các cửa hàng</p>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="stats-container" id="statsContainer">
+            <!-- Stats will be loaded here -->
+        </div>
+
+        <!-- Filters -->
+        <div class="filters">
+            <div class="filter-group">
+                <label>Leader:</label>
+                <select id="leaderFilter">
+                    <option value="">Tất cả Leader</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Shop:</label>
+                <select id="shopFilter">
+                    <option value="">Tất cả Shop</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Từ ngày:</label>
+                <input type="date" id="dateFromFilter">
+            </div>
+            <div class="filter-group">
+                <label>Đến ngày:</label>
+                <input type="date" id="dateToFilter">
+            </div>
+            <div class="filter-group">
+                <label>Số kết quả/trang:</label>
+                <select id="pageSizeSelector">
+                    <option value="10">10</option>
+                    <option value="20" selected>20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>&nbsp;</label>
+                <button id="exportData" class="btn btn-primary btn-green">📊 Xuất Excel</button>
+            </div>
+        </div>
+
+        <!-- Bulk Actions -->
+        <div class="bulk-actions">
+            <button id="selectAllBtn" class="btn btn-secondary" type="button">
+                ☑️ Chọn tất cả
+            </button>
+            <button id="bulkDeleteBtn" class="btn btn-danger" disabled>
+                🗑️ Xóa các khảo sát đã chọn
+            </button>
+        </div>
+
+        <!-- Survey Results -->
+        <div class="responses-container" id="responsesContainer">
+            <!-- Responses will be loaded here -->
+        </div>
+
+        <!-- Loading overlay -->
+        <div id="loadingOverlay" class="loading-overlay">
+            <div class="loading-spinner"></div>
+            <p>Đang tải dữ liệu...</p>
+        </div>
+
+        <!-- Confirm delete dialog -->
+        <div id="confirmDeleteDialog" class="confirm-dialog">
+            <div class="confirm-content">
+                <h3>Xác nhận xóa</h3>
+                <p>Bạn có chắc chắn muốn xóa kết quả khảo sát này?</p>
+                <div class="confirm-buttons">
+                    <button id="btnConfirmDelete" class="btn-confirm">Xóa</button>
+                    <button id="btnCancelDelete" class="btn-cancel">Hủy</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="survey-results.js"></script>
+</body>
+</html>

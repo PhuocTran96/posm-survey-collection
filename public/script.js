@@ -10,13 +10,154 @@ class SurveyApp {
         this.modelSearchSelected = '';
         this.checkboxStates = {}; // { model: { checkboxId: boolean } }
         this.modelQuantities = {}; // { model: number }
+        this.user = null;
         this.init();
     }
 
-    init() {
+    async init() {
+        // Check authentication first
+        const isAuthenticated = await this.checkAuthentication();
+        if (!isAuthenticated) {
+            return; // User will be redirected to login
+        }
+        
         this.bindEvents();
         this.loadLeaders();
+        this.setupAuthUI();
     }
+
+    async checkAuthentication() {
+        const token = localStorage.getItem('accessToken');
+        const user = localStorage.getItem('user');
+        
+        if (!token || !user) {
+            this.redirectToLogin('No access token or user data found');
+            return false;
+        }
+
+        try {
+            const userData = JSON.parse(user);
+            console.log('Survey page: Checking auth for user:', userData.username, userData.role);
+            
+            // If admin user accidentally ends up here, redirect to admin panel
+            if (userData.role === 'admin') {
+                console.log('Admin user redirecting to admin panel');
+                window.location.replace('/survey-results.html');
+                return false;
+            }
+            
+            // Verify token is still valid
+            const response = await fetch('/api/auth/verify', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (response.ok) {
+                this.user = userData;
+                return true;
+            } else {
+                // Token invalid, clear storage
+                localStorage.clear();
+                this.redirectToLogin('Session expired or invalid');
+                return false;
+            }
+        } catch (error) {
+            console.error('Authentication check failed:', error);
+            localStorage.clear();
+            this.redirectToLogin('Session expired or invalid');
+            return false;
+        }
+    }
+
+    clearAuthData() {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+    }
+
+    redirectToLogin(reason) {
+        console.log('Redirecting to login:', reason);
+        // Prevent redirect loops by checking current location
+        if (!window.location.pathname.includes('login.html')) {
+            window.location.replace('/login.html');
+        }
+    }
+
+    setupAuthUI() {
+        // Add user info to the UI
+        const userInfo = document.createElement('div');
+        userInfo.className = 'user-info';
+        userInfo.innerHTML = `
+            <div class="user-details">
+                <span class="user-name">${this.user.username}</span>
+                <span class="user-role">${this.user.role}</span>
+            </div>
+            <button onclick="surveyApp.logout()" class="logout-btn">Đăng xuất</button>
+        `;
+
+        // Add to header
+        const header = document.querySelector('.header');
+        if (header) {
+            header.appendChild(userInfo);
+        }
+    }
+
+    async logout() {
+        try {
+            const token = localStorage.getItem('accessToken');
+            if (token) {
+                // Call logout endpoint to invalidate token
+                await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Logout error:', error);
+        } finally {
+            // Clear all local storage and redirect
+            this.clearAuthData();
+            window.location.href = '/login.html';
+        }
+    }
+
+    // Helper method for authenticated API calls
+    async authenticatedFetch(url, options = {}) {
+        const token = localStorage.getItem('accessToken');
+        if (!token) {
+            this.redirectToLogin('No access token');
+            return null;
+        }
+
+        const authOptions = {
+            ...options,
+            headers: {
+                ...options.headers,
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        };
+
+        try {
+            const response = await fetch(url, authOptions);
+            
+            // If unauthorized, clear tokens and redirect
+            if (response.status === 401) {
+                this.clearAuthData();
+                this.redirectToLogin('Session expired');
+                return null;
+            }
+            
+            return response;
+        } catch (error) {
+            console.error('API request failed:', error);
+            throw error;
+        }
+    }
+
 
     bindEvents() {
         // Step navigation
@@ -52,7 +193,7 @@ class SurveyApp {
     async loadLeaders() {
         try {
             this.showLoading();
-            const response = await fetch('/api/leaders');
+            const response = await this.authenticatedFetch('/api/leaders');
             const leaders = await response.json();
             
             const select = document.getElementById('leaderSelect');
@@ -89,7 +230,7 @@ class SurveyApp {
 
         try {
             this.showLoading();
-            const response = await fetch(`/api/shops/${encodeURIComponent(this.selectedLeader)}`);
+            const response = await this.authenticatedFetch(`/api/shops/${encodeURIComponent(this.selectedLeader)}`);
             const shops = await response.json();
             
             const select = document.getElementById('shopSelect');
@@ -126,7 +267,7 @@ class SurveyApp {
 
         try {
             this.showLoading();
-            const response = await fetch(`/api/models/${encodeURIComponent(this.selectedLeader)}/${encodeURIComponent(this.selectedShop)}`);
+            const response = await this.authenticatedFetch(`/api/models/${encodeURIComponent(this.selectedLeader)}/${encodeURIComponent(this.selectedShop)}`);
             this.surveyData = await response.json();
             
             this.renderModelsAndPOSM();
@@ -172,7 +313,7 @@ class SurveyApp {
                 </div>
                 <div class="posm-info">
                     <div class="posm-code">TẤT CẢ</div>
-                    <div class="posm-name">Thiếu tất cả POSM của model này</div>
+                    <div class="posm-name">Đã dán tất cả POSM</div>
                 </div>
             </div>
         `;
@@ -439,7 +580,7 @@ class SurveyApp {
                     this.showLoadingMsg(`Đang upload ảnh cho model ${model} (${++uploadedCount}/${this.selectedModels.length})...`);
                     const formData = new FormData();
                     formData.append('file', file);
-                    const res = await fetch('/api/upload', {
+                    const res = await this.authenticatedFetch('/api/upload', {
                         method: 'POST',
                         body: formData
                     });
@@ -462,7 +603,7 @@ class SurveyApp {
                 responses: responses
             };
             console.log('📤 Sending survey data to server:', surveyData);
-            const response = await fetch('/api/submit', {
+            const response = await this.authenticatedFetch('/api/submit', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -666,7 +807,7 @@ class SurveyApp {
             this.hideModelSuggestions();
             return;
         }
-        const res = await fetch(`/api/model-autocomplete?q=${encodeURIComponent(value)}`);
+        const res = await this.authenticatedFetch(`/api/model-autocomplete?q=${encodeURIComponent(value)}`);
         const models = await res.json();
         this.showModelSuggestions(models);
     }
@@ -753,7 +894,7 @@ class SurveyApp {
             if (!this.surveyData[model]) {
                 console.log('🔍 Loading POSM data for model:', model);
                 // Fetch POSM for this specific model
-                const response = await fetch(`/api/models/${encodeURIComponent(this.selectedLeader)}/${encodeURIComponent(this.selectedShop)}`);
+                const response = await this.authenticatedFetch(`/api/models/${encodeURIComponent(this.selectedLeader)}/${encodeURIComponent(this.selectedShop)}`);
                 const allModels = await response.json();
                 
                 if (allModels[model]) {
@@ -762,7 +903,7 @@ class SurveyApp {
                 } else {
                     console.log('🔍 Model not found in shop data, trying general model list');
                     // If model not found in shop data, try to get it from the general model list
-                    const modelResponse = await fetch(`/api/model-posm/${encodeURIComponent(model)}`);
+                    const modelResponse = await this.authenticatedFetch(`/api/model-posm/${encodeURIComponent(model)}`);
                     if (modelResponse.ok) {
                         const modelData = await modelResponse.json();
                         if (modelData && modelData.length > 0) {

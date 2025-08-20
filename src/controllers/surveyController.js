@@ -69,6 +69,7 @@ const getModelsByLeaderAndShop = async (req, res) => {
 const submitSurvey = async (req, res) => {
   try {
     const { leader, shopName, responses } = req.body;
+    const user = req.user; // From auth middleware
     
     if (!leader || !shopName || !responses || !Array.isArray(responses)) {
       return res.status(400).json({
@@ -80,18 +81,21 @@ const submitSurvey = async (req, res) => {
     const surveyResponse = new SurveyResponse({
       leader,
       shopName,
-      responses
+      responses,
+      submittedBy: user ? user.username : 'anonymous',
+      submittedByRole: user ? user.role : 'unknown'
     });
     
     await surveyResponse.save();
-    console.log(`✅ Survey submitted successfully: ${leader} - ${shopName}`);
+    console.log(`✅ Survey submitted successfully: ${leader} - ${shopName} by ${user?.username || 'anonymous'}`);
     
     res.status(200).json({ 
       success: true, 
       message: 'Survey submitted successfully',
       data: {
         id: surveyResponse._id,
-        submittedAt: surveyResponse.submittedAt
+        submittedAt: surveyResponse.submittedAt,
+        submittedBy: surveyResponse.submittedBy
       }
     });
   } catch (error) {
@@ -265,71 +269,122 @@ const deleteSurveyResponse = async (req, res) => {
 const bulkDeleteSurveyResponses = async (req, res) => {
   try {
     const { ids } = req.body;
+    console.log(`🗑️ Bulk delete request for ${ids?.length || 0} survey responses`);
+    
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ 
         success: false, 
-        message: 'No IDs provided' 
+        message: 'No IDs provided for bulk delete' 
       });
     }
-    
-    const deletedIds = [];
-    const errors = [];
-    
-    for (const id of ids) {
-      if (!mongoose.Types.ObjectId.isValid(id)) {
-        errors.push({ id, error: 'Invalid survey ID' });
-        continue;
-      }
-      
-      try {
-        const response = await SurveyResponse.findById(id);
-        if (!response) {
-          errors.push({ id, error: 'Survey response not found' });
-          continue;
-        }
-        
-        const imageUrls = [];
-        if (response.responses && Array.isArray(response.responses)) {
-          response.responses.forEach(modelResp => {
-            if (modelResp.images && Array.isArray(modelResp.images)) {
-              modelResp.images.forEach(url => imageUrls.push(url));
-            }
-          });
-        }
-        
-        for (const url of imageUrls) {
-          try {
-            const match = url.match(/https?:\/\/.+?\.amazonaws\.com\/(.+)$/);
-            if (match && match[1]) {
-              const Key = decodeURIComponent(match[1]);
-              await s3.deleteObject({
-                Bucket: process.env.AWS_S3_BUCKET,
-                Key
-              }).promise();
-            }
-          } catch (err) {
-            errors.push({ id, error: 'Failed to delete image from S3', url });
-          }
-        }
-        
-        await SurveyResponse.findByIdAndDelete(id);
-        deletedIds.push(id);
-      } catch (err) {
-        errors.push({ id, error: err.message });
-      }
+
+    // Validate all IDs first
+    const invalidIds = ids.filter(id => !mongoose.Types.ObjectId.isValid(id));
+    if (invalidIds.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid survey IDs provided: ${invalidIds.join(', ')}`
+      });
     }
+
+    // Fetch all responses in parallel for better performance
+    console.log('📋 Fetching responses to delete...');
+    const responses = await SurveyResponse.find({ _id: { $in: ids } }).lean();
     
-    res.json({
-      success: true,
-      deletedIds,
-      errors
+    const foundIds = responses.map(r => r._id.toString());
+    const notFoundIds = ids.filter(id => !foundIds.includes(id));
+    
+    if (responses.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No survey responses found with the provided IDs'
+      });
+    }
+
+    console.log(`✅ Found ${responses.length} responses to delete, ${notFoundIds.length} not found`);
+
+    // Collect all image URLs that need to be deleted from S3
+    const imageUrls = [];
+    responses.forEach(response => {
+      if (response.responses && Array.isArray(response.responses)) {
+        response.responses.forEach(modelResp => {
+          if (modelResp.images && Array.isArray(modelResp.images)) {
+            modelResp.images.forEach(url => imageUrls.push(url));
+          }
+        });
+      }
     });
+
+    console.log(`📸 Found ${imageUrls.length} images to delete from S3`);
+
+    // Delete images from S3 in parallel (with concurrency limit)
+    const deleteImagePromises = imageUrls.map(async (url) => {
+      try {
+        const match = url.match(/https?:\/\/.+?\.amazonaws\.com\/(.+)$/);
+        if (match && match[1]) {
+          const Key = decodeURIComponent(match[1]);
+          await s3.deleteObject({
+            Bucket: process.env.AWS_S3_BUCKET,
+            Key
+          }).promise();
+          return { url, success: true };
+        }
+        return { url, success: false, error: 'Invalid S3 URL format' };
+      } catch (err) {
+        console.error('❌ Failed to delete image from S3:', url, err.message);
+        return { url, success: false, error: err.message };
+      }
+    });
+
+    // Process S3 deletions with concurrency limit (10 at a time)
+    const batchSize = 10;
+    const imageResults = [];
+    for (let i = 0; i < deleteImagePromises.length; i += batchSize) {
+      const batch = deleteImagePromises.slice(i, i + batchSize);
+      const batchResults = await Promise.all(batch);
+      imageResults.push(...batchResults);
+    }
+
+    const failedImages = imageResults.filter(result => !result.success);
+    if (failedImages.length > 0) {
+      console.log(`⚠️ Failed to delete ${failedImages.length} images from S3`);
+    }
+
+    // Delete survey responses from database in bulk
+    console.log('🗑️ Deleting survey responses from database...');
+    const deleteResult = await SurveyResponse.deleteMany({ _id: { $in: foundIds } });
+    
+    const successMessage = `Successfully deleted ${deleteResult.deletedCount} survey response(s)`;
+    console.log(`✅ ${successMessage}`);
+
+    // Prepare response with detailed results
+    const responseData = {
+      success: true,
+      message: successMessage,
+      deletedCount: deleteResult.deletedCount,
+      deletedIds: foundIds,
+      skippedIds: notFoundIds,
+      imagesDeleted: imageResults.filter(r => r.success).length,
+      imagesFailed: failedImages.length
+    };
+
+    // Add warnings if there were issues
+    if (notFoundIds.length > 0) {
+      responseData.warnings = [`${notFoundIds.length} survey response(s) not found: ${notFoundIds.join(', ')}`];
+    }
+    if (failedImages.length > 0) {
+      responseData.warnings = responseData.warnings || [];
+      responseData.warnings.push(`Failed to delete ${failedImages.length} image(s) from S3`);
+    }
+
+    res.status(200).json(responseData);
+
   } catch (error) {
-    console.error('Error in bulk delete:', error);
+    console.error('❌ Error in bulk delete operation:', error);
     res.status(500).json({ 
       success: false, 
-      message: 'Error in bulk delete', 
-      error: error.message 
+      message: 'Internal server error during bulk delete operation', 
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

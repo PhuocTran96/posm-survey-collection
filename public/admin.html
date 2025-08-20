@@ -69,11 +69,34 @@
             background: #475569;
         }
     </style>
+    <script src="auth-utils.js"></script>
     <script>
-        // Auto redirect to survey results after 3 seconds
-        setTimeout(() => {
-            window.location.href = 'survey-results.html';
-        }, 3000);
+        // Wait for auth manager to be available
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.authManager) {
+                window.authManager.init();
+            }
+            
+            // Check if user is authenticated admin and redirect accordingly
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            const token = localStorage.getItem('accessToken');
+            
+            console.log('Admin.html redirect - User:', user, 'Token exists:', !!token);
+            
+            if (token && user.role === 'admin') {
+                // Redirect to survey results (main admin page)
+                console.log('Redirecting admin to survey-results.html');
+                window.location.replace('survey-results.html');
+            } else if (token && user.role) {
+                // Non-admin user, redirect to user page
+                console.log('Non-admin user, redirecting to main page');
+                window.location.replace('/');
+            } else {
+                // No valid token, redirect to admin login
+                console.log('No valid token, redirecting to admin login');
+                window.location.replace('admin-login.html');
+            }
+        });
     </script>
 </head>
 <body>

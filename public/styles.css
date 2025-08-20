@@ -48,6 +48,7 @@ body {
 header {
     background: var(--primary);
     color: white;
+    position: relative;
     padding: clamp(20px, 4vw, 30px);
     text-align: center;
     position: relative;
@@ -840,4 +841,110 @@ html, body {
     .admin-container {
         padding-bottom: 110px !important;
     }
+}
+
+/* User Authentication UI */
+.user-info {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 10px 15px;
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+}
+
+.user-details {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.user-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: white;
+}
+
+.user-role {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.8);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.logout-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.logout-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+    .user-info {
+        position: static;
+        margin-top: 15px;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.15);
+    }
+    
+    .user-details {
+        align-items: center;
+    }
+}
+
+/* Admin Authentication UI */
+.admin-user-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.admin-user-details {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.admin-user-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: white;
+}
+
+.admin-user-role {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.8);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.admin-logout-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.admin-logout-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
 }

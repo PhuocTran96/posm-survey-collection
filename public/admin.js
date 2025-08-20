@@ -9,13 +9,152 @@ class AdminApp {
         this.totalPages = 1;
         this.totalCount = 0;
         this.pagination = null;
+        this.user = null;
         this.init();
     }
 
-    init() {
+    async init() {
+        // Check authentication first
+        const isAuthenticated = await this.checkAuthentication();
+        if (!isAuthenticated) {
+            return; // User will be redirected to login
+        }
+
         this.bindEvents();
         this.loadResponses();
         this.initUploadFunctionality();
+        this.setupAuthUI();
+    }
+
+    async checkAuthentication() {
+        const token = localStorage.getItem('accessToken');
+        if (!token) {
+            this.redirectToAdminLogin('No access token found');
+            return false;
+        }
+
+        try {
+            const response = await fetch('/api/auth/verify', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                this.user = result.data.user;
+                
+                // Check if user is admin
+                if (this.user.role !== 'admin') {
+                    alert('Access denied: Admin privileges required');
+                    this.clearAuthData();
+                    window.location.replace('/login.html');
+                    return false;
+                }
+                
+                return true;
+            } else {
+                const errorData = await response.json().catch(() => ({ message: 'Authentication failed' }));
+                console.log('Auth verification failed:', errorData.message);
+                this.clearAuthData();
+                this.redirectToAdminLogin('Session expired or invalid');
+                return false;
+            }
+        } catch (error) {
+            console.error('Authentication check failed:', error);
+            this.clearAuthData();
+            this.redirectToAdminLogin('Network error during authentication');
+            return false;
+        }
+    }
+
+    clearAuthData() {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+    }
+
+    redirectToAdminLogin(reason) {
+        console.log('Redirecting to admin login:', reason);
+        // Prevent redirect loops by checking current location
+        if (!window.location.pathname.includes('admin-login.html')) {
+            window.location.replace('/admin-login.html');
+        }
+    }
+
+    setupAuthUI() {
+        // Add user info to the admin header
+        const adminHeader = document.querySelector('.admin-header');
+        if (adminHeader) {
+            const userInfo = document.createElement('div');
+            userInfo.className = 'admin-user-info';
+            userInfo.innerHTML = `
+                <div class="admin-user-details">
+                    <span class="admin-user-name">${this.user.username}</span>
+                    <span class="admin-user-role">ADMIN</span>
+                </div>
+                <button onclick="adminApp.logout()" class="admin-logout-btn">Đăng xuất</button>
+            `;
+            
+            adminHeader.appendChild(userInfo);
+        }
+    }
+
+    async logout() {
+        try {
+            const token = localStorage.getItem('accessToken');
+            if (token) {
+                await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Logout error:', error);
+        } finally {
+            // Clear local storage and redirect
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('user');
+            window.location.href = '/admin-login.html';
+        }
+    }
+
+    // Helper method for authenticated API calls
+    async authenticatedFetch(url, options = {}) {
+        const token = localStorage.getItem('accessToken');
+        if (!token) {
+            window.location.href = '/admin-login.html';
+            return null;
+        }
+
+        const authOptions = {
+            ...options,
+            headers: {
+                ...options.headers,
+                'Authorization': `Bearer ${token}`
+            }
+        };
+
+        try {
+            const response = await fetch(url, authOptions);
+            
+            // If unauthorized, redirect to login
+            if (response.status === 401) {
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('refreshToken');
+                localStorage.removeItem('user');
+                window.location.href = '/admin-login.html';
+                return null;
+            }
+
+            return response;
+        } catch (error) {
+            console.error('API call failed:', error);
+            throw error;
+        }
     }
 
     bindEvents() {
@@ -118,7 +257,7 @@ class AdminApp {
 
         try {
             this.showLoading();
-            const response = await fetch(`/api/responses/${this.deleteID}`, {
+            const response = await this.authenticatedFetch(`/api/responses/${this.deleteID}`, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json'
@@ -198,7 +337,7 @@ class AdminApp {
                 params.append('dateTo', dateToFilter.value);
             }
             
-            const response = await fetch(`/api/responses?${params}`);
+            const response = await this.authenticatedFetch(`/api/responses?${params}`);
             
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
@@ -248,7 +387,7 @@ class AdminApp {
     async loadAllResponsesForFilters() {
         try {
             // Load all responses without pagination for filter population
-            const response = await fetch('/api/responses?limit=10000');
+            const response = await this.authenticatedFetch('/api/responses?limit=10000');
             if (response.ok) {
                 const data = await response.json();
                 const allResponses = data.data || data;
@@ -481,7 +620,7 @@ class AdminApp {
                 params.append('dateTo', dateToFilter.value);
             }
             
-            const response = await fetch(`/api/responses?${params}`);
+            const response = await this.authenticatedFetch(`/api/responses?${params}`);
             if (!response.ok) {
                 throw new Error('Failed to fetch export data');
             }
@@ -579,7 +718,7 @@ class AdminApp {
         if (!confirm(`Bạn có chắc chắn muốn xóa ${this.selectedIds.size} khảo sát đã chọn?`)) return;
         try {
             this.showLoading();
-            const res = await fetch('/api/responses/bulk-delete', {
+            const res = await this.authenticatedFetch('/api/responses/bulk-delete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ids: Array.from(this.selectedIds) })
@@ -914,7 +1053,7 @@ class AdminApp {
 
             console.log(`📤 Starting ${type} upload...`);
 
-            const response = await fetch(`/api/data-upload/${type}`, {
+            const response = await this.authenticatedFetch(`/api/data-upload/${type}`, {
                 method: 'POST',
                 body: formData
             });
@@ -995,7 +1134,7 @@ class AdminApp {
 
     async loadUploadStats() {
         try {
-            const response = await fetch('/api/data-upload/stats');
+            const response = await this.authenticatedFetch('/api/data-upload/stats');
             const result = await response.json();
 
             if (result.success) {

@@ -12,10 +12,125 @@ class SurveyResultsApp {
         this.init();
     }
 
-    init() {
+    async init() {
+        // Check authentication first
+        const isAuthenticated = await this.checkAuthentication();
+        if (!isAuthenticated) {
+            return; // User will be redirected to login
+        }
+        
         this.bindEvents();
         this.loadResponses();
         this.initNavigation();
+        this.setupAuthUI();
+    }
+
+    async checkAuthentication() {
+        const token = localStorage.getItem('accessToken');
+        const user = localStorage.getItem('user');
+        
+        if (!token || !user) {
+            this.redirectToAdminLogin('No access token or user data found');
+            return false;
+        }
+
+        try {
+            const userData = JSON.parse(user);
+            console.log('Admin page: Checking auth for user:', userData.username, userData.role);
+            
+            // Check if user is admin
+            if (userData.role !== 'admin') {
+                alert('Access denied: Admin privileges required');
+                localStorage.clear();
+                window.location.replace('/login.html');
+                return false;
+            }
+            
+            // Verify token is still valid
+            const response = await fetch('/api/auth/verify', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (response.ok) {
+                this.user = userData;
+                return true;
+            } else {
+                // Token invalid, clear storage
+                localStorage.clear();
+                this.redirectToAdminLogin('Session expired or invalid');
+                return false;
+            }
+        } catch (error) {
+            console.error('Authentication check failed:', error);
+            localStorage.clear();
+            this.redirectToAdminLogin('Session expired or invalid');
+            return false;
+        }
+    }
+
+    redirectToAdminLogin(reason) {
+        console.log('Redirecting to admin login:', reason);
+        if (!window.location.pathname.includes('admin-login.html')) {
+            window.location.replace('/admin-login.html');
+        }
+    }
+
+    setupAuthUI() {
+        // Add user info to the admin header
+        const adminHeader = document.querySelector('.nav-brand h1');
+        if (adminHeader && this.user) {
+            const userInfo = document.createElement('div');
+            userInfo.style.cssText = 'font-size: 12px; color: #64748b; font-weight: normal; margin-top: 4px;';
+            userInfo.textContent = `Logged in as: ${this.user.username} (${this.user.role})`;
+            adminHeader.appendChild(userInfo);
+        }
+
+        // Add logout button
+        const navMenu = document.querySelector('.nav-menu');
+        if (navMenu) {
+            const logoutBtn = document.createElement('a');
+            logoutBtn.href = '#';
+            logoutBtn.className = 'nav-item logout';
+            logoutBtn.innerHTML = '🚪 Đăng xuất';
+            logoutBtn.style.cssText = 'color: #dc2626; border: 1px solid #dc2626;';
+            logoutBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                if (confirm('Bạn có chắc chắn muốn đăng xuất?')) {
+                    try {
+                        const token = localStorage.getItem('accessToken');
+                        if (token) {
+                            await fetch('/api/auth/logout', {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${token}`
+                                }
+                            });
+                        }
+                    } catch (error) {
+                        console.error('Logout error:', error);
+                    } finally {
+                        localStorage.clear();
+                        window.location.replace('/admin-login.html');
+                    }
+                }
+            });
+            navMenu.appendChild(logoutBtn);
+        }
+    }
+
+    // Helper method to make authenticated API requests
+    async makeAuthenticatedRequest(url, options = {}) {
+        try {
+            return await window.authManager.makeAuthenticatedRequest(url, options);
+        } catch (error) {
+            console.error('API request failed:', error);
+            if (error.message.includes('Authentication failed')) {
+                this.redirectToAdminLogin('Authentication failed');
+            }
+            throw error;
+        }
     }
 
     initNavigation() {
@@ -159,7 +274,7 @@ class SurveyResultsApp {
 
             console.log('Loading responses with params:', params.toString());
 
-            const response = await fetch(`/api/responses?${params}`);
+            const response = await this.makeAuthenticatedRequest(`/api/responses?${params}`);
             
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
@@ -209,7 +324,7 @@ class SurveyResultsApp {
     async loadAllResponsesForFilters() {
         try {
             // Load all responses without pagination for filter population
-            const response = await fetch('/api/responses?limit=10000');
+            const response = await this.makeAuthenticatedRequest('/api/responses?limit=10000');
             if (response.ok) {
                 const data = await response.json();
                 const allResponses = data.data || data;
@@ -466,11 +581,13 @@ class SurveyResultsApp {
             this.responses.forEach(response => {
                 this.selectedIds.add(response._id);
             });
-            selectAllBtn.innerHTML = '❌ Bỏ chọn tất cả';
+            selectAllBtn.innerHTML = '❌ Bỏ chọn tất cả trang này';
+            selectAllBtn.title = `Đã chọn tất cả ${this.responses.length} khảo sát trên trang này`;
         } else {
             // Deselect all
             this.selectedIds.clear();
-            selectAllBtn.innerHTML = '☑️ Chọn tất cả';
+            selectAllBtn.innerHTML = '☑️ Chọn tất cả trang này';
+            selectAllBtn.title = 'Chọn tất cả khảo sát trên trang hiện tại';
         }
         
         this.renderResponses();
@@ -480,8 +597,15 @@ class SurveyResultsApp {
     updateBulkDeleteButton() {
         const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
         if (bulkDeleteBtn) {
-            bulkDeleteBtn.disabled = this.selectedIds.size === 0;
-            bulkDeleteBtn.innerHTML = `🗑️ Xóa các khảo sát đã chọn (${this.selectedIds.size})`;
+            const count = this.selectedIds.size;
+            bulkDeleteBtn.disabled = count === 0;
+            if (count === 0) {
+                bulkDeleteBtn.innerHTML = '🗑️ Xóa các khảo sát đã chọn';
+                bulkDeleteBtn.title = 'Chọn ít nhất một khảo sát để xóa';
+            } else {
+                bulkDeleteBtn.innerHTML = `🗑️ Xóa ${count} khảo sát đã chọn`;
+                bulkDeleteBtn.title = `Xóa ${count} khảo sát đã chọn (hành động không thể hoàn tác)`;
+            }
         }
     }
 
@@ -506,21 +630,27 @@ class SurveyResultsApp {
 
         try {
             this.showLoading();
-            const response = await fetch(`/api/responses/${this.deleteID}`, {
+            const response = await this.makeAuthenticatedRequest(`/api/responses/${this.deleteID}`, {
                 method: 'DELETE'
             });
 
             if (response.ok) {
                 this.cancelDelete();
-                this.loadResponses(this.currentPage);
-                alert('Xóa khảo sát thành công!');
+                
+                // If we deleted the only item on current page and it's not page 1, go to previous page
+                if (this.responses.length === 1 && this.currentPage > 1) {
+                    this.currentPage--;
+                }
+                
+                await this.loadResponses(this.currentPage);
+                this.showNotification('✅ Xóa khảo sát thành công!', 'success');
             } else {
                 const errorData = await response.json();
                 throw new Error(errorData.message || 'Lỗi khi xóa');
             }
         } catch (error) {
             console.error('Error deleting response:', error);
-            alert('Lỗi khi xóa khảo sát: ' + error.message);
+            this.showNotification(`❌ Lỗi khi xóa khảo sát: ${error.message}`, 'error');
         } finally {
             this.hideLoading();
         }
@@ -529,34 +659,49 @@ class SurveyResultsApp {
     async handleBulkDelete() {
         if (this.selectedIds.size === 0) return;
 
-        if (!confirm(`Bạn có chắc chắn muốn xóa ${this.selectedIds.size} khảo sát đã chọn?`)) {
+        // Show enhanced confirmation dialog
+        if (!await this.showBulkDeleteConfirmation()) {
             return;
         }
 
         try {
             this.showLoading();
-            const response = await fetch('/api/responses/bulk-delete', {
+            console.log(`🗑️ Starting bulk delete of ${this.selectedIds.size} survey responses`);
+            
+            const response = await this.makeAuthenticatedRequest('/api/responses/bulk-delete', {
                 method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
                 body: JSON.stringify({
                     ids: Array.from(this.selectedIds)
                 })
             });
 
-            if (response.ok) {
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                // Clear selections and reload current page
                 this.selectedIds.clear();
-                this.loadResponses(this.currentPage);
                 this.updateBulkDeleteButton();
-                alert('Xóa các khảo sát thành công!');
+                
+                // If we deleted all items on current page and it's not page 1, go to previous page
+                if (this.responses.length === result.deletedCount && this.currentPage > 1) {
+                    this.currentPage--;
+                }
+                
+                await this.loadResponses(this.currentPage);
+                
+                // Show detailed success message
+                let message = `✅ ${result.message}`;
+                if (result.warnings && result.warnings.length > 0) {
+                    message += '\n\n⚠️ Cảnh báo:\n' + result.warnings.join('\n');
+                }
+                
+                this.showNotification(message, 'success');
             } else {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Lỗi khi xóa');
+                throw new Error(result.message || 'Lỗi không xác định khi xóa khảo sát');
             }
         } catch (error) {
             console.error('Error bulk deleting responses:', error);
-            alert('Lỗi khi xóa khảo sát: ' + error.message);
+            this.showNotification(`❌ Lỗi khi xóa khảo sát: ${error.message}`, 'error');
         } finally {
             this.hideLoading();
         }
@@ -592,7 +737,7 @@ class SurveyResultsApp {
             // Fetch all data for export (no pagination)
             params.append('limit', '10000');
 
-            const response = await fetch(`/api/responses?${params}`);
+            const response = await this.makeAuthenticatedRequest(`/api/responses?${params}`);
             if (!response.ok) {
                 throw new Error('Lỗi khi tải dữ liệu export');
             }
@@ -625,7 +770,7 @@ class SurveyResultsApp {
             'Shop',
             'Model',
             'Số lượng',
-            'POSM thiếu',
+            'POSM',
             'Tất cả POSM',
             'Hình ảnh'
         ]);
@@ -676,6 +821,131 @@ class SurveyResultsApp {
 
         XLSX.writeFile(workbook, filename);
     }
+
+    // Enhanced confirmation dialog for bulk delete
+    showBulkDeleteConfirmation() {
+        return new Promise((resolve) => {
+            const selectedCount = this.selectedIds.size;
+            const selectedResponses = this.responses.filter(r => this.selectedIds.has(r._id));
+            
+            let detailsHtml = '';
+            if (selectedResponses.length > 0) {
+                detailsHtml = selectedResponses.slice(0, 5).map(r => 
+                    `<li>${r.leader} - ${r.shopName} (${new Date(r.createdAt).toLocaleDateString('vi-VN')})</li>`
+                ).join('');
+                if (selectedCount > 5) {
+                    detailsHtml += `<li style="font-style: italic;">... và ${selectedCount - 5} khảo sát khác</li>`;
+                }
+            }
+
+            // Create enhanced confirmation dialog
+            const dialogHtml = `
+                <div id="bulkDeleteDialog" class="confirm-dialog" style="display: flex;">
+                    <div class="confirm-content" style="max-width: 500px;">
+                        <h3>🗑️ Xác nhận xóa hàng loạt</h3>
+                        <p>Bạn có chắc chắn muốn xóa <strong>${selectedCount} khảo sát</strong> đã chọn?</p>
+                        ${detailsHtml ? `
+                            <div style="margin: 15px 0;">
+                                <strong>Các khảo sát sẽ bị xóa:</strong>
+                                <ul style="max-height: 120px; overflow-y: auto; margin: 5px 0; padding-left: 20px;">
+                                    ${detailsHtml}
+                                </ul>
+                            </div>
+                        ` : ''}
+                        <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 4px; margin: 10px 0;">
+                            <strong>⚠️ Cảnh báo:</strong> Hành động này không thể hoàn tác. Tất cả dữ liệu và hình ảnh liên quan sẽ bị xóa vĩnh viễn.
+                        </div>
+                        <div class="confirm-buttons">
+                            <button id="btnConfirmBulkDelete" class="btn-confirm" style="background: #dc3545;">Xóa ${selectedCount} khảo sát</button>
+                            <button id="btnCancelBulkDelete" class="btn-cancel">Hủy</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Remove existing dialog if any
+            const existingDialog = document.getElementById('bulkDeleteDialog');
+            if (existingDialog) {
+                existingDialog.remove();
+            }
+
+            // Add dialog to body
+            document.body.insertAdjacentHTML('beforeend', dialogHtml);
+
+            // Add event listeners
+            document.getElementById('btnConfirmBulkDelete').addEventListener('click', () => {
+                document.getElementById('bulkDeleteDialog').remove();
+                resolve(true);
+            });
+
+            document.getElementById('btnCancelBulkDelete').addEventListener('click', () => {
+                document.getElementById('bulkDeleteDialog').remove();
+                resolve(false);
+            });
+
+            // Close on background click
+            document.getElementById('bulkDeleteDialog').addEventListener('click', (e) => {
+                if (e.target.id === 'bulkDeleteDialog') {
+                    document.getElementById('bulkDeleteDialog').remove();
+                    resolve(false);
+                }
+            });
+        });
+    }
+
+    // Enhanced notification system
+    showNotification(message, type = 'info', duration = 5000) {
+        // Remove existing notifications
+        const existingNotifications = document.querySelectorAll('.notification');
+        existingNotifications.forEach(n => n.remove());
+
+        const typeStyles = {
+            success: 'background: #d4edda; border-color: #c3e6cb; color: #155724;',
+            error: 'background: #f8d7da; border-color: #f5c6cb; color: #721c24;',
+            warning: 'background: #fff3cd; border-color: #ffeaa7; color: #856404;',
+            info: 'background: #d1ecf1; border-color: #bee5eb; color: #0c5460;'
+        };
+
+        const notificationHtml = `
+            <div class="notification" style="
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 10000;
+                padding: 15px 20px;
+                border: 1px solid;
+                border-radius: 4px;
+                max-width: 400px;
+                white-space: pre-line;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                ${typeStyles[type]}
+            ">
+                <button onclick="this.parentElement.remove()" style="
+                    position: absolute;
+                    top: 5px;
+                    right: 10px;
+                    background: none;
+                    border: none;
+                    font-size: 18px;
+                    cursor: pointer;
+                    color: inherit;
+                ">×</button>
+                <div style="margin-right: 20px;">${message}</div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', notificationHtml);
+
+        // Auto remove after duration
+        if (duration > 0) {
+            setTimeout(() => {
+                const notification = document.querySelector('.notification');
+                if (notification) {
+                    notification.remove();
+                }
+            }, duration);
+        }
+    }
 }
 
 // Global instance of SurveyResultsApp
@@ -683,5 +953,9 @@ let surveyResultsApp;
 
 // Initialize the survey results app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize auth manager first
+    if (window.authManager) {
+        window.authManager.init();
+    }
     surveyResultsApp = new SurveyResultsApp();
 });

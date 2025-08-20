@@ -2,28 +2,34 @@
   "name": "survey-posm",
   "version": "1.0.0",
   "description": "POSM Survey System",
-  "main": "server.js",  "scripts": {
+  "main": "server.js",
+  "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
     "upload-posm": "node upload-posm-data.js",
     "upload-posm-clear": "node upload-posm-data.js --clear",
     "upload-posm-insert": "node upload-posm-data.js --insert-only",
     "upload-posm-update": "node upload-posm-data.js --update-only",
-    "upload-posm-upsert": "node upload-posm-data.js --upsert"
+    "upload-posm-upsert": "node upload-posm-data.js --upsert",
+    "import-users": "node import-users.js",
+    "create-super-admin": "node import-users.js --create-super-admin"
   },
   "dependencies": {
     "aws-sdk": "^2.1531.0",
+    "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "csv-parser": "^3.0.0",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
     "mongoose": "^7.5.0",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^7.0.3",
-    "xlsx": "^0.18.5",
-    "sharp": "^0.32.6"
+    "sharp": "^0.32.6",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "axios": "^1.11.0",
     "nodemon": "^3.0.1"
   },
   "keywords": [

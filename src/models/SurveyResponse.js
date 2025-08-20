@@ -35,6 +35,14 @@ const surveyResponseSchema = new mongoose.Schema({
   submittedAt: {
     type: Date,
     default: Date.now
+  },
+  submittedBy: {
+    type: String,
+    default: 'anonymous'
+  },
+  submittedByRole: {
+    type: String,
+    default: 'unknown'
   }
 }, {
   timestamps: true

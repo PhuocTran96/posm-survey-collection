@@ -1,217 +1,35 @@
-﻿Name,Province,Leader
-Anh Chinh Thai Binh 2, THAI BINH ,Nguyễn Hồng Phong
-Cao Phong Bac Lieu, BAC LIEU ,Nguyễn Cao Huy
-Cao Phong Bao Loc, LAM DONG ,Trần Công Anh Tú
-Cao Phong Ben Tre, BEN TRE ,Nguyễn Văn Quang
-Cao Phong Bien Hoa, DONG NAI ,Võ Minh Nhật
-Cao Phong Binh Chanh, HO CHI MINH ,Huỳnh Thị Bích Tuyền
-Cao Phong Binh Duong, BINH DUONG ,Đào Ngọc Lâm
-Cao Phong Binh Duong 3, BINH DUONG ,Đào Ngọc Lâm
-Cao Phong Binh Tan, HO CHI MINH ,Huỳnh Thị Bích Tuyền
-Cao Phong Binh Tan 2, HO CHI MINH ,Huỳnh Thị Bích Tuyền
-Cao Phong Ca Mau, CA MAU ,Nguyễn Cao Huy
-Cao Phong Can Tho, CAN THO ,Nguyễn Cao Huy
-Cao Phong Can Tho 2, CAN THO ,Nguyễn Cao Huy
-Cao Phong Da Lat, LAM DONG ,Trần Công Anh Tú
-Cao Phong Da Nang, DA NANG ,Ngô Việt Thắng
-Cao Phong Da Nang 2, DA NANG ,Ngô Việt Thắng
-Cao Phong Da Nang 3, DA NANG ,Ngô Việt Thắng
-Cao Phong Dak Lak, DAK LAK ,Đào Thị Xuân Quỳnh
-Cao Phong Dist 12, HO CHI MINH ,Nguyễn Bùi Vĩnh Phúc
-Cao Phong Dist 2, HO CHI MINH ,Võ Minh Nhật
-Cao Phong Dist 4, HO CHI MINH ,Võ Minh Nhật
-Cao Phong Dist 5, HO CHI MINH ,Đào Ngọc Lâm
-Cao Phong Dist 7, HO CHI MINH ,Đào Ngọc Lâm
-Cao Phong Dist 7 - 2, HO CHI MINH ,Đào Ngọc Lâm
-Cao Phong Dist 9, HO CHI MINH ,Trần Công Anh Tú
-Cao Phong Dong Thap, DONG THAP ,Nguyễn Văn Quang
-Cao Phong Gia Lai, GIA LAI ,Đào Thị Xuân Quỳnh
-Cao Phong Go Vap, HO CHI MINH ,Nguyễn Bùi Vĩnh Phúc
-Cao Phong Go Vap 2, HO CHI MINH ,Nguyễn Bùi Vĩnh Phúc
-Cao Phong Go Vap 3, HO CHI MINH ,Nguyễn Bùi Vĩnh Phúc
-Cao Phong Hue 2, THUA THIEN HUE ,Ngô Việt Thắng
-Cao Phong Kien Giang, KIEN GIANG ,Nguyễn Cao Huy
-Cao Phong Le Van Khuong, HO CHI MINH ,Nguyễn Bùi Vĩnh Phúc
-Cao Phong Linh Dong (Thu Duc 2), HO CHI MINH ,Trần Công Anh Tú
-Cao Phong Long Xuyen 1, AN GIANG ,Nguyễn Cao Huy
-Cao Phong My Tho, TIEN GIANG ,Nguyễn Văn Quang
-Cao Phong Nha Trang, KHANH HOA ,Đào Thị Xuân Quỳnh
-Cao Phong Nha Trang 3, KHANH HOA ,Đào Thị Xuân Quỳnh
-Cao Phong Pham Van Dong, HO CHI MINH ,Trần Công Anh Tú
-Cao Phong Phan Rang, NINH THUAN ,Đào Thị Xuân Quỳnh
-Cao Phong Phan Thiet, BINH THUAN ,Đào Thị Xuân Quỳnh
-Cao Phong Phu Quoc, KIEN GIANG ,Nguyễn Cao Huy
-Cao Phong Phu Yen, PHU YEN ,Đào Thị Xuân Quỳnh
-Cao Phong Q3, HO CHI MINH ,Đào Ngọc Lâm
-Cao Phong Quang Ngai, QUANG NGAI ,Ngô Việt Thắng
-Cao Phong Quy Nhon, BINH DINH ,Đào Thị Xuân Quỳnh
-Cao Phong Tam Ky, QUANG NAM ,Ngô Việt Thắng
-Cao Phong Tan Phu, HO CHI MINH ,Huỳnh Thị Bích Tuyền
-Cao Phong Tay Ninh, TAY NINH ,Nguyễn Bùi Vĩnh Phúc
-Cao Phong Thua Thien Hue, THUA THIEN HUE ,Ngô Việt Thắng
-Cao Phong Tra Vinh, TRA VINH ,Nguyễn Văn Quang
-Cao Phong Vinh Long, VINH LONG ,Nguyễn Văn Quang
-CPN LE HONG PHONG, HAI PHONG ,Nguyễn Hồng Phong
-CPN TRAN NGUYEN HAN, HAI PHONG ,Nguyễn Hồng Phong
-DML_BNI_BNI - 33 Ly Thai To, BAC NINH ,Nguyễn Duy Hưng
-DML_BRV_VTA - 155 Nguyen Thai Hoc, BA RIA VUNG TAU ,Nguyễn Bùi Vĩnh Phúc
-DML_BTH_PTH - 241 Tran Hung Dao, BINH THUAN ,Đào Thị Xuân Quỳnh
-DML_CMA_CMA - 18 Ngo Quyen, CA MAU ,Nguyễn Cao Huy
-DML_DLA_BMT - 37 Nguyen Tat Thanh, DAK LAK ,Đào Thị Xuân Quỳnh
-DML_DNA_HCH - 242 Nguyen Huu Tho, DA NANG ,Ngô Việt Thắng
-DML_DNA_STR - Vo Van Kiet, DA NANG ,Ngô Việt Thắng
-DML_DNA_TKH - 222 Nguyen Van Linh, DA NANG ,Ngô Việt Thắng
-DML_DON_BHO - 205C Pham Van Thuan, DONG NAI ,Võ Minh Nhật
-DMM_DON_LKH - 272 Ho Thi Huong (Xuan An), DONG NAI ,Trần Công Anh Tú
-DML_DON_TBO - Nga 3 Tri An, DONG NAI ,Võ Minh Nhật
-DML_DON_XLO - 11 Hung Vuong, DONG NAI ,Trần Công Anh Tú
-DML_HCM_BCH - Binh Hung, HO CHI MINH ,Huỳnh Thị Bích Tuyền
-DML_HCM_BTA - 106 Nguyen Thi Tu, HO CHI MINH ,Huỳnh Thị Bích Tuyền
-DML_HCM_BTA - 953 Tinh Lo 10, HO CHI MINH ,Huỳnh Thị Bích Tuyền
-DML_HCM_BTH - 561 Xo Viet Nghe Tinh, HO CHI MINH ,Võ Minh Nhật
-DML_HCM_GVA - 168 Quang Trung, HO CHI MINH ,Nguyễn Bùi Vĩnh Phúc
-DML_HCM_PNH - 179 Phan Dang Luu, HO CHI MINH ,Đào Ngọc Lâm
-DML_HCM_Q03 - 542 Cach Mang Thang 8, HO CHI MINH ,Đào Ngọc Lâm
-DML_HCM_Q06 - 416 Hau Giang, HO CHI MINH ,Huỳnh Thị Bích Tuyền
-DML_HCM_Q07 - 428 Nguyen Thi Thap, HO CHI MINH ,Đào Ngọc Lâm
-DML_HCM_Q07 - 677 Huynh Tan Phat, HO CHI MINH ,Đào Ngọc Lâm
-DML_HCM_Q12 - 01 Bis To Ky, HO CHI MINH ,Nguyễn Bùi Vĩnh Phúc
-DML_HCM_Q12 - 102 Le Van Khuong, HO CHI MINH ,Nguyễn Bùi Vĩnh Phúc
-DML_HCM_Q12 - 102 Truong Chinh, HO CHI MINH ,Nguyễn Bùi Vĩnh Phúc
-DML_HCM_TDU - 21 Tran Nao, HO CHI MINH ,Võ Minh Nhật
-DML_HCM_TDU - 382 Nguyen Duy Trinh, HO CHI MINH ,Võ Minh Nhật
-DML_HCM_TDU - 71 Le Van Viet, HO CHI MINH ,Trần Công Anh Tú
-DML_HCM_TPH - 265 Hoa Binh, HO CHI MINH ,Huỳnh Thị Bích Tuyền
-DML_HCM_TPH - 451 Le Trong Tan, HO CHI MINH ,Huỳnh Thị Bích Tuyền
-DML_HNO_BTL - Minh Khai, HA NOI ,Đỗ Minh Tú
-DML_HNO_CGI - 260 Cau Giay, HA NOI ,Nguyễn Duy Hưng
-DML_HNO_DDA - 159 Thai Ha, HA NOI ,Nguyễn Duy Hưng
-DML_HNO_HBT - 349 Minh Khai, HA NOI ,Lưu Văn Hải
-DML_HNO_HDO - Mo Lao, HA NOI ,Lưu Văn Hải
-DML_HNO_HMA - 1283 Giai Phong, HA NOI ,Lưu Văn Hải
-DML_HNO_LBI - Savico (Long Bien), HA NOI ,Đỗ Minh Tú
-DML_HPH_NQU - 282 Da Nang, HAI PHONG ,Nguyễn Hồng Phong
-DML_HTI_HTI - Tran Phu, HA TINH ,Vacant
-DML_KGI_PQU - Duong Dong, KIEN GIANG ,Nguyễn Cao Huy
-DML_KGI_RGI - 358 Nguyen Trung Truc, KIEN GIANG ,Nguyễn Cao Huy
-DML_LAN_TAN - 254 Hung Vuong, LONG AN ,Nguyễn Văn Quang
-DML_LDO_BLO - 583 Tran Phu, LAM DONG ,Trần Công Anh Tú
-DML_LDO_DLA - 25 Nguyen Van Cu, LAM DONG ,Trần Công Anh Tú
-DML_NAN_VIN - 78 Nguyen Thi Minh Khai, NGHE AN ,Vacant
-DML_NDI_NDI - Loc Vuong, NAM DINH ,Vacant
-DML_PYE_THO - 222 Hung Vuong, PHU YEN ,Đào Thị Xuân Quỳnh
-DML_QBI_DHO - 226 Tran Hung Dao, QUANG BINH ,Ngô Việt Thắng
-DML_QNA_TKY - Phan Boi Chau, QUANG NAM ,Ngô Việt Thắng
-DML_QNG_QNG - 275 Quang Trung, QUANG NGAI ,Ngô Việt Thắng
-DML_STR_STR - 99 Hung Vuong, SOC TRANG ,Nguyễn Cao Huy
-DML_TBI_TBI - 456 Ly Bon, THAI BINH ,Nguyễn Hồng Phong
-DML_TGI_MTH - 115 Nguyen Trai, TIEN GIANG ,Nguyễn Văn Quang
-DML_THO_THO - Dai Lo Le Loi, THANH HOA ,Vacant
-DML_TNI_TBA - 10 Quoc Lo 22 (Trang Bang), TAY NINH ,Nguyễn Bùi Vĩnh Phúc
-DML_TTH_HUE - 01 Duong Ha Noi, THUA THIEN HUE ,Ngô Việt Thắng
-EcoMart, HA NOI ,Đỗ Minh Tú
-Gia Thanh, HO CHI MINH ,Đào Ngọc Lâm
-HC 36 Pham Van Dong, HA NOI ,Đỗ Minh Tú
-HC 399 Pham Van Dong, HA NOI ,Đỗ Minh Tú
-HC Giai Phong, HA NOI ,Lưu Văn Hải
-HC Hai Duong, HAI DUONG ,Nguyễn Hồng Phong
-HC Hai Phong, HAI PHONG ,Nguyễn Hồng Phong
-HC Long Bien, HA NOI ,Đỗ Minh Tú
-HC Nghe An, NGHE AN ,Vacant
-HC Quang Ninh, QUANG NINH ,Nguyễn Hồng Phong
-HC Tam Trinh, HA NOI ,Lưu Văn Hải
-HC Thai Binh, THAI BINH ,Nguyễn Hồng Phong
-HC Thai Nguyen, THAI NGUYEN ,Lưu Văn Hải
-HC 319 Tay Son, HA NOI ,Nguyễn Duy Hưng
-HC Thanh Hoa, THANH HOA ,Vacant
-HC Vinh Phuc, VINH PHUC ,Đỗ Minh Tú
-MM Bac Ninh, BAC NINH ,Nguyễn Duy Hưng
-MM Cau Giay, HA NOI ,Nguyễn Duy Hưng
-MM Co Linh, HA NOI ,Đỗ Minh Tú
-MM Hai Ba Trung, HA NOI ,Nguyễn Duy Hưng
-MM Hai Phong - Le Hong Phong, HAI PHONG ,Nguyễn Hồng Phong
-MM Long Bien, HA NOI ,Đỗ Minh Tú
-MM My Dinh, HA NOI ,Đỗ Minh Tú
-MM Nguyen Chi Thanh, HA NOI ,Nguyễn Duy Hưng
-MM Pham Van Dong, HA NOI ,Đỗ Minh Tú
-MM Phu Tho - Viet Tri, PHU THO ,Đỗ Minh Tú
-MM Thanh Hoa - Le Loi, THANH HOA ,Vacant
-MM Thanh Xuan, HA NOI ,Lưu Văn Hải
-MM Truong Chinh, HA NOI ,Nguyễn Duy Hưng
-MM Tuyen Quang, TUYEN QUANG ,Đỗ Minh Tú
-Nguyen Kim Ba Dinh, HA NOI ,Nguyễn Duy Hưng
-Nguyen Kim Bien Hoa, DONG NAI ,Võ Minh Nhật
-Nguyen Kim Binh Duong, BINH DUONG ,Đào Ngọc Lâm
-Nguyen Kim Binh Tan, HO CHI MINH ,Huỳnh Thị Bích Tuyền
-Nguyen Kim Binh Thanh, HO CHI MINH ,Võ Minh Nhật
-Nguyen Kim Can Tho, CAN THO ,Nguyễn Cao Huy
-Nguyen Kim Da Nang, DA NANG ,Ngô Việt Thắng
-Nguyen Kim Dist 1, HO CHI MINH ,Võ Minh Nhật
-Nguyen Kim Dist 2, HO CHI MINH ,Võ Minh Nhật
-Nguyen Kim Dong Nai, DONG NAI ,Võ Minh Nhật
-Nguyen Kim Go Vap, HO CHI MINH ,Nguyễn Bùi Vĩnh Phúc
-Nguyen Kim Ha Dong, HA NOI ,Lưu Văn Hải
-Nguyen Kim Hai Phong, HAI PHONG ,Nguyễn Hồng Phong
-Nguyen Kim Kien Giang, KIEN GIANG ,Nguyễn Cao Huy
-Nguyen Kim Long Bien NVC, HA NOI ,Đỗ Minh Tú
-Nguyen Kim Phu Nhuan, HO CHI MINH ,Đào Ngọc Lâm
-Nguyen Kim Thanh Hoa - Lam Son, THANH HOA ,Vacant
-Nguyen Kim Thu Duc, HO CHI MINH ,Trần Công Anh Tú
-Nguyen Kim Trang Thi, HA NOI ,Nguyễn Duy Hưng
-Nguyen Kim Truong Chinh, HO CHI MINH ,Huỳnh Thị Bích Tuyền
-Pico 173 Xuan Thuy - Ha Noi, HA NOI ,Nguyễn Duy Hưng
-Pico 76 Nguyen Trai - Ha Noi, HA NOI ,Lưu Văn Hải
-Pico Le Trong Tan - Ha Noi, HA NOI ,Lưu Văn Hải
-Pico Ton Duc Thang - Ha Noi, HA NOI ,Nguyễn Duy Hưng
-Pico 1174 Lang, HA NOI ,Nguyễn Duy Hưng
-Pico 8 Trang Thi, HA NOI ,Nguyễn Duy Hưng
-Cao Phong Binh Duong 2, BINH DUONG ,Đào Ngọc Lâm
-Cao Phong Trang Dai, DONG NAI ,Võ Minh Nhật
-Cao Phong Hoc Mon, HO CHI MINH ,Nguyễn Bùi Vĩnh Phúc
-Cao Phong Vung Tau, BA RIA VUNG TAU ,Nguyễn Bùi Vĩnh Phúc
-Cao Phong Nguyen Thi Tu (Binh Tan 3), HO CHI MINH ,Huỳnh Thị Bích Tuyền
-Nguyen Kim Le Van Viet - Dist 9, HO CHI MINH ,Trần Công Anh Tú
-Cao Phong Trang Bom, DONG NAI ,Võ Minh Nhật
-Cao Phong Cu Chi, HO CHI MINH ,Nguyễn Bùi Vĩnh Phúc
-Cao Phong Long Khanh, DONG NAI ,Trần Công Anh Tú
-Cao Phong My Tho 2, TIEN GIANG ,Nguyễn Văn Quang
-Cao Phong Tan An, LONG AN ,Nguyễn Văn Quang
-Nguyen Kim Dist 7, HO CHI MINH ,Đào Ngọc Lâm
-Nguyen Kim Tan Binh 2 - Lac Long Quan, HO CHI MINH ,Trần Công Anh Tú
-Nguyen Kim Di An, BINH DUONG ,Đào Ngọc Lâm
-Nguyen Kim An Lac, HO CHI MINH ,Huỳnh Thị Bích Tuyền
-HC Van Phuc, HA NOI ,Lưu Văn Hải
-Cao Phong Duc Trong, LAM DONG ,Trần Công Anh Tú
-Cao Phong Hoi An, QUANG NAM ,Ngô Việt Thắng
-Nguyen Kim Nam Dinh, NAM DINH ,Vacant
-Nguyen Kim Vung Tau, BA RIA VUNG TAU ,Nguyễn Bùi Vĩnh Phúc
-Cao Phong Thap Muoi, DONG THAP ,Nguyễn Văn Quang
-Cao Phong QL 1K, HO CHI MINH ,Trần Công Anh Tú
-Cao Phong Binh Duong 4, BINH DUONG ,Đào Ngọc Lâm
-Cao Phong Quang Binh, QUANG BINH ,Ngô Việt Thắng
-Cao Phong Ben Cat, BINH DUONG ,Đào Ngọc Lâm
-Cao Phong Binh Thuy, CAN THO ,Nguyễn Cao Huy
-DML_BDU_TDM - 322 Dai Lo Binh Duong, BINH DUONG ,Đào Ngọc Lâm
-DML_HCM_TDU - 502 Do Xuan Hop, HO CHI MINH ,Trần Công Anh Tú
-DML_PTH_VTR - 1606A Hung Vuong, PHU THO ,Đỗ Minh Tú
-DML_AGI_LXU - 129 Tran Hung Dao, AN GIANG ,Nguyễn Cao Huy
-Cao Phong Binh Phuoc, BINH PHUOC ,Đào Ngọc Lâm
-DML_BNI_TSO - Lo A1 Tu Son, BAC NINH ,Nguyễn Duy Hưng
-DML_TTH_HUE - 197 Tran Hung Dao, THUA THIEN HUE ,Ngô Việt Thắng
-DML_DNA_LCH - 908A Ton Duc Thang, DA NANG ,Ngô Việt Thắng
-DML_DNA_HCH - 07 Le Duan, DA NANG ,Ngô Việt Thắng
-DML_HNO_DAN - Uy No, HA NOI ,Đỗ Minh Tú
-DML_GLA_PLK - 279 Nguyen Tat Thanh, GIA LAI ,Đào Thị Xuân Quỳnh
-DML_NBI_NBI - 2 Tran Hung Dao, NINH BINH ,Vacant
-DML_BRV_BRI - 25 Nguyen Huu Tho, BA RIA VUNG TAU ,Nguyễn Bùi Vĩnh Phúc
-DML_DTH_SDE - 90 Hung Vuong, DONG THAP ,Nguyễn Văn Quang
-DML_LDO_DTR - 462 Quoc Lo 20 (Lien Nghia), LAM DONG ,Trần Công Anh Tú
-DML_HTI_HTI - 173 Ha Huy Tap, HA TINH ,Vacant
-DML_HCM_TDU - 794 Pham Van Dong, HO CHI MINH ,Trần Công Anh Tú
-DML_TVI_TVI - 21 Dien Bien Phu, TRA VINH ,Nguyễn Văn Quang
-DML_HCM_Q01 - 189A Cong Quynh, HO CHI MINH ,Võ Minh Nhật
-DML_LAN_BLU - Nguyen Huu Tho, LONG AN ,Nguyễn Văn Quang
-DML_HPH_LCH - 268 Tran Nguyen Han, HAI PHONG ,Nguyễn Hồng Phong
-DML_NTH_PRA - 279 Ngo Gia Tu, NINH THUAN ,Đào Thị Xuân Quỳnh
-DML_CTH_NKI - 08 Hoa Binh, CAN THO ,Nguyễn Cao Huy
-DML_QNI_HLO - So 1 Duong 25/4, QUANG NINH ,Nguyễn Hồng Phong
+﻿Prompt:
+"""I want to set up the user management flow for my survey web app as follows:"
+1. CSV Import Script (Initial Step):
+Create a JavaScript script to import users from a CSV file into MongoDB using a schema with the following fields: (table name 'users' in current MONGODB_URI)
+id (auto-generated by MongoDB)
+userid (a unique employee ID or identifier)
+username
+loginid (a unique for login)
+password (should be hashed with bcrypt before saving)
+"role (e.g., admin, user)"
+"leader (reference to another user’s username and role: role 'PRT' will under 'TDS', role 'TDS' will under 'TDL', or a boolean flag)."
+Ensure that username or userid is unique.
+2. Login Page for Survey Users:
+Implement a login page where users can log in with their loginid and password.
+Passwords must be checked with bcrypt.
+"On successful login, issue a JWT access token (short expiry, e.g. 15 minutes) and a refresh token (longer expiry, e.g. 7 days)."
+Protect survey submission and admin routes using middleware that validates the access token.
+3. Admin Page:
+Create a login page for current Admin page and only role = admin users can login.
+New tab: User management
+View users (with pagination).
+Add/Edit/Delete users.
+Import users directly via CSV (replacing the old standalone script).
+Export users back to CSV for backup or offline editing.
+Ensure database and frontend stay in sync after imports and edits.
+Validate CSV imports (skip rows with errors and report them).
+Prevent overwriting or deleting the default super admin account.
+4. Cleanup:
+Remove the old standalone CSV import script since the functionality now exists in the admin panel.
+5. Additional Requirements:
+Track lastLogin for each user.
+Add isActive flag to allow disabling accounts without deleting them.
+"Add audit logging (who imported, who deleted/edited users, and when)."
+Ensure mobile and desktop compatibility for the admin UI.
+"Please provide code and best practices for implementing this flow, including backend (MongoDB/Mongoose, Node.js, JWT, bcrypt) and frontend (login page, admin user management with CSV import/export, validation, and role-based access control)."""

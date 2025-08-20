@@ -15,6 +15,7 @@ DEPLOYMENT.md
 # Logs
 logs
 *.log
+.claude
 
 # Runtime data
 pids

@@ -2,6 +2,67 @@ const { SurveyResponse, Store, ModelPosm } = require('../models');
 const { s3 } = require('../utils/s3Helper');
 const mongoose = require('mongoose');
 
+// Configuration for deletion behavior
+const DELETION_CONFIG = {
+  // If true, abort entire operation if ANY S3 deletion fails
+  // If false, proceed with DB deletion even if some S3 deletions fail
+  strictMode: false,
+  
+  // Maximum S3 deletions to attempt in parallel
+  s3ConcurrencyLimit: 10,
+  
+  // Timeout for individual S3 deletion operations (milliseconds)
+  s3OperationTimeout: 10000
+};
+
+// Helper function to check if S3 object exists
+const checkS3ObjectExists = async (s3Key) => {
+  try {
+    await s3.headObject({
+      Bucket: process.env.AWS_S3_BUCKET,
+      Key: s3Key
+    }).promise();
+    return true;
+  } catch (error) {
+    if (error.code === 'NotFound' || error.statusCode === 404) {
+      return false;
+    }
+    // For other errors (permissions, network, etc.), assume it exists to be safe
+    console.warn(`⚠️ Could not verify S3 object existence for ${s3Key}: ${error.message}`);
+    return true;
+  }
+};
+
+// Helper function to extract S3 key from URL
+const extractS3KeyFromUrl = (url) => {
+  if (!url || typeof url !== 'string') {
+    return null;
+  }
+  
+  // Handle different S3 URL formats:
+  // 1. https://bucket-name.s3.amazonaws.com/key
+  // 2. https://bucket-name.s3-region.amazonaws.com/key  
+  // 3. https://s3.amazonaws.com/bucket-name/key
+  // 4. https://s3-region.amazonaws.com/bucket-name/key
+  
+  const patterns = [
+    // Pattern 1 & 2: bucket-name.s3[.region].amazonaws.com/key
+    /https?:\/\/[^.]+\.s3(?:-[^.]+)?\.amazonaws\.com\/(.+)$/,
+    // Pattern 3 & 4: s3[.region].amazonaws.com/bucket-name/key (need to extract key after bucket)
+    /https?:\/\/s3(?:-[^.]+)?\.amazonaws\.com\/[^/]+\/(.+)$/
+  ];
+  
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      return decodeURIComponent(match[1]);
+    }
+  }
+  
+  console.warn(`⚠️ Unrecognized S3 URL format: ${url}`);
+  return null;
+};
+
 const getLeaders = async (req, res) => {
   try {
     const leaders = await Store.distinct('leader');
@@ -210,52 +271,99 @@ const deleteSurveyResponse = async (req, res) => {
     
     console.log(`✅ Found survey response: ${response.leader} - ${response.shopName}`);
     
-    const imageUrls = [];
+    // Extract all image URLs and their S3 keys
+    const imageData = [];
     if (response.responses && Array.isArray(response.responses)) {
       response.responses.forEach(modelResp => {
         if (modelResp.images && Array.isArray(modelResp.images)) {
-          modelResp.images.forEach(url => imageUrls.push(url));
+          modelResp.images.forEach(url => {
+            const s3Key = extractS3KeyFromUrl(url);
+            if (s3Key) {
+              imageData.push({ url, s3Key });
+            } else {
+              console.warn(`⚠️ Could not extract S3 key from URL: ${url}`);
+            }
+          });
         }
       });
     }
     
-    console.log(`📸 Found ${imageUrls.length} images to delete from S3`);
+    console.log(`📸 Found ${imageData.length} images to delete from S3`);
     
-    for (const url of imageUrls) {
+    // Phase 1: Delete images from S3 with error tracking
+    const s3DeletionResults = [];
+    for (const { url, s3Key } of imageData) {
       try {
-        const match = url.match(/https?:\/\/.+?\.amazonaws\.com\/(.+)$/);
-        if (match && match[1]) {
-          const Key = decodeURIComponent(match[1]);
-          await s3.deleteObject({
-            Bucket: process.env.AWS_S3_BUCKET,
-            Key
-          }).promise();
-          console.log(`✅ Deleted S3 image: ${Key}`);
-        }
+        await s3.deleteObject({
+          Bucket: process.env.AWS_S3_BUCKET,
+          Key: s3Key
+        }).promise();
+        console.log(`✅ Deleted S3 image: ${s3Key}`);
+        s3DeletionResults.push({ url, s3Key, success: true });
       } catch (err) {
-        console.error('❌ Failed to delete image from S3:', url, err);
+        console.error(`❌ Failed to delete S3 image: ${s3Key}`, err);
+        s3DeletionResults.push({ url, s3Key, success: false, error: err.message });
       }
     }
     
+    const failedS3Deletions = s3DeletionResults.filter(result => !result.success);
+    
+    // Check deletion policy: should we proceed if some S3 deletions failed?
+    if (failedS3Deletions.length > 0) {
+      if (DELETION_CONFIG.strictMode) {
+        console.error(`❌ ${failedS3Deletions.length} S3 deletions failed. Aborting operation due to strict mode.`);
+        return res.status(500).json({
+          success: false,
+          message: `Failed to delete ${failedS3Deletions.length} image(s) from S3. Operation aborted.`,
+          failedImages: failedS3Deletions.map(f => ({ url: f.url, error: f.error })),
+          totalImages: imageData.length
+        });
+      } else {
+        console.warn(`⚠️ ${failedS3Deletions.length} S3 deletions failed, but proceeding with DB deletion (non-strict mode)`);
+      }
+    }
+    
+    // Phase 2: Delete from MongoDB
     const deletedResponse = await SurveyResponse.findByIdAndDelete(id);
     if (!deletedResponse) {
       console.log(`❌ Failed to delete survey response from DB: ${id}`);
+      
+      // Rollback: attempt to restore S3 objects if DB deletion failed
+      // (Note: This is complex to implement perfectly due to S3 eventual consistency)
+      if (s3DeletionResults.some(r => r.success)) {
+        console.warn(`⚠️ DB deletion failed but S3 objects were already deleted. Manual cleanup may be needed.`);
+      }
+      
       return res.status(404).json({
         success: false,
-        message: 'Survey response not found'
+        message: 'Survey response not found or could not be deleted'
       });
     }
     
-    console.log(`✅ Survey response and images deleted successfully: ${id}`);
-    res.status(200).json({
+    console.log(`✅ Survey response deleted successfully: ${id}`);
+    console.log(`📊 Deletion Summary: DB=✅ | S3 Images: ${s3DeletionResults.filter(r => r.success).length}/${imageData.length} deleted`);
+    
+    // Prepare response with detailed results
+    const responseData = {
       success: true,
-      message: 'Survey response and images deleted successfully',
+      message: 'Survey response deleted successfully',
       data: {
         id: deletedResponse._id,
         leader: deletedResponse.leader,
         shopName: deletedResponse.shopName
-      }
-    });
+      },
+      imagesDeleted: s3DeletionResults.filter(r => r.success).length,
+      totalImages: imageData.length
+    };
+    
+    // Add warnings if there were S3 deletion failures
+    if (failedS3Deletions.length > 0) {
+      responseData.warnings = [`Failed to delete ${failedS3Deletions.length} image(s) from S3. Database record was still deleted.`];
+      responseData.failedImages = failedS3Deletions.map(f => ({ url: f.url, error: f.error }));
+    }
+    
+    res.status(200).json(responseData);
+    
   } catch (error) {
     console.error('❌ Error deleting survey response:', error);
     res.status(500).json({
@@ -303,41 +411,43 @@ const bulkDeleteSurveyResponses = async (req, res) => {
 
     console.log(`✅ Found ${responses.length} responses to delete, ${notFoundIds.length} not found`);
 
-    // Collect all image URLs that need to be deleted from S3
-    const imageUrls = [];
+    // Collect all image URLs and their S3 keys that need to be deleted from S3
+    const imageData = [];
     responses.forEach(response => {
       if (response.responses && Array.isArray(response.responses)) {
         response.responses.forEach(modelResp => {
           if (modelResp.images && Array.isArray(modelResp.images)) {
-            modelResp.images.forEach(url => imageUrls.push(url));
+            modelResp.images.forEach(url => {
+              const s3Key = extractS3KeyFromUrl(url);
+              if (s3Key) {
+                imageData.push({ url, s3Key });
+              } else {
+                console.warn(`⚠️ Could not extract S3 key from URL: ${url}`);
+              }
+            });
           }
         });
       }
     });
 
-    console.log(`📸 Found ${imageUrls.length} images to delete from S3`);
+    console.log(`📸 Found ${imageData.length} images to delete from S3`);
 
     // Delete images from S3 in parallel (with concurrency limit)
-    const deleteImagePromises = imageUrls.map(async (url) => {
+    const deleteImagePromises = imageData.map(async ({ url, s3Key }) => {
       try {
-        const match = url.match(/https?:\/\/.+?\.amazonaws\.com\/(.+)$/);
-        if (match && match[1]) {
-          const Key = decodeURIComponent(match[1]);
-          await s3.deleteObject({
-            Bucket: process.env.AWS_S3_BUCKET,
-            Key
-          }).promise();
-          return { url, success: true };
-        }
-        return { url, success: false, error: 'Invalid S3 URL format' };
+        await s3.deleteObject({
+          Bucket: process.env.AWS_S3_BUCKET,
+          Key: s3Key
+        }).promise();
+        return { url, s3Key, success: true };
       } catch (err) {
-        console.error('❌ Failed to delete image from S3:', url, err.message);
-        return { url, success: false, error: err.message };
+        console.error(`❌ Failed to delete S3 image: ${s3Key}`, err.message);
+        return { url, s3Key, success: false, error: err.message };
       }
     });
 
-    // Process S3 deletions with concurrency limit (10 at a time)
-    const batchSize = 10;
+    // Process S3 deletions with concurrency limit
+    const batchSize = DELETION_CONFIG.s3ConcurrencyLimit;
     const imageResults = [];
     for (let i = 0; i < deleteImagePromises.length; i += batchSize) {
       const batch = deleteImagePromises.slice(i, i + batchSize);
@@ -346,8 +456,21 @@ const bulkDeleteSurveyResponses = async (req, res) => {
     }
 
     const failedImages = imageResults.filter(result => !result.success);
+    
+    // Check if we should abort due to S3 failures (strict mode)
     if (failedImages.length > 0) {
-      console.log(`⚠️ Failed to delete ${failedImages.length} images from S3`);
+      if (DELETION_CONFIG.strictMode) {
+        console.error(`❌ ${failedImages.length} S3 deletions failed. Aborting bulk operation due to strict mode.`);
+        return res.status(500).json({
+          success: false,
+          message: `Failed to delete ${failedImages.length} image(s) from S3. Bulk operation aborted.`,
+          failedImages: failedImages.map(f => ({ url: f.url, error: f.error })),
+          totalImages: imageData.length,
+          affectedResponses: responses.length
+        });
+      } else {
+        console.warn(`⚠️ ${failedImages.length} S3 deletions failed, but proceeding with DB bulk deletion (non-strict mode)`);
+      }
     }
 
     // Delete survey responses from database in bulk
@@ -356,6 +479,7 @@ const bulkDeleteSurveyResponses = async (req, res) => {
     
     const successMessage = `Successfully deleted ${deleteResult.deletedCount} survey response(s)`;
     console.log(`✅ ${successMessage}`);
+    console.log(`📊 Bulk Deletion Summary: DB=${deleteResult.deletedCount}/${responses.length} | S3 Images: ${imageResults.filter(r => r.success).length}/${imageData.length} deleted`);
 
     // Prepare response with detailed results
     const responseData = {

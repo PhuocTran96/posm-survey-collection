@@ -20,7 +20,7 @@ class AdminDashboard {
         
         // Initialize components
         this.initUserManagement();
-        this.initAuditLogs();
+        
     }
 
     async checkAuth() {
@@ -239,7 +239,7 @@ class AdminDashboard {
         if (tabName === 'users' && !this.userManagement) {
             this.loadUserManagement();
         } else if (tabName === 'audit' && !this.auditLogs) {
-            this.loadAuditLogs();
+            
         } else if (tabName === 'survey-results') {
             window.location.href = 'survey-results.html';
         } else if (tabName === 'data-upload') {
@@ -369,122 +369,13 @@ class AdminDashboard {
         container.innerHTML = html;
     }
 
-    initAuditLogs() {
-        // Audit logs will be initialized when tab is first accessed
-    }
-
-    async loadAuditLogs() {
-        try {
-            const container = document.getElementById('auditContainer');
-            
-            container.innerHTML = `
-                <div style="margin-bottom: 20px;">
-                    <h3>📝 Nhật ký hoạt động</h3>
-                </div>
-                <div id="auditList">
-                    <div style="text-align: center; padding: 40px;">
-                        <div class="loading-spinner" style="margin: 0 auto 20px;"></div>
-                        <p>Đang tải nhật ký hoạt động...</p>
-                    </div>
-                </div>
-            `;
-
-            const response = await this.apiCall('/api/audit?limit=20');
-            
-            if (response.ok) {
-                const result = await response.json();
-                this.renderAuditLogs(result.data);
-            } else {
-                throw new Error('Failed to load audit logs');
-            }
-            
-        } catch (error) {
+     catch (error) {
             console.error('Error loading audit logs:', error);
             this.showNotification('Lỗi khi tải nhật ký hoạt động', 'error');
         }
     }
 
-    renderAuditLogs(logs) {
-        const container = document.getElementById('auditList');
-        
-        if (!logs || logs.length === 0) {
-            container.innerHTML = `
-                <div style="text-align: center; padding: 40px;">
-                    📝 Chưa có hoạt động nào
-                </div>
-            `;
-            return;
-        }
-
-        let html = `
-            <div style="overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    <thead>
-                        <tr style="background: #f8fafc;">
-                            <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0;">Thời gian</th>
-                            <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0;">Hành động</th>
-                            <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0;">Người thực hiện</th>
-                            <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0;">Đối tượng</th>
-                            <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0;">Trạng thái</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
-
-        logs.forEach(log => {
-            const statusBadge = log.success 
-                ? '<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Thành công</span>'
-                : '<span style="background: #ef4444; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px;">Thất bại</span>';
-
-            html += `
-                <tr style="border-bottom: 1px solid #f1f5f9;">
-                    <td style="padding: 12px;">${new Date(log.createdAt).toLocaleString('vi-VN')}</td>
-                    <td style="padding: 12px;">${log.action}</td>
-                    <td style="padding: 12px;">${log.performedBy}</td>
-                    <td style="padding: 12px;">${log.targetUser || '-'}</td>
-                    <td style="padding: 12px;">${statusBadge}</td>
-                </tr>
-            `;
-        });
-
-        html += `
-                    </tbody>
-                </table>
-            </div>
-        `;
-
-        container.innerHTML = html;
-    }
-
-    // User management actions
-    createUser() {
-        // For now, just show an alert
-        alert('Tính năng thêm người dùng sẽ được phát triển trong phiên bản tiếp theo.');
-    }
-
-    editUser(userId) {
-        // For now, just show an alert
-        alert(`Tính năng sửa người dùng sẽ được phát triển trong phiên bản tiếp theo. User ID: ${userId}`);
-    }
-
-    async deleteUser(userId, username) {
-        if (!confirm(`Bạn có chắc chắn muốn xóa người dùng "${username}"?`)) {
-            return;
-        }
-
-        try {
-            this.showLoading();
-            
-            const response = await this.apiCall(`/api/users/${userId}`, 'DELETE');
-            
-            if (response.ok) {
-                this.showNotification('Xóa người dùng thành công', 'success');
-                await this.loadUsersList(); // Reload the list
-            } else {
-                const result = await response.json();
-                throw new Error(result.message || 'Lỗi khi xóa người dùng');
-            }
-        } catch (error) {
+     catch (error) {
             console.error('Error deleting user:', error);
             this.showNotification(error.message, 'error');
         } finally {

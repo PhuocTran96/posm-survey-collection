@@ -1,4 +1,4 @@
-const { User, AuditLog } = require('../models');
+const { User } = require('../models');
 const { getClientInfo } = require('../middleware/auth');
 const csv = require('csv-parser');
 const fs = require('fs');
@@ -179,18 +179,6 @@ const createUser = async (req, res) => {
     await newUser.save();
 
     // Log user creation
-    await AuditLog.logAction({
-      action: 'USER_CREATED',
-      performedBy: currentUser.username,
-      performedByRole: currentUser.role,
-      targetUser: newUser.username,
-      details: {
-        userid: newUser.userid,
-        role: newUser.role,
-        leader: newUser.leader
-      },
-      ...getClientInfo(req)
-    });
 
     res.status(201).json({
       success: true,
@@ -326,19 +314,6 @@ const updateUser = async (req, res) => {
     await user.save();
 
     // Log user update
-    await AuditLog.logAction({
-      action: 'USER_UPDATED',
-      performedBy: currentUser.username,
-      performedByRole: currentUser.role,
-      targetUser: user.username,
-      details: {
-        updatedFields: Object.keys(req.body),
-        newRole: user.role,
-        newLeader: user.leader,
-        isActive: user.isActive
-      },
-      ...getClientInfo(req)
-    });
 
     res.json({
       success: true,
@@ -415,17 +390,6 @@ const deleteUser = async (req, res) => {
     await User.findByIdAndDelete(id);
 
     // Log user deletion
-    await AuditLog.logAction({
-      action: 'USER_DELETED',
-      performedBy: currentUser.username,
-      performedByRole: currentUser.role,
-      targetUser: user.username,
-      details: {
-        deletedUserId: user.userid,
-        deletedUserRole: user.role
-      },
-      ...getClientInfo(req)
-    });
 
     res.json({
       success: true,
@@ -500,17 +464,6 @@ const bulkDeleteUsers = async (req, res) => {
     const deleteResult = await User.deleteMany({ _id: { $in: ids } });
 
     // Log bulk deletion
-    await AuditLog.logAction({
-      action: 'USER_DELETED',
-      performedBy: currentUser.username,
-      performedByRole: currentUser.role,
-      details: {
-        bulkDelete: true,
-        deletedCount: deleteResult.deletedCount,
-        deletedUsers: users.map(u => u.username)
-      },
-      ...getClientInfo(req)
-    });
 
     res.json({
       success: true,
@@ -565,16 +518,6 @@ const resetUserPassword = async (req, res) => {
     await user.save();
 
     // Log password reset
-    await AuditLog.logAction({
-      action: 'PASSWORD_CHANGED',
-      performedBy: currentUser.username,
-      performedByRole: currentUser.role,
-      targetUser: user.username,
-      details: {
-        resetByAdmin: true
-      },
-      ...getClientInfo(req)
-    });
 
     res.json({
       success: true,
@@ -686,16 +629,6 @@ const importUsersFromCSV = async (req, res) => {
     }
 
     // Log import activity
-    await AuditLog.logAction({
-      action: 'CSV_IMPORT',
-      performedBy: currentUser.username,
-      performedByRole: currentUser.role,
-      details: {
-        fileName: req.file.originalname,
-        stats
-      },
-      ...getClientInfo(req)
-    });
 
     // Clean up uploaded file
     fs.unlinkSync(req.file.path);
@@ -762,16 +695,6 @@ const exportUsersToCSV = async (req, res) => {
     const filename = `users-export-${timestamp}.xlsx`;
 
     // Log export activity
-    await AuditLog.logAction({
-      action: 'CSV_EXPORT',
-      performedBy: currentUser.username,
-      performedByRole: currentUser.role,
-      details: {
-        fileName: filename,
-        userCount: users.length
-      },
-      ...getClientInfo(req)
-    });
 
     // Set response headers
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

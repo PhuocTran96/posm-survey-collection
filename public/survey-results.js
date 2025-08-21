@@ -122,13 +122,39 @@ class SurveyResultsApp {
 
     // Helper method to make authenticated API requests
     async makeAuthenticatedRequest(url, options = {}) {
+        const token = localStorage.getItem('accessToken');
+        if (!token) {
+            this.redirectToAdminLogin('No access token');
+            return null;
+        }
+
+        const authOptions = {
+            ...options,
+            headers: {
+                ...options.headers,
+                'Authorization': `Bearer ${token}`
+            }
+        };
+
+        // Only set Content-Type to application/json if not uploading files
+        // When uploading FormData, browser will set the correct Content-Type with boundary
+        if (!(options.body instanceof FormData)) {
+            authOptions.headers['Content-Type'] = 'application/json';
+        }
+
         try {
-            return await window.authManager.makeAuthenticatedRequest(url, options);
+            const response = await fetch(url, authOptions);
+            
+            // If unauthorized, clear tokens and redirect
+            if (response.status === 401) {
+                localStorage.clear();
+                this.redirectToAdminLogin('Session expired');
+                return null;
+            }
+            
+            return response;
         } catch (error) {
             console.error('API request failed:', error);
-            if (error.message.includes('Authentication failed')) {
-                this.redirectToAdminLogin('Authentication failed');
-            }
             throw error;
         }
     }
@@ -953,9 +979,5 @@ let surveyResultsApp;
 
 // Initialize the survey results app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize auth manager first
-    if (window.authManager) {
-        window.authManager.init();
-    }
     surveyResultsApp = new SurveyResultsApp();
 });

@@ -1,4 +1,4 @@
-const { User, AuditLog } = require('../models');
+const { User } = require('../models');
 const { generateTokens, getClientInfo } = require('../middleware/auth');
 
 /**
@@ -20,14 +20,6 @@ const login = async (req, res) => {
     
     if (!user) {
       // Log failed login attempt
-      await AuditLog.logAction({
-        action: 'USER_LOGIN',
-        performedBy: loginid,
-        performedByRole: 'unknown',
-        success: false,
-        errorMessage: 'User not found',
-        ...getClientInfo(req)
-      });
       
       return res.status(401).json({
         success: false,
@@ -37,14 +29,6 @@ const login = async (req, res) => {
 
     // Check if account is active
     if (!user.isActive) {
-      await AuditLog.logAction({
-        action: 'USER_LOGIN',
-        performedBy: user.username,
-        performedByRole: user.role,
-        success: false,
-        errorMessage: 'Account deactivated',
-        ...getClientInfo(req)
-      });
       
       return res.status(401).json({
         success: false,
@@ -56,14 +40,6 @@ const login = async (req, res) => {
     const isPasswordValid = await user.comparePassword(password);
     
     if (!isPasswordValid) {
-      await AuditLog.logAction({
-        action: 'USER_LOGIN',
-        performedBy: user.username,
-        performedByRole: user.role,
-        success: false,
-        errorMessage: 'Invalid password',
-        ...getClientInfo(req)
-      });
       
       return res.status(401).json({
         success: false,
@@ -81,13 +57,6 @@ const login = async (req, res) => {
     await user.save();
 
     // Log successful login
-    await AuditLog.logAction({
-      action: 'USER_LOGIN',
-      performedBy: user.username,
-      performedByRole: user.role,
-      success: true,
-      ...getClientInfo(req)
-    });
 
     // Return tokens and user info
     res.json({
@@ -135,14 +104,6 @@ const adminLogin = async (req, res) => {
     const user = await User.findOne({ loginid: loginid.trim() });
     
     if (!user || user.role !== 'admin') {
-      await AuditLog.logAction({
-        action: 'ADMIN_LOGIN',
-        performedBy: loginid,
-        performedByRole: user?.role || 'unknown',
-        success: false,
-        errorMessage: 'Not an admin user',
-        ...getClientInfo(req)
-      });
       
       return res.status(401).json({
         success: false,
@@ -152,14 +113,6 @@ const adminLogin = async (req, res) => {
 
     // Check if account is active
     if (!user.isActive) {
-      await AuditLog.logAction({
-        action: 'ADMIN_LOGIN',
-        performedBy: user.username,
-        performedByRole: user.role,
-        success: false,
-        errorMessage: 'Account deactivated',
-        ...getClientInfo(req)
-      });
       
       return res.status(401).json({
         success: false,
@@ -171,14 +124,6 @@ const adminLogin = async (req, res) => {
     const isPasswordValid = await user.comparePassword(password);
     
     if (!isPasswordValid) {
-      await AuditLog.logAction({
-        action: 'ADMIN_LOGIN',
-        performedBy: user.username,
-        performedByRole: user.role,
-        success: false,
-        errorMessage: 'Invalid password',
-        ...getClientInfo(req)
-      });
       
       return res.status(401).json({
         success: false,
@@ -196,13 +141,6 @@ const adminLogin = async (req, res) => {
     await user.save();
 
     // Log successful admin login
-    await AuditLog.logAction({
-      action: 'ADMIN_LOGIN',
-      performedBy: user.username,
-      performedByRole: user.role,
-      success: true,
-      ...getClientInfo(req)
-    });
 
     res.json({
       success: true,
@@ -246,13 +184,6 @@ const logout = async (req, res) => {
       });
 
       // Log logout
-      await AuditLog.logAction({
-        action: 'USER_LOGOUT',
-        performedBy: user.username,
-        performedByRole: user.role,
-        success: true,
-        ...getClientInfo(req)
-      });
     }
 
     res.json({
@@ -331,14 +262,6 @@ const changePassword = async (req, res) => {
     const isCurrentPasswordValid = await fullUser.comparePassword(currentPassword);
     
     if (!isCurrentPasswordValid) {
-      await AuditLog.logAction({
-        action: 'PASSWORD_CHANGED',
-        performedBy: user.username,
-        performedByRole: user.role,
-        success: false,
-        errorMessage: 'Invalid current password',
-        ...getClientInfo(req)
-      });
       
       return res.status(401).json({
         success: false,
@@ -358,14 +281,6 @@ const changePassword = async (req, res) => {
     });
 
     // Log password change
-    await AuditLog.logAction({
-      action: 'PASSWORD_CHANGED',
-      performedBy: user.username,
-      performedByRole: user.role,
-      targetUser: user.username,
-      success: true,
-      ...getClientInfo(req)
-    });
 
     res.json({
       success: true,

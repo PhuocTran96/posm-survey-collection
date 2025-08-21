@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management - POSM Survey Management</title>
+    <link rel="stylesheet" href="styles-admin.css">
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Navigation -->
+        <nav class="admin-nav">
+            <div class="nav-brand">
+                <h1>📊 POSM Survey Management</h1>
+            </div>
+            <div class="nav-menu">
+                <a href="survey-results.html" class="nav-item">
+                    📋 Kết quả khảo sát
+                </a>
+                <a href="data-upload.html" class="nav-item">
+                    📤 Quản lý dữ liệu
+                </a>
+                <a href="user-management.html" class="nav-item active">
+                    👥 Quản lý người dùng
+                </a>
+            </div>
+            <div class="nav-mobile-toggle" id="navMobileToggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </nav>
+
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="page-header-content">
+                <h1>👥 Quản lý người dùng</h1>
+                <p>Quản lý tài khoản người dùng, phân quyền và import/export dữ liệu</p>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="stats-container" id="userStatsContainer">
+            <!-- Stats will be loaded here -->
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <button id="addUserBtn" class="btn btn-primary">
+                ➕ Thêm người dùng
+            </button>
+            <button id="importUsersBtn" class="btn btn-secondary">
+                📤 Import CSV
+            </button>
+            <button id="exportUsersBtn" class="btn btn-green">
+                📥 Export CSV
+            </button>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters">
+            <div class="filter-group">
+                <label>Vai trò:</label>
+                <select id="roleFilter">
+                    <option value="">Tất cả vai trò</option>
+                    <option value="admin">Admin</option>
+                    <option value="user">User</option>
+                    <option value="PRT">PRT</option>
+                    <option value="TDS">TDS</option>
+                    <option value="TDL">TDL</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Trạng thái:</label>
+                <select id="statusFilter">
+                    <option value="">Tất cả</option>
+                    <option value="active">Hoạt động</option>
+                    <option value="inactive">Đã khóa</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Leader:</label>
+                <select id="leaderFilter">
+                    <option value="">Tất cả Leader</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Tìm kiếm:</label>
+                <input type="text" id="searchInput" placeholder="Tên, ID, email...">
+            </div>
+            <div class="filter-group">
+                <label>&nbsp;</label>
+                <button id="clearFiltersBtn" class="btn btn-secondary">Xóa bộ lọc</button>
+            </div>
+        </div>
+
+        <!-- Bulk Actions -->
+        <div class="bulk-actions">
+            <button id="selectAllUsersBtn" class="btn btn-secondary" type="button">
+                ☑️ Chọn tất cả
+            </button>
+            <button id="bulkActivateBtn" class="btn btn-green" disabled>
+                ✅ Kích hoạt các tài khoản đã chọn
+            </button>
+            <button id="bulkDeactivateBtn" class="btn btn-orange" disabled>
+                ❌ Khóa các tài khoản đã chọn
+            </button>
+            <button id="bulkDeleteUsersBtn" class="btn btn-danger" disabled>
+                🗑️ Xóa các tài khoản đã chọn
+            </button>
+        </div>
+
+        <!-- Users Table -->
+        <div class="users-container" id="usersContainer">
+            <!-- Users will be loaded here -->
+        </div>
+
+        <!-- Loading overlay -->
+        <div id="loadingOverlay" class="loading-overlay">
+            <div class="loading-spinner"></div>
+            <p>Đang tải dữ liệu...</p>
+        </div>
+
+        <!-- Add/Edit User Modal -->
+        <div id="userModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modalTitle">Thêm người dùng mới</h3>
+                    <button id="closeModalBtn" class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="userForm">
+                        <input type="hidden" id="userId" name="userId">
+                        
+                        <div class="form-group">
+                            <label for="userid">User ID <span class="required">*</span></label>
+                            <input type="text" id="userid" name="userid" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="username">Họ và tên <span class="required">*</span></label>
+                            <input type="text" id="username" name="username" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="loginid">Login ID <span class="required">*</span></label>
+                            <input type="text" id="loginid" name="loginid" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="role">Vai trò <span class="required">*</span></label>
+                            <select id="role" name="role" required>
+                                <option value="">Chọn vai trò</option>
+                                <option value="admin">Admin</option>
+                                <option value="user">User</option>
+                                <option value="PRT">PRT</option>
+                                <option value="TDS">TDS</option>
+                                <option value="TDL">TDL</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="leader">Leader</label>
+                            <input type="text" id="leader" name="leader">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="password">Mật khẩu <span class="required">*</span></label>
+                            <input type="password" id="password" name="password" required>
+                            <small>Ít nhất 6 ký tự</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="isActive" name="isActive" checked>
+                                Tài khoản hoạt động
+                            </label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button id="saveUserBtn" class="btn btn-primary">Lưu</button>
+                    <button id="cancelUserBtn" class="btn btn-secondary">Hủy</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import CSV Modal -->
+        <div id="importModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Import người dùng từ CSV</h3>
+                    <button id="closeImportModalBtn" class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="import-info">
+                        <h4>Định dạng file CSV:</h4>
+                        <p>File CSV cần có các cột sau (hàng đầu tiên là header):</p>
+                        <code>userid,username,loginid,role,leader,password,isActive</code>
+                        
+                        <h4>Ví dụ:</h4>
+                        <pre>userid,username,loginid,role,leader,password,isActive
+ELUX00001,Nguyen Van A,nvana@company.com,PRT,Tran Van B,123456,true
+ELUX00002,Le Thi C,lthic@company.com,TDS,Tran Van B,123456,true</pre>
+                        
+                        <div class="import-notes">
+                            <strong>Lưu ý:</strong>
+                            <ul>
+                                <li>File tối đa 5MB</li>
+                                <li>Chỉ hỗ trợ định dạng .csv, .xlsx, .xls</li>
+                                <li>Nếu userid đã tồn tại, thông tin sẽ được cập nhật</li>
+                                <li>isActive: true/false hoặc 1/0</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="file-upload-area">
+                        <input type="file" id="csvFileInput" accept=".csv,.xlsx,.xls" style="display: none;">
+                        <div class="file-drop-zone" id="fileDropZone">
+                            <div class="file-drop-content">
+                                <div class="file-drop-icon">📄</div>
+                                <div class="file-drop-text">
+                                    <p><strong>Kéo thả file CSV vào đây</strong></p>
+                                    <p>hoặc <button type="button" id="selectFileBtn" class="btn-link">chọn file</button></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="selectedFileInfo" class="selected-file-info" style="display: none;">
+                            <span id="selectedFileName"></span>
+                            <button type="button" id="removeFileBtn" class="btn-remove">×</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="importBtn" class="btn btn-primary" disabled>Import</button>
+                    <button id="cancelImportBtn" class="btn btn-secondary">Hủy</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Confirm delete dialog -->
+        <div id="confirmDeleteDialog" class="confirm-dialog">
+            <div class="confirm-content">
+                <h3>Xác nhận xóa</h3>
+                <p id="deleteConfirmText">Bạn có chắc chắn muốn xóa người dùng này?</p>
+                <div class="confirm-buttons">
+                    <button id="btnConfirmDelete" class="btn-confirm">Xóa</button>
+                    <button id="btnCancelDelete" class="btn-cancel">Hủy</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="user-management.js"></script>
+</body>
+</html>

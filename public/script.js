@@ -136,10 +136,15 @@ class SurveyApp {
             ...options,
             headers: {
                 ...options.headers,
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
+                'Authorization': `Bearer ${token}`
             }
         };
+
+        // Only set Content-Type to application/json if not uploading files
+        // When uploading FormData, browser will set the correct Content-Type with boundary
+        if (!(options.body instanceof FormData)) {
+            authOptions.headers['Content-Type'] = 'application/json';
+        }
 
         try {
             const response = await fetch(url, authOptions);

@@ -126,6 +126,18 @@ app.get('/admin-dashboard.html', protectAdminPage, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin-dashboard.html'));
 });
 
+app.get('/survey-results.html', protectAdminPage, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'survey-results.html'));
+});
+
+app.get('/data-upload.html', protectAdminPage, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'data-upload.html'));
+});
+
+app.get('/user-management.html', protectAdminPage, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'user-management.html'));
+});
+
 // Static files (CSS, JS, images) - these should be served last
 app.use(express.static('public', {
   index: false // Prevent serving index.html automatically

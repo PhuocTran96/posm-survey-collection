@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { User, AuditLog } = require('../models');
+const { User } = require('../models');
 
 // JWT Secret keys (should be in environment variables)
 const ACCESS_TOKEN_SECRET = process.env.JWT_ACCESS_SECRET || 'your-super-secret-access-key-change-in-production';
@@ -254,30 +254,6 @@ const getClientInfo = (req) => {
   };
 };
 
-/**
- * Middleware to log user activity
- */
-const logActivity = (action) => {
-  return async (req, res, next) => {
-    if (req.user) {
-      const clientInfo = getClientInfo(req);
-      
-      await AuditLog.logAction({
-        action,
-        performedBy: req.user.username,
-        performedByRole: req.user.role,
-        targetUser: req.params.id || req.body.targetUser || null,
-        details: {
-          endpoint: req.originalUrl,
-          method: req.method,
-          ...clientInfo
-        },
-        ...clientInfo
-      });
-    }
-    next();
-  };
-};
 
 /**
  * Optional authentication middleware (doesn't fail if no token)
@@ -315,7 +291,6 @@ module.exports = {
   requireManager,
   refreshAccessToken,
   getClientInfo,
-  logActivity,
   optionalAuth,
   
   // Constants

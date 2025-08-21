@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const userController = require('../controllers/userController');
-const { verifyToken, requireAdmin, logActivity } = require('../middleware/auth');
+const { verifyToken, requireAdmin } = require('../middleware/auth');
 
 // Configure multer for CSV uploads
 const storage = multer.diskStorage({
@@ -38,26 +38,24 @@ router.use(verifyToken);
 router.use(requireAdmin);
 
 // User CRUD operations
-router.get('/', logActivity('USER_VIEW'), userController.getUsers);
-router.get('/stats', logActivity('USER_STATS'), userController.getUserStats);
-router.get('/:id', logActivity('USER_VIEW'), userController.getUserById);
-router.post('/', logActivity('USER_CREATED'), userController.createUser);
-router.put('/:id', logActivity('USER_UPDATED'), userController.updateUser);
-router.delete('/:id', logActivity('USER_DELETED'), userController.deleteUser);
-router.delete('/bulk/delete', logActivity('USER_DELETED'), userController.bulkDeleteUsers);
+router.get('/', userController.getUsers);
+router.get('/stats', userController.getUserStats);
+router.get('/:id', userController.getUserById);
+router.post('/', userController.createUser);
+router.put('/:id', userController.updateUser);
+router.delete('/:id', userController.deleteUser);
+router.delete('/bulk/delete', userController.bulkDeleteUsers);
 
 // Password management
-router.post('/:id/reset-password', logActivity('PASSWORD_CHANGED'), userController.resetUserPassword);
+router.post('/:id/reset-password', userController.resetUserPassword);
 
 // CSV import/export
 router.post('/import/csv', 
   upload.single('csvFile'), 
-  logActivity('CSV_IMPORT'), 
   userController.importUsersFromCSV
 );
 
 router.get('/export/csv', 
-  logActivity('CSV_EXPORT'), 
   userController.exportUsersToCSV
 );
 

@@ -27,7 +27,7 @@ const fs = require('fs');
 const path = require('path');
 const csv = require('csv-parser');
 const mongoose = require('mongoose');
-const { User, AuditLog } = require('./src/models');
+const { User } = require('./src/models');
 
 // Configuration
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/posm-survey';
@@ -145,17 +145,6 @@ CSV Example:
       }
 
       const superAdmin = await User.createSuperAdmin(DEFAULT_SUPER_ADMIN);
-      
-      await AuditLog.logAction({
-        action: 'USER_CREATED',
-        performedBy: 'system',
-        performedByRole: 'system',
-        targetUser: superAdmin.username,
-        details: {
-          method: 'script',
-          isSuperAdmin: true
-        }
-      });
 
       console.log('✅ Super admin created successfully');
       console.log(`   Username: ${superAdmin.username}`);
@@ -176,16 +165,6 @@ CSV Example:
     
     const result = await User.deleteMany({ isSuperAdmin: { $ne: true } });
     console.log(`   Deleted ${result.deletedCount} users`);
-    
-    await AuditLog.logAction({
-      action: 'BULK_USER_IMPORT',
-      performedBy: 'system',
-      performedByRole: 'system',
-      details: {
-        action: 'clear_users',
-        deletedCount: result.deletedCount
-      }
-    });
   }
 
   validateUserData(userData, lineNumber) {
@@ -266,17 +245,6 @@ CSV Example:
           
           this.stats.updated++;
           console.log(`📝 Updated: ${cleanUserData.username}`);
-          
-          await AuditLog.logAction({
-            action: 'USER_UPDATED',
-            performedBy: 'system',
-            performedByRole: 'system',
-            targetUser: cleanUserData.username,
-            details: {
-              method: 'csv-import',
-              line: lineNumber
-            }
-          });
         } else {
           // Skip existing user
           this.stats.skipped++;
@@ -289,17 +257,6 @@ CSV Example:
         
         this.stats.created++;
         console.log(`✅ Created: ${cleanUserData.username}`);
-        
-        await AuditLog.logAction({
-          action: 'USER_CREATED',
-          performedBy: 'system',
-          performedByRole: 'system',
-          targetUser: cleanUserData.username,
-          details: {
-            method: 'csv-import',
-            line: lineNumber
-          }
-        });
       }
 
     } catch (error) {

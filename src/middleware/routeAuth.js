@@ -13,16 +13,22 @@ const protectRoute = (options = {}) => {
   } = options;
   
   return async (req, res, next) => {
-    // For browser requests, always redirect to login
-    // Frontend JavaScript will handle authentication check
-    return res.redirect(redirectTo);
-
+    // For browser navigation requests, serve the HTML page and let frontend JavaScript handle auth
+    // Only check auth headers for API requests or requests with explicit auth headers
+    const authHeader = req.headers.authorization;
+    const isApiRequest = req.path.startsWith('/api/');
+    const hasAuthHeader = authHeader && authHeader.startsWith('Bearer ');
+    
+    // If this is a browser navigation (no auth header) and not an API request,
+    // serve the page and let frontend JavaScript handle authentication
+    if (!hasAuthHeader && !isApiRequest) {
+      return next();
+    }
+    
     try {
-      // Check for token in Authorization header
-      const authHeader = req.headers.authorization;
       let token = null;
       
-      if (authHeader && authHeader.startsWith('Bearer ')) {
+      if (hasAuthHeader) {
         token = authHeader.substring(7);
       }
       

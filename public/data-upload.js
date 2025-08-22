@@ -4,8 +4,123 @@ class DataUploadApp {
     }
 
     init() {
+        this.checkAuthentication();
         this.initNavigation();
         this.initUploadFunctionality();
+    }
+
+    // Authentication methods
+    checkAuthentication() {
+        const token = localStorage.getItem('accessToken');
+        if (!token) {
+            console.warn('⚠️ No access token found. Redirecting to admin login...');
+            window.location.href = '/admin-login.html';
+            return false;
+        }
+        return true;
+    }
+
+    clearAuthData() {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+    }
+
+    // Token refresh method
+    async refreshToken() {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) {
+            console.log('No refresh token available');
+            return false;
+        }
+
+        try {
+            const response = await fetch('/api/auth/refresh', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ refreshToken })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                    // Update tokens in localStorage
+                    localStorage.setItem('accessToken', result.data.accessToken);
+                    localStorage.setItem('refreshToken', result.data.refreshToken);
+                    localStorage.setItem('user', JSON.stringify(result.data.user));
+                    console.log('Token refreshed successfully');
+                    return true;
+                }
+            }
+            
+            console.log('Token refresh failed:', response.status);
+            return false;
+        } catch (error) {
+            console.error('Token refresh error:', error);
+            return false;
+        }
+    }
+
+    // Authenticated fetch with token refresh
+    async authenticatedFetch(url, options = {}, retryCount = 0) {
+        let token = localStorage.getItem('accessToken');
+        if (!token) {
+            console.error('🚫 No access token found in localStorage');
+            window.location.href = '/admin-login.html';
+            return null;
+        }
+
+        const authOptions = {
+            ...options,
+            headers: {
+                ...options.headers,
+                'Authorization': `Bearer ${token}`
+            }
+        };
+
+        // Only set Content-Type to application/json if not uploading files
+        if (!(options.body instanceof FormData) && !authOptions.headers['Content-Type']) {
+            authOptions.headers['Content-Type'] = 'application/json';
+        }
+
+        console.log(`🌐 Making authenticated request to: ${url}`);
+
+        try {
+            const response = await fetch(url, authOptions);
+            
+            console.log(`📡 Response status: ${response.status} ${response.statusText}`);
+            
+            // If unauthorized, try to refresh token once
+            if (response.status === 401 && retryCount === 0) {
+                console.log('🔄 Token expired (401), attempting refresh...');
+                
+                const refreshSuccess = await this.refreshToken();
+                if (refreshSuccess) {
+                    console.log('✅ Token refreshed, retrying request...');
+                    // Retry the original request with new token
+                    return await this.authenticatedFetch(url, options, 1);
+                } else {
+                    console.error('❌ Token refresh failed, redirecting to login');
+                    // Refresh failed, redirect to login
+                    this.clearAuthData();
+                    window.location.href = '/admin-login.html';
+                    return null;
+                }
+            } else if (response.status === 401) {
+                console.error('❌ Authentication failed after retry, redirecting to login');
+                // Already retried once, redirect to login
+                this.clearAuthData();
+                window.location.href = '/admin-login.html';
+                return null;
+            }
+
+            return response;
+        } catch (error) {
+            console.error('❌ API call failed:', error);
+            throw error;
+        }
     }
 
     initNavigation() {
@@ -196,6 +311,17 @@ class DataUploadApp {
         const uploadBtn = form.querySelector('.upload-btn');
         const resultDiv = document.getElementById(`${type}Result`);
 
+        // Check if we have an access token
+        const token = localStorage.getItem('accessToken');
+        if (!token) {
+            console.error('❌ No access token found in localStorage');
+            this.showUploadResult(type, 'error', {
+                message: 'Không tìm thấy thông tin đăng nhập. Vui lòng đăng nhập lại từ trang Admin Login.'
+            });
+            window.location.href = '/admin-login.html';
+            return;
+        }
+
         if (!fileInput.files[0]) {
             alert('Vui lòng chọn file CSV');
             return;
@@ -223,10 +349,44 @@ class DataUploadApp {
 
             console.log(`📤 Starting ${type} upload...`);
 
-            const response = await fetch(`/api/data-upload/${type}`, {
+            // Debug: Check token status before upload
+            const currentToken = localStorage.getItem('accessToken');
+            const refreshToken = localStorage.getItem('refreshToken');
+            console.log(`🔑 Token status - Access: ${currentToken ? 'Present' : 'Missing'}, Refresh: ${refreshToken ? 'Present' : 'Missing'}`);
+
+            const response = await this.authenticatedFetch(`/api/data-upload/${type}`, {
                 method: 'POST',
                 body: formData
             });
+
+            // Check if authentication failed (response is null)
+            if (!response) {
+                this.showUploadResult(type, 'error', {
+                    message: 'Xác thực không thành công. Vui lòng thử đăng nhập lại.'
+                });
+                return;
+            }
+
+            // Check for HTTP errors
+            if (!response.ok) {
+                const errorText = await response.text();
+                let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                
+                try {
+                    const errorData = JSON.parse(errorText);
+                    errorMessage = errorData.message || errorMessage;
+                } catch (e) {
+                    // Use the raw text if it's not JSON
+                    if (errorText) {
+                        errorMessage = errorText;
+                    }
+                }
+                
+                this.showUploadResult(type, 'error', {
+                    message: errorMessage
+                });
+                return;
+            }
 
             const result = await response.json();
 
@@ -302,7 +462,13 @@ class DataUploadApp {
 
     async loadUploadStats() {
         try {
-            const response = await fetch('/api/data-upload/stats');
+            const response = await this.authenticatedFetch('/api/data-upload/stats');
+            
+            if (!response) {
+                console.error('Failed to load upload stats: Authentication failed');
+                return;
+            }
+
             const result = await response.json();
 
             if (result.success) {

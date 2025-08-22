@@ -124,9 +124,9 @@ class SurveyApp {
         }
     }
 
-    // Helper method for authenticated API calls
-    async authenticatedFetch(url, options = {}) {
-        const token = localStorage.getItem('accessToken');
+    // Helper method for authenticated API calls with token refresh
+    async authenticatedFetch(url, options = {}, retryCount = 0) {
+        let token = localStorage.getItem('accessToken');
         if (!token) {
             this.redirectToLogin('No access token');
             return null;
@@ -142,17 +142,31 @@ class SurveyApp {
 
         // Only set Content-Type to application/json if not uploading files
         // When uploading FormData, browser will set the correct Content-Type with boundary
-        if (!(options.body instanceof FormData)) {
+        if (!(options.body instanceof FormData) && !authOptions.headers['Content-Type']) {
             authOptions.headers['Content-Type'] = 'application/json';
         }
 
         try {
             const response = await fetch(url, authOptions);
             
-            // If unauthorized, clear tokens and redirect
-            if (response.status === 401) {
+            // If unauthorized, try to refresh token once
+            if (response.status === 401 && retryCount === 0) {
+                console.log('Token expired, attempting refresh...');
+                
+                const refreshSuccess = await this.refreshToken();
+                if (refreshSuccess) {
+                    // Retry the original request with new token
+                    return await this.authenticatedFetch(url, options, 1);
+                } else {
+                    // Refresh failed, redirect to login
+                    this.clearAuthData();
+                    this.redirectToLogin('Session expired, please login again');
+                    return null;
+                }
+            } else if (response.status === 401) {
+                // Already retried once, redirect to login
                 this.clearAuthData();
-                this.redirectToLogin('Session expired');
+                this.redirectToLogin('Authentication failed');
                 return null;
             }
             
@@ -160,6 +174,43 @@ class SurveyApp {
         } catch (error) {
             console.error('API request failed:', error);
             throw error;
+        }
+    }
+
+    // Token refresh method
+    async refreshToken() {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) {
+            console.log('No refresh token available');
+            return false;
+        }
+
+        try {
+            const response = await fetch('/api/auth/refresh', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ refreshToken })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                    // Update tokens in localStorage
+                    localStorage.setItem('accessToken', result.data.accessToken);
+                    localStorage.setItem('refreshToken', result.data.refreshToken);
+                    localStorage.setItem('user', JSON.stringify(result.data.user));
+                    console.log('Token refreshed successfully');
+                    return true;
+                }
+            }
+            
+            console.log('Token refresh failed:', response.status);
+            return false;
+        } catch (error) {
+            console.error('Token refresh error:', error);
+            return false;
         }
     }
 

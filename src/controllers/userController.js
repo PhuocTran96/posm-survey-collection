@@ -1,4 +1,4 @@
-const { User } = require('../models');
+const { User, Store } = require('../models');
 const { getClientInfo } = require('../middleware/auth');
 const csv = require('csv-parser');
 const fs = require('fs');
@@ -611,6 +611,22 @@ const importUsersFromCSV = async (req, res) => {
           ]
         });
 
+        // Process assigned stores - convert store_id to ObjectIds
+        let assignedStoreIds = [];
+        if (userData.assignedStores) {
+          const storeIds = typeof userData.assignedStores === 'string' ? 
+            userData.assignedStores.split(';').map(s => s.trim()).filter(s => s) : 
+            userData.assignedStores;
+          
+          if (storeIds.length > 0) {
+            // Find stores by store_id and get their ObjectIds
+            const foundStores = await Store.find({ 
+              store_id: { $in: storeIds } 
+            }).select('_id');
+            assignedStoreIds = foundStores.map(store => store._id);
+          }
+        }
+
         const cleanUserData = {
           userid: userData.userid.trim(),
           username: userData.username.trim(),
@@ -618,6 +634,7 @@ const importUsersFromCSV = async (req, res) => {
           password: userData.password.trim(),
           role: userData.role.trim(),
           leader: userData.leader?.trim() || null,
+          assignedStores: assignedStoreIds,
           createdBy: currentUser.username,
           updatedBy: currentUser.username
         };
@@ -680,9 +697,10 @@ const exportUsersToCSV = async (req, res) => {
   try {
     const currentUser = req.user;
     
-    // Get all users (excluding passwords)
+    // Get all users (excluding passwords) with populated store details
     const users = await User.find({})
       .select('-password -refreshToken -refreshTokenExpiry')
+      .populate('assignedStores', 'store_id')
       .sort({ createdAt: -1 });
 
     // Create workbook
@@ -695,6 +713,8 @@ const exportUsersToCSV = async (req, res) => {
       loginid: user.loginid,
       role: user.role,
       leader: user.leader || '',
+      assignedStores: Array.isArray(user.assignedStores) ? 
+        user.assignedStores.map(store => store.store_id || store).join(';') : '',
       isActive: user.isActive,
       lastLogin: user.lastLogin ? user.lastLogin.toISOString() : '',
       createdAt: user.createdAt ? user.createdAt.toISOString() : '',

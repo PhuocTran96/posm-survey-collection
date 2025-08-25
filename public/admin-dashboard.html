@@ -289,6 +289,7 @@
         <div class="nav-tabs">
             <button class="nav-tab active" onclick="switchTab('dashboard')">📊 Tổng quan</button>
             <button class="nav-tab" onclick="switchTab('users')">👥 Quản lý người dùng</button>
+            <button class="nav-tab" onclick="switchTab('displays')">🖥️ Quản lý Display</button>
             <button class="nav-tab" onclick="switchTab('survey-results')">📋 Kết quả khảo sát</button>
             <button class="nav-tab" onclick="switchTab('data-upload')">📤 Quản lý dữ liệu</button>
         </div>
@@ -305,6 +306,11 @@
                     <div class="quick-action-icon">👥</div>
                     <div class="quick-action-title">Quản lý người dùng</div>
                     <div class="quick-action-desc">Thêm, sửa, xóa tài khoản</div>
+                </a>
+                <a href="#" class="quick-action-btn" onclick="switchTab('displays')">
+                    <div class="quick-action-icon">🖥️</div>
+                    <div class="quick-action-title">Quản lý Display</div>
+                    <div class="quick-action-desc">Quản lý trạng thái display</div>
                 </a>
                 <a href="#" class="quick-action-btn" onclick="switchTab('survey-results')">
                     <div class="quick-action-icon">📋</div>
@@ -331,6 +337,17 @@
                 <div style="text-align: center; padding: 40px;">
                     <div class="loading-spinner" style="margin: 0 auto 20px;"></div>
                     <p>Đang tải quản lý người dùng...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Display Management Tab -->
+        <div id="displays" class="tab-content">
+            <div id="displayManagementContainer">
+                <!-- Display management will be loaded here -->
+                <div style="text-align: center; padding: 40px;">
+                    <div class="loading-spinner" style="margin: 0 auto 20px;"></div>
+                    <p>Đang tải quản lý display...</p>
                 </div>
             </div>
         </div>

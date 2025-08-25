@@ -269,7 +269,7 @@ class StoreManagement {
 
     async loadFilterOptions() {
         try {
-            const response = await fetch('/api/stores?limit=1000', {
+            const response = await fetch('/api/stores?limit=5000', {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
 

@@ -6,6 +6,7 @@ const dataUploadRoutes = require('./dataUploadRoutes');
 const authRoutes = require('./authRoutes');
 const userRoutes = require('./userRoutes');
 const storeRoutes = require('./storeRoutes');
+const displayRoutes = require('./displayRoutes');
 
 const router = express.Router();
 
@@ -17,6 +18,9 @@ router.use('/api/users', userRoutes);
 
 // Store management routes
 router.use('/api/stores', storeRoutes);
+
+// Display management routes
+router.use('/api/displays', displayRoutes);
 
 // Existing routes
 router.use('/api', uploadRoutes);

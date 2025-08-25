@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Display Management - POSM Survey Management</title>
+    <link rel="stylesheet" href="styles-admin.css">
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Navigation -->
+        <nav class="admin-nav">
+            <div class="nav-brand">
+                <h1>📊 POSM Survey Management</h1>
+            </div>
+            <div class="nav-menu">
+                <a href="survey-results.html" class="nav-item">
+                    📋 Kết quả khảo sát
+                </a>
+                <a href="data-upload.html" class="nav-item">
+                    📤 Quản lý dữ liệu
+                </a>
+                <a href="user-management.html" class="nav-item">
+                    👥 Quản lý người dùng
+                </a>
+                <a href="store-management.html" class="nav-item">
+                    🏪 Quản lý cửa hàng
+                </a>
+                <a href="display-management.html" class="nav-item active">
+                    🖥️ Quản lý Display
+                </a>
+            </div>
+            <div class="nav-mobile-toggle" id="navMobileToggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </nav>
+
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="page-header-content">
+                <h1>🖥️ Quản lý Display</h1>
+                <p>Quản lý trạng thái hiển thị của các model POSM tại các cửa hàng</p>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="stats-container" id="displayStatsContainer">
+            <!-- Stats will be loaded here -->
+        </div>
+
+        <!-- Actions -->
+        <div class="actions-bar">
+            <div class="action-group">
+                <button class="btn btn-primary" id="addDisplayBtn">
+                    ➕ Thêm Display
+                </button>
+                <button class="btn btn-secondary" id="importDisplayBtn">
+                    📥 Import CSV/Excel
+                </button>
+                <button class="btn btn-success" id="exportDisplayBtn">
+                    📤 Xuất Excel
+                </button>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters">
+            <div class="filter-group">
+                <label>Store ID:</label>
+                <input type="text" id="storeIdFilter" placeholder="Tìm theo Store ID">
+            </div>
+            <div class="filter-group">
+                <label>Model:</label>
+                <input type="text" id="modelFilter" placeholder="Tìm theo Model">
+            </div>
+            <div class="filter-group">
+                <label>Trạng thái:</label>
+                <select id="displayStatusFilter">
+                    <option value="">Tất cả</option>
+                    <option value="true">Đang hiển thị</option>
+                    <option value="false">Ẩn</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Tìm kiếm:</label>
+                <input type="text" id="searchInput" placeholder="Tìm kiếm tổng quát">
+            </div>
+            <div class="filter-group">
+                <label>&nbsp;</label>
+                <button id="clearFiltersBtn" class="btn btn-outline">🧹 Xóa bộ lọc</button>
+            </div>
+        </div>
+
+        <!-- Bulk Actions -->
+        <div class="bulk-actions">
+            <button id="selectAllDisplaysBtn" class="btn btn-secondary" disabled>
+                ☑️ Chọn tất cả
+            </button>
+            <button id="bulkShowBtn" class="btn btn-success" disabled>
+                👁️ Hiển thị đã chọn
+            </button>
+            <button id="bulkHideBtn" class="btn btn-warning" disabled>
+                🙈 Ẩn đã chọn
+            </button>
+            <button id="bulkDeleteBtn" class="btn btn-danger" disabled>
+                🗑️ Xóa đã chọn
+            </button>
+        </div>
+
+        <!-- Display List -->
+        <div class="data-container" id="displaysContainer">
+            <!-- Displays will be loaded here -->
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination-container" id="paginationContainer">
+            <!-- Pagination will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Add/Edit Display Modal -->
+    <div id="displayModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="displayModalTitle">Thêm Display Mới</h3>
+                <span class="close" id="closeDisplayModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="displayForm">
+                    <input type="hidden" id="displayId">
+                    
+                    <div class="form-group">
+                        <label for="storeIdInput">Store ID *</label>
+                        <input type="text" id="storeIdInput" name="store_id" required 
+                               placeholder="Nhập Store ID">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="modelInput">Model *</label>
+                        <input type="text" id="modelInput" name="model" required 
+                               placeholder="Nhập Model">
+                    </div>
+
+                    <div class="form-group checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="isDisplayedInput" name="is_displayed" checked>
+                            <span class="checkmark"></span>
+                            Đang hiển thị
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="cancelDisplayBtn">Hủy</button>
+                <button type="button" class="btn btn-primary" id="saveDisplayBtn">Lưu</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div id="importModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📥 Import Display Records</h3>
+                <span class="close" id="closeImportModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="import-instructions">
+                    <h4>Hướng dẫn import:</h4>
+                    <ul>
+                        <li>File CSV/Excel phải có các cột: <strong>store_id, model, is_displayed</strong></li>
+                        <li><strong>is_displayed</strong>: 1 = hiển thị, 0 = ẩn</li>
+                        <li>Kích thước file tối đa: 10MB</li>
+                        <li>Các bản ghi trùng lặp (cùng store_id và model) sẽ được cập nhật</li>
+                    </ul>
+                </div>
+                
+                <div class="file-upload-area" id="fileUploadArea">
+                    <div class="file-upload-content">
+                        <div class="file-upload-icon">📄</div>
+                        <p>Kéo thả file vào đây hoặc</p>
+                        <button type="button" class="btn btn-outline" id="selectFileBtn">Chọn file</button>
+                        <p class="file-format-hint">Hỗ trợ: CSV, XLSX, XLS</p>
+                    </div>
+                </div>
+
+                <div class="selected-file-info" id="selectedFileInfo" style="display: none;">
+                    <div class="file-info">
+                        <span class="file-icon">📄</span>
+                        <span id="selectedFileName" class="file-name"></span>
+                        <span id="selectedFileSize" class="file-size"></span>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-danger" id="removeFileBtn">✕</button>
+                </div>
+
+                <input type="file" id="csvFileInput" accept=".csv,.xlsx,.xls" style="display: none;">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="cancelImportBtn">Hủy</button>
+                <button type="button" class="btn btn-primary" id="startImportBtn" disabled>Import</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h3>⚠️ Xác nhận xóa</h3>
+                <span class="close" id="closeDeleteModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p id="deleteMessage">Bạn có chắc chắn muốn xóa bản ghi display này?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="cancelDeleteBtn">Hủy</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Xóa</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p>Đang xử lý...</p>
+    </div>
+
+    <!-- Scripts -->
+    <script src="pagination-component.js"></script>
+    <script src="display-management.js"></script>
+    <script>
+        // Initialize display management when page loads
+        let displayManager;
+        document.addEventListener('DOMContentLoaded', () => {
+            displayManager = new DisplayManagement();
+        });
+        
+        // Mobile navigation toggle
+        document.getElementById('navMobileToggle').addEventListener('click', function() {
+            const navMenu = document.querySelector('.nav-menu');
+            navMenu.classList.toggle('active');
+        });
+    </script>
+</body>
+</html>

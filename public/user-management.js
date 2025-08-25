@@ -612,7 +612,7 @@ class UserManagementApp {
 
     async loadStoresForAssignment() {
         try {
-            const response = await this.makeAuthenticatedRequest('/api/stores?limit=1000');
+            const response = await this.makeAuthenticatedRequest('/api/stores?limit=5000');
             if (response && response.ok) {
                 const storesData = await response.json();
                 this.allStores = storesData.success ? storesData.data : [];

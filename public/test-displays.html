@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Display Management</title>
+</head>
+<body>
+    <h1>Display Management Test</h1>
+    <p>If you can see this page, the server is serving static files correctly.</p>
+    <button onclick="testDisplayAPI()">Test Display API</button>
+    <div id="result"></div>
+
+    <script>
+        console.log('Test page loaded successfully');
+        
+        async function testDisplayAPI() {
+            try {
+                const response = await fetch('/api/displays');
+                const result = await response.json();
+                document.getElementById('result').innerHTML = `
+                    <h3>API Response:</h3>
+                    <pre>${JSON.stringify(result, null, 2)}</pre>
+                `;
+                console.log('API Response:', result);
+            } catch (error) {
+                document.getElementById('result').innerHTML = `
+                    <h3>Error:</h3>
+                    <p>${error.message}</p>
+                `;
+                console.error('API Error:', error);
+            }
+        }
+        
+        // Test if display management files exist
+        fetch('/display-management.html')
+            .then(response => {
+                console.log('display-management.html status:', response.status);
+            });
+            
+        fetch('/display-management.js')
+            .then(response => {
+                console.log('display-management.js status:', response.status);
+            });
+    </script>
+</body>
+</html>

@@ -4,6 +4,7 @@ class AdminDashboard {
         this.accessToken = null;
         this.activeTab = 'dashboard';
         this.userManagement = null;
+        this.displayManagement = null;
         this.auditLogs = null;
         this.init();
     }
@@ -238,6 +239,8 @@ class AdminDashboard {
         // Load content for specific tabs
         if (tabName === 'users' && !this.userManagement) {
             this.loadUserManagement();
+        } else if (tabName === 'displays' && !this.displayManagement) {
+            this.loadDisplayManagement();
         } else if (tabName === 'audit' && !this.auditLogs) {
             
         } else if (tabName === 'survey-results') {
@@ -428,6 +431,59 @@ class AdminDashboard {
         } finally {
             this.hideLoading();
         }
+    }
+
+    // Display Management Functions
+    async loadDisplayManagement() {
+        try {
+            const container = document.getElementById('displayManagementContainer');
+            
+            // Load the display management HTML content
+            const response = await fetch('display-management.html');
+            const html = await response.text();
+            container.innerHTML = html;
+            
+            // Load and initialize the display management JavaScript
+            if (!window.displayManagement) {
+                await this.loadScript('display-management.js');
+                // Initialize display management
+                setTimeout(() => {
+                    window.displayManagement = new DisplayManagement();
+                }, 100);
+            }
+            
+            // Load pagination component if not already loaded
+            if (!window.PaginationComponent) {
+                await this.loadScript('pagination-component.js');
+            }
+            
+            this.displayManagement = true;
+            
+        } catch (error) {
+            console.error('Error loading display management:', error);
+            document.getElementById('displayManagementContainer').innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #ef4444;">
+                    ❌ Lỗi khi tải quản lý display: ${error.message}
+                </div>
+            `;
+        }
+    }
+
+    // Helper function to load scripts dynamically
+    loadScript(src) {
+        return new Promise((resolve, reject) => {
+            // Check if script already exists
+            if (document.querySelector(`script[src="${src}"]`)) {
+                resolve();
+                return;
+            }
+            
+            const script = document.createElement('script');
+            script.src = src;
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
     }
 
     async exportUsers() {

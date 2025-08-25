@@ -1,4 +1,5 @@
 const Display = require('../models/Display');
+const Store = require('../models/Store');
 const csv = require('csv-parser');
 const fs = require('fs');
 const XLSX = require('xlsx');
@@ -46,11 +47,29 @@ const getDisplays = async (req, res) => {
       .skip(skip)
       .limit(limit);
 
+    // Join with stores collection to get store names
+    // Both collections store store_id as strings, so no conversion needed
+    const displayIds = displays.map(d => d.store_id);
+    const stores = await Store.find({ store_id: { $in: displayIds } });
+    
+    // Create a map for quick lookup: store_id -> store_name
+    const storeMap = {};
+    stores.forEach(store => {
+      storeMap[store.store_id] = store.store_name;
+    });
+    
+    // Add store_name to each display
+    const displaysWithStoreName = displays.map(display => {
+      const displayObj = display.toObject();
+      displayObj.store_name = storeMap[display.store_id] || null;
+      return displayObj;
+    });
+
     const totalPages = Math.ceil(totalCount / limit);
 
     res.json({
       success: true,
-      data: displays,
+      data: displaysWithStoreName,
       pagination: {
         currentPage: page,
         totalPages: totalPages,

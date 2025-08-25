@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Display Management - POSM Survey Management</title>
+    <title>Display Management - Menu</title>
     <link rel="stylesheet" href="styles-admin.css">
 </head>
 <body>
@@ -11,7 +11,7 @@
         <!-- Navigation -->
         <nav class="admin-nav">
             <div class="nav-brand">
-                <h1>📊 POSM Survey Management</h1>
+                <h1>📊 Menu</h1>
             </div>
             <div class="nav-menu">
                 <a href="survey-results.html" class="nav-item">
@@ -50,19 +50,17 @@
             <!-- Stats will be loaded here -->
         </div>
 
-        <!-- Actions -->
-        <div class="actions-bar">
-            <div class="action-group">
-                <button class="btn btn-primary" id="addDisplayBtn">
-                    ➕ Thêm Display
-                </button>
-                <button class="btn btn-secondary" id="importDisplayBtn">
-                    📥 Import CSV/Excel
-                </button>
-                <button class="btn btn-success" id="exportDisplayBtn">
-                    📤 Xuất Excel
-                </button>
-            </div>
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <button id="addDisplayBtn" class="btn btn-primary">
+                ➕ Thêm Display
+            </button>
+            <button id="importDisplayBtn" class="btn btn-secondary">
+                📤 Import CSV
+            </button>
+            <button id="exportDisplayBtn" class="btn btn-green">
+                📥 Export Excel
+            </button>
         </div>
 
         <!-- Filters -->
@@ -89,19 +87,19 @@
             </div>
             <div class="filter-group">
                 <label>&nbsp;</label>
-                <button id="clearFiltersBtn" class="btn btn-outline">🧹 Xóa bộ lọc</button>
+                <button id="clearFiltersBtn" class="btn btn-secondary">Xóa bộ lọc</button>
             </div>
         </div>
 
         <!-- Bulk Actions -->
         <div class="bulk-actions">
-            <button id="selectAllDisplaysBtn" class="btn btn-secondary" disabled>
+            <button id="selectAllDisplaysBtn" class="btn btn-secondary" type="button">
                 ☑️ Chọn tất cả
             </button>
-            <button id="bulkShowBtn" class="btn btn-success" disabled>
+            <button id="bulkShowBtn" class="btn btn-green" disabled>
                 👁️ Hiển thị đã chọn
             </button>
-            <button id="bulkHideBtn" class="btn btn-warning" disabled>
+            <button id="bulkHideBtn" class="btn btn-orange" disabled>
                 🙈 Ẩn đã chọn
             </button>
             <button id="bulkDeleteBtn" class="btn btn-danger" disabled>
@@ -109,8 +107,8 @@
             </button>
         </div>
 
-        <!-- Display List -->
-        <div class="data-container" id="displaysContainer">
+        <!-- Displays Table -->
+        <div class="displays-container" id="displaysContainer">
             <!-- Displays will be loaded here -->
         </div>
 
@@ -232,7 +230,6 @@
     <script src="display-management.js"></script>
     <script>
         // Initialize display management when page loads
-        let displayManager;
         document.addEventListener('DOMContentLoaded', () => {
             displayManager = new DisplayManagement();
         });

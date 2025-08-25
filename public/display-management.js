@@ -22,13 +22,31 @@ class DisplayManagement {
             return; // User will be redirected to login
         }
         
+        this.addLogoutButton();
         this.bindEvents();
         this.initializePagination();
         this.loadDisplays();
     }
 
+    addLogoutButton() {
+        // Add logout button
+        const navMenu = document.querySelector('.nav-menu');
+        if (navMenu) {
+            const logoutBtn = document.createElement('a');
+            logoutBtn.href = '#';
+            logoutBtn.className = 'nav-item logout';
+            logoutBtn.innerHTML = '🚪 Đăng xuất';
+            logoutBtn.style.cssText = 'color: #dc2626; border: 1px solid #dc2626;';
+            logoutBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                await this.logout();
+            });
+            navMenu.appendChild(logoutBtn);
+        }
+    }
+
     initializePagination() {
-        this.pagination = new PaginationComponent('displaysPaginationContainer', {
+        this.pagination = new PaginationComponent('paginationContainer', {
             defaultPageSize: 25,
             pageSizeOptions: [10, 25, 50, 100],
             showPageInfo: true,
@@ -146,41 +164,41 @@ class DisplayManagement {
         
         // Action buttons
         document.getElementById('addDisplayBtn').addEventListener('click', () => this.showAddDisplayModal());
-        document.getElementById('importDisplaysBtn').addEventListener('click', () => this.showImportModal());
-        document.getElementById('exportDisplaysBtn').addEventListener('click', () => this.exportDisplays());
+        document.getElementById('importDisplayBtn').addEventListener('click', () => this.showImportModal());
+        document.getElementById('exportDisplayBtn').addEventListener('click', () => this.exportDisplays());
 
         // Filter events
         document.getElementById('storeIdFilter').addEventListener('input', () => this.applyFilters());
         document.getElementById('modelFilter').addEventListener('input', () => this.applyFilters());
         document.getElementById('displayStatusFilter').addEventListener('change', () => this.applyFilters());
-        document.getElementById('displaySearchInput').addEventListener('input', () => this.applyFilters());
-        document.getElementById('clearDisplayFiltersBtn').addEventListener('click', () => this.clearFilters());
+        document.getElementById('searchInput').addEventListener('input', () => this.applyFilters());
+        document.getElementById('clearFiltersBtn').addEventListener('click', () => this.clearFilters());
 
         // Bulk action events
         document.getElementById('selectAllDisplaysBtn').addEventListener('click', () => this.handleSelectAll());
-        document.getElementById('bulkDisplayBtn').addEventListener('click', () => this.handleBulkDisplay());
+        document.getElementById('bulkShowBtn').addEventListener('click', () => this.handleBulkDisplay());
         document.getElementById('bulkHideBtn').addEventListener('click', () => this.handleBulkHide());
-        document.getElementById('bulkDeleteDisplaysBtn').addEventListener('click', () => this.handleBulkDelete());
+        document.getElementById('bulkDeleteBtn').addEventListener('click', () => this.handleBulkDelete());
 
         // Modal events
-        document.getElementById('closeDisplayModalBtn').addEventListener('click', () => this.hideDisplayModal());
+        document.getElementById('closeDisplayModal').addEventListener('click', () => this.hideDisplayModal());
         document.getElementById('cancelDisplayBtn').addEventListener('click', () => this.hideDisplayModal());
         document.getElementById('saveDisplayBtn').addEventListener('click', () => this.saveDisplay());
 
         // Import modal events
-        document.getElementById('closeImportDisplayModalBtn').addEventListener('click', () => this.hideImportModal());
-        document.getElementById('cancelImportDisplayBtn').addEventListener('click', () => this.hideImportModal());
-        document.getElementById('selectDisplayFileBtn').addEventListener('click', () => document.getElementById('csvDisplayFileInput').click());
-        document.getElementById('csvDisplayFileInput').addEventListener('change', (e) => this.handleFileSelect(e));
-        document.getElementById('removeDisplayFileBtn').addEventListener('click', () => this.removeSelectedFile());
-        document.getElementById('importDisplayBtn').addEventListener('click', () => this.importDisplays());
+        document.getElementById('closeImportModal').addEventListener('click', () => this.hideImportModal());
+        document.getElementById('cancelImportBtn').addEventListener('click', () => this.hideImportModal());
+        document.getElementById('selectFileBtn').addEventListener('click', () => document.getElementById('csvFileInput').click());
+        document.getElementById('csvFileInput').addEventListener('change', (e) => this.handleFileSelect(e));
+        document.getElementById('removeFileBtn').addEventListener('click', () => this.removeSelectedFile());
+        document.getElementById('startImportBtn').addEventListener('click', () => this.importDisplays());
 
         // Delete confirmation events
-        document.getElementById('btnConfirmDisplayDelete').addEventListener('click', () => this.confirmDelete());
-        document.getElementById('btnCancelDisplayDelete').addEventListener('click', () => this.cancelDelete());
+        document.getElementById('confirmDeleteBtn').addEventListener('click', () => this.confirmDelete());
+        document.getElementById('cancelDeleteBtn').addEventListener('click', () => this.cancelDelete());
 
         // File drop zone events
-        const dropZone = document.getElementById('displayFileDropZone');
+        const dropZone = document.getElementById('fileUploadArea');
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
             dropZone.classList.add('drag-over');
@@ -290,7 +308,7 @@ class DisplayManagement {
             model: document.getElementById('modelFilter')?.value || '',
             is_displayed: document.getElementById('displayStatusFilter')?.value === 'true' ? 'true' : 
                          document.getElementById('displayStatusFilter')?.value === 'false' ? 'false' : '',
-            search: document.getElementById('displaySearchInput')?.value || ''
+            search: document.getElementById('searchInput')?.value || ''
         };
 
         // Reset to first page when filters change
@@ -299,7 +317,7 @@ class DisplayManagement {
     }
 
     clearFilters() {
-        const filters = ['storeIdFilter', 'modelFilter', 'displayStatusFilter', 'displaySearchInput'];
+        const filters = ['storeIdFilter', 'modelFilter', 'displayStatusFilter', 'searchInput'];
         filters.forEach(filterId => {
             const element = document.getElementById(filterId);
             if (element) {
@@ -361,9 +379,10 @@ class DisplayManagement {
                 <div class="table-header">
                     <div class="table-row">
                         <div class="table-cell checkbox-cell">
-                            <input type="checkbox" id="selectAllDisplaysCheckbox" onchange="displayManagement.toggleSelectAll()">
+                            <input type="checkbox" id="selectAllDisplaysCheckbox" onchange="displayManager.toggleSelectAll()">
                         </div>
                         <div class="table-cell">Store ID</div>
+                        <div class="table-cell">Store Name</div>
                         <div class="table-cell">Model</div>
                         <div class="table-cell">Trạng thái hiển thị</div>
                         <div class="table-cell">Cập nhật lần cuối</div>
@@ -373,7 +392,7 @@ class DisplayManagement {
                 <div class="table-body">
         `;
 
-        this.displays.forEach(display => {
+        this.displays.forEach((display) => {
             const isSelected = this.selectedDisplayIds.has(display._id);
             const lastUpdate = display.updatedAt ? new Date(display.updatedAt).toLocaleString('vi-VN') : 'Chưa cập nhật';
             const statusClass = display.is_displayed ? 'status-displayed' : 'status-hidden';
@@ -383,25 +402,26 @@ class DisplayManagement {
                 <div class="table-row">
                     <div class="table-cell checkbox-cell">
                         <input type="checkbox" ${isSelected ? 'checked' : ''} 
-                               onchange="displayManagement.toggleDisplaySelection('${display._id}')">
+                               onchange="displayManager.toggleDisplaySelection('${display._id}')">
                     </div>
                     <div class="table-cell">
                         <strong>${display.store_id}</strong>
                     </div>
+                    <div class="table-cell">${display.store_name || 'N/A'}</div>
                     <div class="table-cell">${display.model}</div>
                     <div class="table-cell">
                         <span class="status-badge ${statusClass}">${statusText}</span>
                     </div>
-                    <div class="table-cell">${lastUpdate}</div>
+                    <div class="table-cell date-cell">${lastUpdate}</div>
                     <div class="table-cell">
                         <div class="action-buttons">
-                            <button class="btn-action btn-edit" onclick="displayManagement.editDisplay('${display._id}')" title="Chỉnh sửa">
+                            <button class="btn-action btn-edit" onclick="displayManager.editDisplay('${display._id}')" title="Chỉnh sửa">
                                 ✏️
                             </button>
-                            <button class="btn-action btn-toggle" onclick="displayManagement.toggleDisplayStatus('${display._id}')" title="${display.is_displayed ? 'Ẩn display' : 'Hiển thị display'}">
-                                ${display.is_displayed ? '👁️‍🗨️' : '🙈'}
+                            <button class="btn-action btn-toggle" onclick="displayManager.toggleDisplayStatus('${display._id}')" title="${display.is_displayed ? 'Ẩn display' : 'Hiển thị display'}">
+                                ${display.is_displayed ? '👁️' : '🙈'}
                             </button>
-                            <button class="btn-action btn-delete" onclick="displayManagement.deleteDisplay('${display._id}')" title="Xóa">
+                            <button class="btn-action btn-delete" onclick="displayManager.deleteDisplay('${display._id}')" title="Xóa">
                                 🗑️
                             </button>
                         </div>
@@ -470,13 +490,13 @@ class DisplayManagement {
 
     updateBulkActionButtons() {
         const selectedCount = this.selectedDisplayIds ? this.selectedDisplayIds.size : 0;
-        const buttons = ['bulkDisplayBtn', 'bulkHideBtn', 'bulkDeleteDisplaysBtn'];
+        const buttons = ['bulkShowBtn', 'bulkHideBtn', 'bulkDeleteBtn'];
         
         buttons.forEach(btnId => {
             const btn = document.getElementById(btnId);
             if (btn) {
                 btn.disabled = selectedCount === 0;
-                if (btnId === 'bulkDeleteDisplaysBtn') {
+                if (btnId === 'bulkDeleteBtn') {
                     btn.innerHTML = selectedCount > 0 ? 
                         `🗑️ Xóa ${selectedCount} bản ghi đã chọn` : 
                         '🗑️ Xóa các bản ghi đã chọn';
@@ -503,8 +523,8 @@ class DisplayManagement {
     handleEscapeKey(event) {
         if (event.key === 'Escape') {
             const displayModal = document.getElementById('displayModal');
-            const importModal = document.getElementById('importDisplayModal');
-            const confirmDeleteDialog = document.getElementById('confirmDisplayDeleteDialog');
+            const importModal = document.getElementById('importModal');
+            const confirmDeleteDialog = document.getElementById('deleteModal');
             
             if (displayModal && displayModal.style.display === 'flex') {
                 this.hideDisplayModal();
@@ -549,9 +569,9 @@ class DisplayManagement {
                 this.editingDisplayId = displayId;
                 document.getElementById('displayModalTitle').textContent = 'Chỉnh sửa bản ghi display';
                 document.getElementById('displayId').value = display._id;
-                document.getElementById('storeId').value = display.store_id || '';
-                document.getElementById('model').value = display.model || '';
-                document.getElementById('isDisplayed').checked = display.is_displayed !== false;
+                document.getElementById('storeIdInput').value = display.store_id || '';
+                document.getElementById('modelInput').value = display.model || '';
+                document.getElementById('isDisplayedInput').checked = display.is_displayed !== false;
                 
                 document.getElementById('displayModal').style.display = 'flex';
             } else {
@@ -647,10 +667,10 @@ class DisplayManagement {
         const display = this.displays.find(d => d._id === displayId);
         if (!display) return;
 
-        document.getElementById('displayDeleteConfirmText').textContent = 
+        document.getElementById('deleteMessage').textContent = 
             `Bạn có chắc chắn muốn xóa bản ghi display "${display.store_id} - ${display.model}"?`;
         this.deleteDisplayId = displayId;
-        document.getElementById('confirmDisplayDeleteDialog').style.display = 'flex';
+        document.getElementById('deleteModal').style.display = 'flex';
     }
 
     async confirmDelete() {
@@ -680,7 +700,7 @@ class DisplayManagement {
     }
 
     cancelDelete() {
-        document.getElementById('confirmDisplayDeleteDialog').style.display = 'none';
+        document.getElementById('deleteModal').style.display = 'none';
         this.deleteDisplayId = null;
     }
 
@@ -772,12 +792,12 @@ class DisplayManagement {
 
     // Import/Export functions
     showImportModal() {
-        document.getElementById('importDisplayModal').style.display = 'flex';
+        document.getElementById('importModal').style.display = 'flex';
         this.removeSelectedFile();
     }
 
     hideImportModal() {
-        document.getElementById('importDisplayModal').style.display = 'none';
+        document.getElementById('importModal').style.display = 'none';
         this.removeSelectedFile();
     }
 
@@ -802,21 +822,21 @@ class DisplayManagement {
         }
 
         // Show selected file
-        document.getElementById('selectedDisplayFileName').textContent = file.name;
-        document.getElementById('selectedDisplayFileInfo').style.display = 'flex';
-        document.getElementById('displayFileDropZone').style.display = 'none';
-        document.getElementById('importDisplayBtn').disabled = false;
+        document.getElementById('selectedFileName').textContent = file.name;
+        document.getElementById('selectedFileInfo').style.display = 'flex';
+        document.getElementById('fileUploadArea').style.display = 'none';
+        document.getElementById('startImportBtn').disabled = false;
     }
 
     removeSelectedFile() {
-        document.getElementById('csvDisplayFileInput').value = '';
-        document.getElementById('selectedDisplayFileInfo').style.display = 'none';
-        document.getElementById('displayFileDropZone').style.display = 'flex';
-        document.getElementById('importDisplayBtn').disabled = true;
+        document.getElementById('csvFileInput').value = '';
+        document.getElementById('selectedFileInfo').style.display = 'none';
+        document.getElementById('fileUploadArea').style.display = 'flex';
+        document.getElementById('startImportBtn').disabled = true;
     }
 
     async importDisplays() {
-        const fileInput = document.getElementById('csvDisplayFileInput');
+        const fileInput = document.getElementById('csvFileInput');
         const file = fileInput.files[0];
         
         if (!file) {
@@ -934,7 +954,24 @@ class DisplayManagement {
             }, duration);
         }
     }
+
+    async logout() {
+        try {
+            const token = localStorage.getItem('accessToken');
+            await fetch('/api/auth/logout', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+        } catch (error) {
+            console.error('Logout error:', error);
+        } finally {
+            localStorage.clear();
+            window.location.replace('/admin-login.html');
+        }
+    }
 }
 
 // Global instance
-let displayManagement;
+let displayManager;

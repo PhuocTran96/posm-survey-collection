@@ -4,7 +4,9 @@ const csv = require('csv-parser');
 const Display = require('./src/models/Display');
 
 // Database connection
-mongoose.connect('mongodb://localhost:27017/posm-survey-db', {
+require('dotenv').config();
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/posm_survey';
+mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 });
@@ -23,8 +25,9 @@ async function importDisplaysFromCSV() {
         .on('data', (data) => {
           lineNumber++;
           
-          // Clean and validate data
-          const store_id = data.store_id?.toString().trim();
+          // Clean and validate data - handle BOM in column names
+          const storeIdKey = Object.keys(data).find(key => key.includes('store_id')) || 'store_id';
+          const store_id = data[storeIdKey]?.toString().trim();
           const model = data.model?.toString().trim();
           const is_displayed = data.is_displayed === '1' || data.is_displayed === 'true' || data.is_displayed === true;
           

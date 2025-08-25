@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Store Management - POSM Survey Management</title>
+    <title>Store Management - Menu</title>
     <link rel="stylesheet" href="styles-admin.css">
 </head>
 <body>
@@ -11,7 +11,7 @@
         <!-- Navigation -->
         <nav class="admin-nav">
             <div class="nav-brand">
-                <h1>📊 POSM Survey Management</h1>
+                <h1>📊 Menu</h1>
             </div>
             <div class="nav-menu">
                 <a href="survey-results.html" class="nav-item">
@@ -53,29 +53,13 @@
         <!-- Action Buttons -->
         <div class="action-buttons">
             <button id="addStoreBtn" class="btn btn-primary">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-                Thêm cửa hàng
+                ➕ Thêm cửa hàng
             </button>
             <button id="importStoresBtn" class="btn btn-secondary">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14,2 14,8 20,8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                    <polyline points="10,9 9,9 8,9"></polyline>
-                </svg>
-                Import CSV
+                📤 Import CSV
             </button>
             <button id="exportStoresBtn" class="btn btn-green">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7,10 12,15 17,10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                Export CSV
+                📥 Export CSV
             </button>
         </div>
 
@@ -128,33 +112,16 @@
         <!-- Bulk Actions -->
         <div class="bulk-actions">
             <button id="selectAllStoresBtn" class="btn btn-secondary" type="button">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;">
-                    <polyline points="9,11 12,14 22,4"></polyline>
-                    <path d="m21,4-7.5,7.5L11,9"></path>
-                </svg>
-                Chọn tất cả
+                ☑️ Chọn tất cả
             </button>
             <button id="bulkActivateBtn" class="btn btn-green" disabled>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                    <polyline points="22,4 12,14.01 9,11.01"></polyline>
-                </svg>
-                Kích hoạt
+                ✅ Kích hoạt
             </button>
             <button id="bulkDeactivateBtn" class="btn btn-orange" disabled>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="15" y1="9" x2="9" y2="15"></line>
-                    <line x1="9" y1="9" x2="15" y2="15"></line>
-                </svg>
-                Tạm dừng
+                ❌ Tạm dừng
             </button>
             <button id="bulkDeleteStoresBtn" class="btn btn-danger" disabled>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;">
-                    <polyline points="3,6 5,6 21,6"></polyline>
-                    <path d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"></path>
-                </svg>
-                Xóa
+                🗑️ Xóa
             </button>
         </div>
 

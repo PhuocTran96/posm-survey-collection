@@ -220,6 +220,9 @@ class AdminApp {
     }
 
     bindEvents() {
+        // ESC key to close modals
+        document.addEventListener('keydown', (e) => this.handleEscapeKey(e));
+        
         const exportDataBtn = document.getElementById('exportData');
         if (exportDataBtn) {
             exportDataBtn.addEventListener('click', () => this.exportData());
@@ -345,6 +348,18 @@ class AdminApp {
         } finally {
             this.hideLoading();
             this.cancelDelete();
+        }
+    }
+
+    // Handle ESC key to close modals
+    handleEscapeKey(event) {
+        if (event.key === 'Escape') {
+            // Check which modal is currently open and close it
+            const confirmDeleteDialog = document.getElementById('confirmDeleteDialog');
+            
+            if (confirmDeleteDialog && confirmDeleteDialog.style.display === 'flex') {
+                this.cancelDelete();
+            }
         }
     }
 
@@ -707,7 +722,9 @@ class AdminApp {
                 'POSM Name',
                 'All Selected',
                 'Image URL',
-                'Submitted At'
+                'Submitted At',
+                'User ID',
+                'Username'
             ]);
             // Add data rows
             exportResponses.forEach(response => {
@@ -724,7 +741,9 @@ class AdminApp {
                         'TẤT CẢ POSM',
                         'Yes',
                         imageUrl,
-                        this.formatDate(response.submittedAt)
+                        this.formatDate(response.submittedAt),
+                        response.submittedById || '',
+                        response.submittedBy || ''
                     ]);
                 } else {
                     modelResponse.posmSelections.forEach(posm => {
@@ -737,7 +756,9 @@ class AdminApp {
                             posm.posmName,
                             'No',
                             imageUrl,
-                            this.formatDate(response.submittedAt)
+                            this.formatDate(response.submittedAt),
+                            response.submittedById || '',
+                            response.submittedBy || ''
                         ]);
                     });
                 }

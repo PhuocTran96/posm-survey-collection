@@ -9,8 +9,22 @@
 <body>
     <div class="container">
         <header>
-            <h1>Khảo sát POSM</h1>
-            <p>Hệ thống khảo sát triển khai POSM</p>
+            <div class="header-content">
+                <div class="header-title">
+                    <h1>Khảo sát POSM</h1>
+                    <p>Hệ thống khảo sát triển khai POSM</p>
+                </div>
+                <div class="header-actions">
+                    <div class="user-info">
+                        <span class="user-welcome">Xin chào, <span id="userDisplayName">User</span></span>
+                        <span class="user-role" id="userRole"></span>
+                    </div>
+                    <button id="logoutBtn" class="btn btn-logout">
+                        <span class="logout-icon">🚪</span>
+                        Đăng xuất
+                    </button>
+                </div>
+            </div>
         </header>
 
         <main>

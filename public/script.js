@@ -86,21 +86,21 @@ class SurveyApp {
     }
 
     setupAuthUI() {
-        // Add user info to the UI
-        const userInfo = document.createElement('div');
-        userInfo.className = 'user-info';
-        userInfo.innerHTML = `
-            <div class="user-details">
-                <span class="user-name">${this.user.username}</span>
-                <span class="user-role">${this.user.role}</span>
-            </div>
-            <button onclick="surveyApp.logout()" class="logout-btn">Đăng xuất</button>
-        `;
+        // Update user info in the existing HTML elements
+        const userDisplayName = document.getElementById('userDisplayName');
+        const userRole = document.getElementById('userRole');
+        const logoutBtn = document.getElementById('logoutBtn');
 
-        // Add to header
-        const header = document.querySelector('.header');
-        if (header) {
-            header.appendChild(userInfo);
+        if (userDisplayName && this.user) {
+            userDisplayName.textContent = this.user.username;
+        }
+        
+        if (userRole && this.user) {
+            userRole.textContent = `(${this.user.role})`;
+        }
+        
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => this.logout());
         }
     }
 
@@ -123,6 +123,12 @@ class SurveyApp {
             this.clearAuthData();
             window.location.href = '/login.html';
         }
+    }
+
+    clearAuthData() {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
     }
 
     // Helper method for authenticated API calls with token refresh
@@ -577,6 +583,22 @@ class SurveyApp {
                 this.hideLoading();
                 return;
             }
+            
+            // Validation: must upload image for each model
+            const modelsWithoutImages = [];
+            for (const model of this.selectedModels) {
+                if (!this.modelImages[model]) {
+                    modelsWithoutImages.push(model);
+                }
+            }
+            if (modelsWithoutImages.length > 0) {
+                const errorMessage = modelsWithoutImages.length === 1 
+                    ? `Vui lòng upload ảnh cho model: ${modelsWithoutImages[0]}`
+                    : `Vui lòng upload ảnh cho các model: ${modelsWithoutImages.join(', ')}`;
+                alert(errorMessage);
+                this.hideLoading();
+                return;
+            }
             // Batch upload images for each model
             const modelImageUrls = {};
             let uploadedCount = 0;
@@ -605,11 +627,13 @@ class SurveyApp {
                 r.images = modelImageUrls[r.model] ? [modelImageUrls[r.model]] : [];
             });
             const surveyData = {
+                leader: this.user ? this.user.leader : 'Unknown',
                 shopName: this.selectedShop.store_name,
                 storeId: this.selectedShop.store_id,
                 responses: responses
             };
             console.log('📤 Sending survey data to server:', surveyData);
+            console.log('👤 User info:', { username: this.user?.username, leader: this.user?.leader, role: this.user?.role });
             const response = await this.authenticatedFetch('/api/submit', {
                 method: 'POST',
                 headers: {
@@ -618,7 +642,10 @@ class SurveyApp {
                 body: JSON.stringify(surveyData)
             });
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorData = await response.json().catch(() => null);
+                const errorMessage = errorData?.message || `HTTP error! status: ${response.status}`;
+                console.error('❌ Server error response:', errorData);
+                throw new Error(errorMessage);
             }
             const result = await response.json();
             console.log('📥 Server response:', result);

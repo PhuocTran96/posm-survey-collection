@@ -153,6 +153,9 @@ class StoreManagement {
     }
 
     bindEvents() {
+        // ESC key to close modals
+        document.addEventListener('keydown', (e) => this.handleEscapeKey(e));
+        
         // Navigation toggle
         document.getElementById('navMobileToggle')?.addEventListener('click', () => {
             document.querySelector('.admin-nav').classList.toggle('active');
@@ -573,6 +576,24 @@ class StoreManagement {
             selectAllBtn.textContent = `☑️ Bỏ chọn tất cả (${this.selectedStores.size})`;
         } else {
             selectAllBtn.textContent = '☑️ Chọn tất cả';
+        }
+    }
+
+    // Handle ESC key to close modals
+    handleEscapeKey(event) {
+        if (event.key === 'Escape') {
+            // Check which modal is currently open and close it
+            const storeModal = document.getElementById('storeModal');
+            const importModal = document.getElementById('importModal');
+            const confirmDeleteDialog = document.getElementById('confirmDeleteDialog');
+            
+            if (storeModal && storeModal.style.display === 'flex') {
+                this.hideStoreModal();
+            } else if (importModal && importModal.style.display === 'flex') {
+                this.hideImportModal();
+            } else if (confirmDeleteDialog && confirmDeleteDialog.style.display === 'flex') {
+                this.cancelDelete();
+            }
         }
     }
 

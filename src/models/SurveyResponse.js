@@ -40,6 +40,10 @@ const surveyResponseSchema = new mongoose.Schema({
     type: String,
     default: 'anonymous'
   },
+  submittedById: {
+    type: String,
+    default: null
+  },
   submittedByRole: {
     type: String,
     default: 'unknown'

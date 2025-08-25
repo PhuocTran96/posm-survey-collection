@@ -211,6 +211,9 @@ class UserManagementApp {
     }
 
     bindEvents() {
+        // ESC key to close modals
+        document.addEventListener('keydown', (e) => this.handleEscapeKey(e));
+        
         // Action buttons
         document.getElementById('addUserBtn').addEventListener('click', () => this.showAddUserModal());
         document.getElementById('importUsersBtn').addEventListener('click', () => this.showImportModal());
@@ -233,6 +236,9 @@ class UserManagementApp {
         document.getElementById('closeModalBtn').addEventListener('click', () => this.hideUserModal());
         document.getElementById('cancelUserBtn').addEventListener('click', () => this.hideUserModal());
         document.getElementById('saveUserBtn').addEventListener('click', () => this.saveUser());
+        
+        // Role change event to update leader dropdown
+        document.getElementById('role').addEventListener('change', (e) => this.onRoleChange(e.target.value));
 
         // Import modal events
         document.getElementById('closeImportModalBtn').addEventListener('click', () => this.hideImportModal());
@@ -779,12 +785,8 @@ class UserManagementApp {
             <div class="store-item ${isSelected ? 'selected' : ''}" data-store-id="${store._id}">
                 <input type="checkbox" ${isSelected ? 'checked' : ''} tabindex="-1">
                 <div class="store-item-content">
-                    <div class="store-item-header">
-                        <span class="store-code">${store.store_id}</span>
-                        <div class="store-status-indicator ${statusClass}"></div>
-                    </div>
                     <div class="store-name">${store.store_name}</div>
-                    <div class="store-details">${store.channel} • ${store.region} • ${store.province}</div>
+                    <div class="store-status-indicator ${statusClass}"></div>
                 </div>
             </div>
         `;
@@ -803,7 +805,7 @@ class UserManagementApp {
         container.className = 'store-chips-container';
         container.innerHTML = this.assignedStoresList.map(store => `
             <div class="store-chip">
-                <span class="chip-text">${store.store_id} - ${store.store_name}</span>
+                <span class="chip-text">${store.store_name}</span>
                 <button type="button" class="chip-remove" onclick="userManagementApp.removeStoreFromChips('${store._id}')">
                     ×
                 </button>
@@ -978,6 +980,96 @@ class UserManagementApp {
         }
     }
 
+    // Handle ESC key to close modals
+    handleEscapeKey(event) {
+        if (event.key === 'Escape') {
+            // Check which modal is currently open and close it
+            const userModal = document.getElementById('userModal');
+            const importModal = document.getElementById('importModal');
+            const confirmDeleteDialog = document.getElementById('confirmDeleteDialog');
+            
+            if (userModal && userModal.style.display === 'flex') {
+                this.hideUserModal();
+            } else if (importModal && importModal.style.display === 'flex') {
+                this.hideImportModal();
+            } else if (confirmDeleteDialog && confirmDeleteDialog.style.display === 'flex') {
+                this.cancelDelete();
+            }
+        }
+    }
+
+    // Handle role change to filter appropriate leaders
+    async onRoleChange(role) {
+        await this.loadLeadersDropdown(null, role);
+    }
+
+    // Load available leaders for dropdown
+    async loadLeadersDropdown(selectedLeader = null, userRole = null) {
+        try {
+            const response = await this.makeAuthenticatedRequest('/api/users?limit=1000'); // Get all users for leader dropdown
+            if (response && response.ok) {
+                const usersData = await response.json();
+                const users = usersData.success && usersData.data ? usersData.data : [];
+                
+                // Filter users who can be leaders - show all potential leaders (TDS, TDL, admin)
+                // Let the server handle hierarchy validation
+                const currentRole = userRole || document.getElementById('role').value;
+                
+                // Always show all potential leaders regardless of current role
+                const potentialLeaders = users.filter(user => 
+                    ['TDS', 'TDL', 'admin'].includes(user.role) && user.isActive
+                );
+                
+                console.log('📊 All users loaded:', users.length);
+                console.log('👥 Users by role:', users.reduce((acc, user) => {
+                    acc[user.role] = (acc[user.role] || 0) + 1;
+                    return acc;
+                }, {}));
+                console.log('👑 Potential leaders found:', potentialLeaders.map(u => `${u.username} (${u.role})`));
+                
+                // Check if the current role should have a leader
+                const rolesNeedingLeader = ['PRT', 'TDS', 'user'];
+                const needsLeader = rolesNeedingLeader.includes(currentRole);
+                
+                const leaderSelect = document.getElementById('leader');
+                
+                if (!needsLeader) {
+                    // No leader needed for this role (TDL, admin)
+                    leaderSelect.innerHTML = '<option value="">Không cần Leader</option>';
+                    leaderSelect.disabled = true;
+                } else {
+                    leaderSelect.disabled = false;
+                    leaderSelect.innerHTML = '<option value="">Chọn Leader</option>';
+                    
+                    if (potentialLeaders.length === 0) {
+                        const option = document.createElement('option');
+                        option.value = '';
+                        option.textContent = 'Không có Leader trong hệ thống';
+                        option.disabled = true;
+                        leaderSelect.appendChild(option);
+                    } else {
+                        potentialLeaders.forEach(leader => {
+                            const option = document.createElement('option');
+                            option.value = leader.username;
+                            option.textContent = `${leader.username} (${leader.role})`;
+                            if (selectedLeader && leader.username === selectedLeader) {
+                                option.selected = true;
+                            }
+                            leaderSelect.appendChild(option);
+                        });
+                        
+                        console.log(`✅ Loaded ${potentialLeaders.length} potential leaders for role: ${currentRole}`);
+                    }
+                }
+                
+            } else {
+                console.error('Failed to load leaders for dropdown');
+            }
+        } catch (error) {
+            console.error('Error loading leaders dropdown:', error);
+        }
+    }
+
     // User CRUD operations
     async showAddUserModal() {
         this.editingUserId = null;
@@ -985,6 +1077,10 @@ class UserManagementApp {
         document.getElementById('userForm').reset();
         document.getElementById('userId').value = '';
         document.getElementById('password').required = true;
+        
+        // Load available leaders for dropdown
+        await this.loadLeadersDropdown();
+        
         document.getElementById('userModal').style.display = 'flex';
         
         // Load stores for assignment with dual list interface
@@ -1021,7 +1117,10 @@ class UserManagementApp {
                 document.getElementById('username').value = user.username || '';
                 document.getElementById('loginid').value = user.loginid || '';
                 document.getElementById('role').value = user.role || '';
-                document.getElementById('leader').value = user.leader || '';
+                
+                // Load available leaders for dropdown and set current value
+                await this.loadLeadersDropdown(user.leader);
+                
                 document.getElementById('isActive').checked = user.isActive !== false;
                 document.getElementById('password').required = false;
                 document.getElementById('password').placeholder = 'Để trống nếu không đổi mật khẩu';

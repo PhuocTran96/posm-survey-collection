@@ -47,7 +47,84 @@ header {
     background: var(--primary);
     color: white;
     padding: clamp(18px, 4vw, 30px);
-    text-align: center;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.header-title {
+    text-align: left;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-info {
+    display: flex;
+    flex-direction: column;
+    text-align: right;
+    gap: 2px;
+}
+
+.user-welcome {
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+
+.user-role {
+    font-size: 0.8rem;
+    opacity: 0.8;
+    font-weight: 400;
+}
+
+.btn-logout {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-logout:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-1px);
+}
+
+.logout-icon {
+    font-size: 1rem;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 640px) {
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .header-title {
+        text-align: center;
+    }
+    
+    .user-info {
+        text-align: center;
+    }
+}
     position: relative;
     overflow: hidden;
 }

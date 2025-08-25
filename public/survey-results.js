@@ -173,6 +173,9 @@ class SurveyResultsApp {
     }
 
     bindEvents() {
+        // ESC key to close modals
+        document.addEventListener('keydown', (e) => this.handleEscapeKey(e));
+        
         const exportDataBtn = document.getElementById('exportData');
         if (exportDataBtn) {
             exportDataBtn.addEventListener('click', () => this.exportData());
@@ -635,6 +638,18 @@ class SurveyResultsApp {
         }
     }
 
+    // Handle ESC key to close modals
+    handleEscapeKey(event) {
+        if (event.key === 'Escape') {
+            // Check which modal is currently open and close it
+            const confirmDeleteDialog = document.getElementById('confirmDeleteDialog');
+            
+            if (confirmDeleteDialog && confirmDeleteDialog.style.display === 'flex') {
+                this.cancelDelete();
+            }
+        }
+    }
+
     showDeleteDialog(responseId) {
         this.deleteID = responseId;
         const dialog = document.getElementById('confirmDeleteDialog');
@@ -798,7 +813,9 @@ class SurveyResultsApp {
             'Số lượng',
             'POSM',
             'Tất cả POSM',
-            'Hình ảnh'
+            'Hình ảnh',
+            'User ID',
+            'Username'
         ]);
 
         // Data rows
@@ -821,7 +838,9 @@ class SurveyResultsApp {
                         modelResponse.quantity || 1,
                         posmList,
                         modelResponse.allSelected ? 'Có' : 'Không',
-                        images
+                        images,
+                        response.submittedById || '',
+                        response.submittedBy || ''
                     ]);
                 });
             } else {
@@ -833,7 +852,9 @@ class SurveyResultsApp {
                     '',
                     '',
                     '',
-                    ''
+                    '',
+                    response.submittedById || '',
+                    response.submittedBy || ''
                 ]);
             }
         });

@@ -144,6 +144,7 @@ const submitSurvey = async (req, res) => {
       shopName,
       responses,
       submittedBy: user ? user.username : 'anonymous',
+      submittedById: user ? user.userid : null,
       submittedByRole: user ? user.role : 'unknown'
     });
     

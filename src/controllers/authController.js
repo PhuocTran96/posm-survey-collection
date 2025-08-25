@@ -56,6 +56,12 @@ const login = async (req, res) => {
     user.refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
     await user.save();
 
+    // Get assigned stores for non-admin users
+    let assignedStores = [];
+    if (user.role !== 'admin') {
+      assignedStores = await user.getAssignedStores();
+    }
+
     // Log successful login
 
     // Return tokens and user info
@@ -72,7 +78,8 @@ const login = async (req, res) => {
           loginid: user.loginid,
           role: user.role,
           leader: user.leader,
-          lastLogin: user.lastLogin
+          lastLogin: user.lastLogin,
+          assignedStores: assignedStores
         }
       }
     });

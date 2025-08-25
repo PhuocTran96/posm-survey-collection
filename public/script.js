@@ -1,7 +1,6 @@
 class SurveyApp {
     constructor() {
         this.currentStep = 1;
-        this.selectedLeader = '';
         this.selectedShop = '';
         this.surveyData = {};
         this.selectedModels = [];
@@ -11,6 +10,7 @@ class SurveyApp {
         this.checkboxStates = {}; // { model: { checkboxId: boolean } }
         this.modelQuantities = {}; // { model: number }
         this.user = null;
+        this.assignedStores = [];
         this.init();
     }
 
@@ -22,7 +22,7 @@ class SurveyApp {
         }
         
         this.bindEvents();
-        this.loadLeaders();
+        this.loadAssignedStores();
         this.setupAuthUI();
     }
 
@@ -55,6 +55,7 @@ class SurveyApp {
             
             if (response.ok) {
                 this.user = userData;
+                this.assignedStores = userData.assignedStores || [];
                 return true;
             } else {
                 // Token invalid, clear storage
@@ -218,14 +219,11 @@ class SurveyApp {
     bindEvents() {
         // Step navigation
         document.getElementById('nextToStep2').addEventListener('click', () => this.goToStep2());
-        document.getElementById('nextToStep3').addEventListener('click', () => this.goToStep3());
         document.getElementById('backToStep1').addEventListener('click', () => this.goToStep1());
-        document.getElementById('backToStep2').addEventListener('click', () => this.goToStep2());
         document.getElementById('submitSurvey').addEventListener('click', () => this.submitSurvey());
         document.getElementById('startNewSurvey').addEventListener('click', () => this.resetSurvey());
 
         // Form changes
-        document.getElementById('leaderSelect').addEventListener('change', (e) => this.onLeaderChange(e));
         document.getElementById('shopSelect').addEventListener('change', (e) => this.onShopChange(e));
 
         // Model autocomplete events
@@ -246,84 +244,54 @@ class SurveyApp {
         document.getElementById('loadingOverlay').classList.remove('show');
     }
 
-    async loadLeaders() {
+    async loadAssignedStores() {
         try {
             this.showLoading();
-            const response = await this.authenticatedFetch('/api/leaders');
-            const leaders = await response.json();
-            
-            const select = document.getElementById('leaderSelect');
-            select.innerHTML = '<option value="">-- Chọn Leader --</option>';
-            
-            leaders.forEach(leader => {
-                const option = document.createElement('option');
-                option.value = leader;
-                option.textContent = leader;
-                select.appendChild(option);
-            });
-        } catch (error) {
-            console.error('Error loading leaders:', error);
-            alert('Lỗi khi tải danh sách leader. Vui lòng thử lại.');
-        } finally {
-            this.hideLoading();
-        }
-    }
-
-    async onLeaderChange(e) {
-        const leader = e.target.value;
-        this.selectedLeader = leader;
-        
-        const nextBtn = document.getElementById('nextToStep2');
-        if (leader) {
-            nextBtn.disabled = false;
-        } else {
-            nextBtn.disabled = true;
-        }
-    }
-
-    async loadShops() {
-        if (!this.selectedLeader) return;
-
-        try {
-            this.showLoading();
-            const response = await this.authenticatedFetch(`/api/shops/${encodeURIComponent(this.selectedLeader)}`);
-            const shops = await response.json();
             
             const select = document.getElementById('shopSelect');
             select.innerHTML = '<option value="">-- Chọn Shop --</option>';
             
-            shops.forEach(shop => {
+            if (this.assignedStores && this.assignedStores.length > 0) {
+                this.assignedStores.forEach(store => {
+                    const option = document.createElement('option');
+                    option.value = JSON.stringify(store);
+                    option.textContent = `${store.store_name} (${store.store_id})`;
+                    select.appendChild(option);
+                });
+            } else {
                 const option = document.createElement('option');
-                option.value = shop;
-                option.textContent = shop;
+                option.value = '';
+                option.textContent = 'Không có shop nào được phân quyền';
+                option.disabled = true;
                 select.appendChild(option);
-            });
+            }
         } catch (error) {
-            console.error('Error loading shops:', error);
+            console.error('Error loading assigned stores:', error);
             alert('Lỗi khi tải danh sách shop. Vui lòng thử lại.');
         } finally {
             this.hideLoading();
         }
     }
 
-    onShopChange(e) {
-        const shop = e.target.value;
-        this.selectedShop = shop;
+    async onShopChange(e) {
+        const shopData = e.target.value;
         
-        const nextBtn = document.getElementById('nextToStep3');
-        if (shop) {
+        const nextBtn = document.getElementById('nextToStep2');
+        if (shopData) {
+            this.selectedShop = JSON.parse(shopData);
             nextBtn.disabled = false;
         } else {
+            this.selectedShop = '';
             nextBtn.disabled = true;
         }
     }
 
     async loadModelsAndPOSM() {
-        if (!this.selectedLeader || !this.selectedShop) return;
+        if (!this.selectedShop) return;
 
         try {
             this.showLoading();
-            const response = await this.authenticatedFetch(`/api/models/${encodeURIComponent(this.selectedLeader)}/${encodeURIComponent(this.selectedShop)}`);
+            const response = await this.authenticatedFetch(`/api/models/${encodeURIComponent(this.selectedShop.store_id)}`);
             this.surveyData = await response.json();
             
             this.renderModelsAndPOSM();
@@ -534,33 +502,16 @@ class SurveyApp {
     }
 
     goToStep2() {
-        if (!this.selectedLeader) {
-            alert('Vui lòng chọn leader trước.');
-            return;
-        }
-        
-        // Save current state before navigating away from step 3
-        if (this.currentStep === 3 && this.selectedModels.length > 0) {
-            this.saveCurrentStates();
-            console.log('💾 Saved state before navigating from step 3 to step 2');
-        }
-        
-        this.showStep(2);
-        this.loadShops();
-    }
-
-    goToStep3() {
         if (!this.selectedShop) {
             alert('Vui lòng chọn shop trước.');
             return;
         }
         
-        // Update selected info display
-        document.getElementById('selectedLeader').textContent = this.selectedLeader;
-        document.getElementById('selectedShop').textContent = this.selectedShop;
-        this.showStep(3);
+        // Update selected info display  
+        document.getElementById('selectedShop').textContent = `${this.selectedShop.store_name} (${this.selectedShop.store_id})`;
+        this.showStep(2);
         
-        // Only reset if this is the first time visiting step 3 or if leader/shop changed
+        // Only reset if this is the first time visiting step 2 or if shop changed
         const shouldReset = this.selectedModels.length === 0;
         
         if (shouldReset) {
@@ -584,7 +535,7 @@ class SurveyApp {
             this.hideModelSuggestions();
         } else {
             // Preserve existing state - just re-render to show current models
-            console.log('🔄 Preserving existing models on step 3 navigation:', this.selectedModels);
+            console.log('🔄 Preserving existing models on step 2 navigation:', this.selectedModels);
             if (this.selectedModels.length > 0) {
                 this.renderSelectedModels();
             }
@@ -654,8 +605,8 @@ class SurveyApp {
                 r.images = modelImageUrls[r.model] ? [modelImageUrls[r.model]] : [];
             });
             const surveyData = {
-                leader: this.selectedLeader,
-                shopName: this.selectedShop,
+                shopName: this.selectedShop.store_name,
+                storeId: this.selectedShop.store_id,
                 responses: responses
             };
             console.log('📤 Sending survey data to server:', surveyData);
@@ -757,7 +708,6 @@ class SurveyApp {
 
     resetSurvey() {
         this.currentStep = 1;
-        this.selectedLeader = '';
         this.selectedShop = '';
         this.surveyData = {};
         this.selectedModels = [];
@@ -950,7 +900,7 @@ class SurveyApp {
             if (!this.surveyData[model]) {
                 console.log('🔍 Loading POSM data for model:', model);
                 // Fetch POSM for this specific model
-                const response = await this.authenticatedFetch(`/api/models/${encodeURIComponent(this.selectedLeader)}/${encodeURIComponent(this.selectedShop)}`);
+                const response = await this.authenticatedFetch(`/api/models/${encodeURIComponent(this.selectedShop.store_id)}`);
                 const allModels = await response.json();
                 
                 if (allModels[model]) {

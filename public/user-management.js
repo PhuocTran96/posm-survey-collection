@@ -1,16 +1,28 @@
 class UserManagementApp {
     constructor() {
-        // Always initialize as empty arrays to prevent iteration errors
         this.users = [];
-        this.filteredUsers = [];
         this.selectedUserIds = new Set();
         this.editingUserId = null;
         this.deleteUserId = null;
-        this.currentPage = 1;
-        this.itemsPerPage = 20;
-        this.totalPages = 1;
-        this.totalCount = 0;
+        this.filters = {
+            role: '',
+            isActive: '',
+            leader: '',
+            search: ''
+        };
+
+        // Initialize pagination component
         this.pagination = null;
+        
+        // Store transfer properties
+        this.allStores = [];
+        this.availableStores = [];
+        this.assignedStoresList = [];
+        this.filteredAvailableStores = [];
+        this.selectedAvailableStores = new Set();
+        this.selectedAssignedStores = new Set();
+        this.storeTransferInitialized = false;
+
         this.init();
     }
 
@@ -22,9 +34,33 @@ class UserManagementApp {
         }
         
         this.bindEvents();
+        this.initializePagination();
         this.loadUsers();
         this.initNavigation();
         this.setupAuthUI();
+    }
+
+    initializePagination() {
+        this.pagination = new PaginationComponent('usersPaginationContainer', {
+            defaultPageSize: 25,
+            pageSizeOptions: [10, 25, 50, 100],
+            showPageInfo: true,
+            showPageSizeSelector: true,
+            maxVisiblePages: 7
+        });
+
+        this.pagination.setCallbacks(
+            (page) => this.handlePageChange(page),
+            (pageSize) => this.handlePageSizeChange(pageSize)
+        );
+    }
+
+    handlePageChange(page) {
+        this.loadUsers(page);
+    }
+
+    handlePageSizeChange(pageSize) {
+        this.loadUsers(1, pageSize);
     }
 
     async checkAuthentication() {
@@ -244,17 +280,28 @@ class UserManagementApp {
         }
     }
 
-    async loadUsers() {
+    async loadUsers(page = null, pageSize = null) {
         try {
             this.showLoading();
 
-            // Initialize as empty arrays to prevent iteration errors
-            this.users = [];
-            this.filteredUsers = [];
+            const currentPage = page || this.pagination?.getCurrentPage() || 1;
+            const limit = pageSize || this.pagination?.getPageSize() || 25;
+
+            const queryParams = new URLSearchParams({
+                page: currentPage,
+                limit: limit
+            });
+
+            // Add filters
+            Object.keys(this.filters).forEach(key => {
+                if (this.filters[key]) {
+                    queryParams.set(key, this.filters[key]);
+                }
+            });
 
             // Load users and stats in parallel
             const [usersResponse, statsResponse] = await Promise.all([
-                this.makeAuthenticatedRequest('/api/users'),
+                this.makeAuthenticatedRequest(`/api/users?${queryParams}`),
                 this.makeAuthenticatedRequest('/api/users/stats')
             ]);
 
@@ -265,13 +312,16 @@ class UserManagementApp {
                 // Handle the correct API response format
                 if (usersData.success && usersData.data) {
                     this.users = Array.isArray(usersData.data) ? usersData.data : [];
-                    this.pagination = usersData.pagination || null;
+                    
+                    // Update pagination component
+                    if (this.pagination && usersData.pagination) {
+                        this.pagination.setData(usersData.pagination);
+                    }
                 } else {
                     this.users = [];
                     console.warn('Unexpected users response format:', usersData);
                 }
                 
-                this.filteredUsers = [...this.users];
                 this.populateFilters();
                 this.renderUsers();
             } else {
@@ -313,7 +363,6 @@ class UserManagementApp {
             
             // Ensure users is always an array even on error
             this.users = [];
-            this.filteredUsers = [];
             this.renderUsers(); // Render empty state
         } finally {
             this.hideLoading();
@@ -321,60 +370,23 @@ class UserManagementApp {
     }
 
     populateFilters() {
-        // Ensure users is an array and not null/undefined
-        if (!Array.isArray(this.users)) {
-            console.warn('this.users is not an array:', this.users);
-            this.users = [];
-            this.filteredUsers = [];
-        }
-
-        // Populate leader filter
-        const leaders = [...new Set(this.users.map(u => u && u.leader).filter(Boolean))];
-        const leaderFilter = document.getElementById('leaderFilter');
-        
-        if (leaderFilter) {
-            leaderFilter.innerHTML = '<option value="">Tất cả Leader</option>';
-            leaders.forEach(leader => {
-                const option = document.createElement('option');
-                option.value = leader;
-                option.textContent = leader;
-                leaderFilter.appendChild(option);
-            });
-        }
+        // For server-side pagination, we'll keep the static filter options
+        // Leader filter will be populated from server data if needed
+        // For now, keep it simple with existing static options
     }
 
     applyFilters() {
-        // Ensure users is an array before filtering
-        if (!Array.isArray(this.users)) {
-            console.warn('Cannot apply filters: this.users is not an array');
-            this.filteredUsers = [];
-            this.renderUsers();
-            return;
-        }
+        this.filters = {
+            role: document.getElementById('roleFilter')?.value || '',
+            isActive: document.getElementById('statusFilter')?.value === 'active' ? 'true' : 
+                     document.getElementById('statusFilter')?.value === 'inactive' ? 'false' : '',
+            leader: document.getElementById('leaderFilter')?.value || '',
+            search: document.getElementById('searchInput')?.value || ''
+        };
 
-        const roleFilter = document.getElementById('roleFilter')?.value || '';
-        const statusFilter = document.getElementById('statusFilter')?.value || '';
-        const leaderFilter = document.getElementById('leaderFilter')?.value || '';
-        const searchInput = document.getElementById('searchInput')?.value?.toLowerCase() || '';
-
-        this.filteredUsers = this.users.filter(user => {
-            // Ensure user object exists and has required properties
-            if (!user) return false;
-            
-            const matchesRole = !roleFilter || user.role === roleFilter;
-            const matchesStatus = !statusFilter || 
-                (statusFilter === 'active' && user.isActive) ||
-                (statusFilter === 'inactive' && !user.isActive);
-            const matchesLeader = !leaderFilter || user.leader === leaderFilter;
-            const matchesSearch = !searchInput || 
-                (user.username && user.username.toLowerCase().includes(searchInput)) ||
-                (user.userid && user.userid.toLowerCase().includes(searchInput)) ||
-                (user.loginid && user.loginid.toLowerCase().includes(searchInput));
-
-            return matchesRole && matchesStatus && matchesLeader && matchesSearch;
-        });
-
-        this.renderUsers();
+        // Reset to first page when filters change
+        this.selectedUserIds.clear();
+        this.loadUsers(1);
     }
 
     clearFilters() {
@@ -420,16 +432,14 @@ class UserManagementApp {
             return;
         }
 
-        // Ensure filteredUsers is an array
-        if (!Array.isArray(this.filteredUsers)) {
-            console.warn('this.filteredUsers is not an array:', this.filteredUsers);
-            this.filteredUsers = [];
+        // Ensure users is an array
+        if (!Array.isArray(this.users)) {
+            console.warn('this.users is not an array:', this.users);
+            this.users = [];
         }
 
-        if (this.filteredUsers.length === 0) {
-            const message = Array.isArray(this.users) && this.users.length === 0 
-                ? 'Chưa có người dùng nào trong hệ thống' 
-                : 'Không tìm thấy người dùng nào phù hợp với bộ lọc';
+        if (this.users.length === 0) {
+            const message = 'Chưa có người dùng nào trong hệ thống hoặc không có kết quả phù hợp với bộ lọc';
             container.innerHTML = `<div class="no-data">${message}</div>`;
             this.updateBulkActionButtons();
             return;
@@ -455,7 +465,7 @@ class UserManagementApp {
                 <div class="table-body">
         `;
 
-        this.filteredUsers.forEach(user => {
+        this.users.forEach(user => {
             const isSelected = this.selectedUserIds.has(user._id);
             const lastLogin = user.lastLogin ? new Date(user.lastLogin).toLocaleString('vi-VN') : 'Chưa đăng nhập';
             const statusClass = user.isActive ? 'status-active' : 'status-inactive';
@@ -514,8 +524,8 @@ class UserManagementApp {
         const isChecked = selectAllCheckbox ? selectAllCheckbox.checked : false;
         
         if (isChecked) {
-            if (Array.isArray(this.filteredUsers)) {
-                this.filteredUsers.forEach(user => {
+            if (Array.isArray(this.users)) {
+                this.users.forEach(user => {
                     if (user && user._id) {
                         this.selectedUserIds.add(user._id);
                     }
@@ -531,18 +541,18 @@ class UserManagementApp {
     handleSelectAll() {
         // This method is called by the bulk action button
         const selectAllBtn = document.getElementById('selectAllUsersBtn');
-        if (!selectAllBtn || !Array.isArray(this.filteredUsers)) return;
+        if (!selectAllBtn || !Array.isArray(this.users)) return;
 
-        const hasUsers = this.filteredUsers.length > 0;
+        const hasUsers = this.users.length > 0;
         const selectedCount = this.selectedUserIds.size;
-        const allSelected = hasUsers && selectedCount === this.filteredUsers.length;
+        const allSelected = hasUsers && selectedCount === this.users.length;
         
         if (allSelected) {
             // Deselect all
             this.selectedUserIds.clear();
         } else {
             // Select all current page users
-            this.filteredUsers.forEach(user => {
+            this.users.forEach(user => {
                 if (user && user._id) {
                     this.selectedUserIds.add(user._id);
                 }
@@ -580,8 +590,8 @@ class UserManagementApp {
         // Update select all button
         const selectAllBtn = document.getElementById('selectAllUsersBtn');
         if (selectAllBtn) {
-            const hasUsers = Array.isArray(this.filteredUsers) && this.filteredUsers.length > 0;
-            const allSelected = hasUsers && selectedCount === this.filteredUsers.length;
+            const hasUsers = Array.isArray(this.users) && this.users.length > 0;
+            const allSelected = hasUsers && selectedCount === this.users.length;
             
             if (allSelected) {
                 selectAllBtn.innerHTML = '❌ Bỏ chọn tất cả';
@@ -592,14 +602,393 @@ class UserManagementApp {
         }
     }
 
+    // Store Transfer List Management - Properties added to existing constructor
+
+    async loadStoresForAssignment() {
+        try {
+            const response = await this.makeAuthenticatedRequest('/api/stores?limit=1000');
+            if (response && response.ok) {
+                const storesData = await response.json();
+                this.allStores = storesData.success ? storesData.data : [];
+                this.populateFilterOptions();
+                return this.allStores;
+            }
+        } catch (error) {
+            console.error('Error loading stores:', error);
+        }
+        this.allStores = [];
+        return [];
+    }
+
+    populateFilterOptions() {
+        // Populate region filter
+        const regions = [...new Set(this.allStores.map(store => store.region))].sort();
+        const regionSelect = document.getElementById('regionFilterSelect');
+        if (regionSelect) {
+            regionSelect.innerHTML = '<option value="">🌍 Tất cả vùng</option>' +
+                regions.map(region => `<option value="${region}">${region}</option>`).join('');
+        }
+    }
+
+    async renderStoreTransferInterface(userAssignedStores = []) {
+        if (!this.storeTransferInitialized) {
+            this.initializeStoreTransferEvents();
+            this.storeTransferInitialized = true;
+        }
+
+        await this.loadStoresForAssignment();
+        
+        // Set assigned stores based on user data
+        const assignedStoreIds = userAssignedStores.map(store => 
+            typeof store === 'string' ? store : store._id
+        );
+        
+        this.assignedStoresList = this.allStores.filter(store => 
+            assignedStoreIds.includes(store._id)
+        );
+        
+        this.availableStores = this.allStores.filter(store => 
+            !assignedStoreIds.includes(store._id)
+        );
+
+        this.applyStoreFilters();
+        this.renderStoreLists();
+        this.renderStoreChips();
+    }
+
+    initializeStoreTransferEvents() {
+        // Search and filter events
+        document.getElementById('storeSearchInput').addEventListener('input', 
+            this.debounce(() => this.applyStoreFilters(), 300));
+        document.getElementById('regionFilterSelect').addEventListener('change', 
+            () => this.applyStoreFilters());
+        document.getElementById('statusFilterSelect').addEventListener('change', 
+            () => this.applyStoreFilters());
+
+        // Transfer button events
+        document.getElementById('assignSelectedBtn').addEventListener('click', 
+            () => this.assignSelectedStores());
+        document.getElementById('assignAllBtn').addEventListener('click', 
+            () => this.assignAllVisibleStores());
+        document.getElementById('removeSelectedBtn').addEventListener('click', 
+            () => this.removeSelectedStores());
+        document.getElementById('removeAllBtn').addEventListener('click', 
+            () => this.removeAllAssignedStores());
+
+        // Bulk action events
+        document.getElementById('selectAllVisibleBtn').addEventListener('click', 
+            () => this.selectAllVisible());
+        document.getElementById('selectByRegionBtn').addEventListener('click', 
+            () => this.selectByRegion());
+        document.getElementById('selectAllAssignedBtn').addEventListener('click', 
+            () => this.selectAllAssigned());
+        document.getElementById('clearAllAssignedBtn').addEventListener('click', 
+            () => this.clearAllAssigned());
+    }
+
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    applyStoreFilters() {
+        const searchTerm = document.getElementById('storeSearchInput').value.toLowerCase();
+        const regionFilter = document.getElementById('regionFilterSelect').value;
+        const statusFilter = document.getElementById('statusFilterSelect').value;
+
+        this.filteredAvailableStores = this.availableStores.filter(store => {
+            const matchesSearch = !searchTerm || 
+                store.store_name.toLowerCase().includes(searchTerm) ||
+                store.store_id.toLowerCase().includes(searchTerm) ||
+                (store.store_code && store.store_code.toLowerCase().includes(searchTerm));
+            
+            const matchesRegion = !regionFilter || store.region === regionFilter;
+            
+            const matchesStatus = !statusFilter || 
+                (statusFilter === 'active' && store.isActive) ||
+                (statusFilter === 'inactive' && !store.isActive);
+
+            return matchesSearch && matchesRegion && matchesStatus;
+        });
+
+        this.renderAvailableStores();
+        this.updateCounts();
+    }
+
+    getSelectedStores() {
+        return this.assignedStoresList.map(store => store._id);
+    }
+
+    // Store rendering methods
+    renderStoreLists() {
+        this.renderAvailableStores();
+        this.renderAssignedStores();
+        this.updateCounts();
+        this.updateTransferButtons();
+    }
+
+    renderAvailableStores() {
+        const container = document.getElementById('availableStoresList');
+        if (!container) return;
+
+        if (this.filteredAvailableStores.length === 0) {
+            container.innerHTML = '<div class="empty-placeholder">Không có cửa hàng nào khả dụng</div>';
+            return;
+        }
+
+        container.innerHTML = this.filteredAvailableStores.map(store => this.createStoreItemHTML(store, 'available')).join('');
+        
+        // Add click events to store items
+        container.querySelectorAll('.store-item').forEach(item => {
+            item.addEventListener('click', (e) => this.handleStoreItemClick(e, 'available'));
+        });
+    }
+
+    renderAssignedStores() {
+        const container = document.getElementById('assignedStoresList');
+        if (!container) return;
+
+        if (this.assignedStoresList.length === 0) {
+            container.innerHTML = '<div class="empty-placeholder">Chưa có cửa hàng nào được phân quyền</div>';
+            return;
+        }
+
+        container.innerHTML = this.assignedStoresList.map(store => this.createStoreItemHTML(store, 'assigned')).join('');
+        
+        // Add click events to store items
+        container.querySelectorAll('.store-item').forEach(item => {
+            item.addEventListener('click', (e) => this.handleStoreItemClick(e, 'assigned'));
+        });
+    }
+
+    createStoreItemHTML(store, listType) {
+        const isSelected = listType === 'available' ? 
+            this.selectedAvailableStores.has(store._id) : 
+            this.selectedAssignedStores.has(store._id);
+        
+        const statusClass = store.isActive ? 'store-status-active' : 'store-status-inactive';
+        
+        return `
+            <div class="store-item ${isSelected ? 'selected' : ''}" data-store-id="${store._id}">
+                <input type="checkbox" ${isSelected ? 'checked' : ''} tabindex="-1">
+                <div class="store-item-content">
+                    <div class="store-item-header">
+                        <span class="store-code">${store.store_id}</span>
+                        <div class="store-status-indicator ${statusClass}"></div>
+                    </div>
+                    <div class="store-name">${store.store_name}</div>
+                    <div class="store-details">${store.channel} • ${store.region} • ${store.province}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    renderStoreChips() {
+        const container = document.getElementById('assignedStoreChips');
+        if (!container) return;
+
+        if (this.assignedStoresList.length === 0) {
+            container.className = 'store-chips-container empty';
+            container.innerHTML = 'Chưa có cửa hàng nào được phân quyền';
+            return;
+        }
+
+        container.className = 'store-chips-container';
+        container.innerHTML = this.assignedStoresList.map(store => `
+            <div class="store-chip">
+                <span class="chip-text">${store.store_id} - ${store.store_name}</span>
+                <button type="button" class="chip-remove" onclick="userManagementApp.removeStoreFromChips('${store._id}')">
+                    ×
+                </button>
+            </div>
+        `).join('');
+    }
+
+    removeStoreFromChips(storeId) {
+        const store = this.assignedStoresList.find(s => s._id === storeId);
+        if (store) {
+            this.assignedStoresList = this.assignedStoresList.filter(s => s._id !== storeId);
+            this.availableStores.push(store);
+            this.applyStoreFilters();
+            this.renderStoreLists();
+            this.renderStoreChips();
+        }
+    }
+
+    // Store interaction methods
+    handleStoreItemClick(e, listType) {
+        const storeItem = e.target.closest('.store-item');
+        if (!storeItem) return;
+        
+        const storeId = storeItem.dataset.storeId;
+        const checkbox = storeItem.querySelector('input[type="checkbox"]');
+        
+        if (e.target !== checkbox) {
+            checkbox.checked = !checkbox.checked;
+        }
+        
+        if (listType === 'available') {
+            if (checkbox.checked) {
+                this.selectedAvailableStores.add(storeId);
+            } else {
+                this.selectedAvailableStores.delete(storeId);
+            }
+        } else {
+            if (checkbox.checked) {
+                this.selectedAssignedStores.add(storeId);
+            } else {
+                this.selectedAssignedStores.delete(storeId);
+            }
+        }
+        
+        storeItem.classList.toggle('selected', checkbox.checked);
+        this.updateTransferButtons();
+    }
+
+    // Transfer actions
+    assignSelectedStores() {
+        const selectedIds = Array.from(this.selectedAvailableStores);
+        const storesToMove = this.availableStores.filter(store => selectedIds.includes(store._id));
+        
+        this.assignedStoresList = [...this.assignedStoresList, ...storesToMove];
+        this.availableStores = this.availableStores.filter(store => !selectedIds.includes(store._id));
+        this.selectedAvailableStores.clear();
+        
+        this.applyStoreFilters();
+        this.renderStoreLists();
+        this.renderStoreChips();
+    }
+
+    assignAllVisibleStores() {
+        this.assignedStoresList = [...this.assignedStoresList, ...this.filteredAvailableStores];
+        this.availableStores = this.availableStores.filter(store => 
+            !this.filteredAvailableStores.some(filtered => filtered._id === store._id)
+        );
+        this.selectedAvailableStores.clear();
+        
+        this.applyStoreFilters();
+        this.renderStoreLists();
+        this.renderStoreChips();
+    }
+
+    removeSelectedStores() {
+        const selectedIds = Array.from(this.selectedAssignedStores);
+        const storesToMove = this.assignedStoresList.filter(store => selectedIds.includes(store._id));
+        
+        this.availableStores = [...this.availableStores, ...storesToMove];
+        this.assignedStoresList = this.assignedStoresList.filter(store => !selectedIds.includes(store._id));
+        this.selectedAssignedStores.clear();
+        
+        this.applyStoreFilters();
+        this.renderStoreLists();
+        this.renderStoreChips();
+    }
+
+    removeAllAssignedStores() {
+        this.availableStores = [...this.availableStores, ...this.assignedStoresList];
+        this.assignedStoresList = [];
+        this.selectedAssignedStores.clear();
+        
+        this.applyStoreFilters();
+        this.renderStoreLists();
+        this.renderStoreChips();
+    }
+
+    // Bulk selection methods
+    selectAllVisible() {
+        this.filteredAvailableStores.forEach(store => {
+            this.selectedAvailableStores.add(store._id);
+        });
+        this.renderAvailableStores();
+        this.updateTransferButtons();
+    }
+
+    selectByRegion() {
+        const regionFilter = document.getElementById('regionFilterSelect').value;
+        if (!regionFilter) {
+            alert('Vui lòng chọn vùng miền trước');
+            return;
+        }
+        
+        this.filteredAvailableStores
+            .filter(store => store.region === regionFilter)
+            .forEach(store => {
+                this.selectedAvailableStores.add(store._id);
+            });
+        
+        this.renderAvailableStores();
+        this.updateTransferButtons();
+    }
+
+    selectAllAssigned() {
+        this.assignedStoresList.forEach(store => {
+            this.selectedAssignedStores.add(store._id);
+        });
+        this.renderAssignedStores();
+        this.updateTransferButtons();
+    }
+
+    clearAllAssigned() {
+        if (confirm('Bạn có chắc chắn muốn xóa tất cả cửa hàng đã phân quyền?')) {
+            this.removeAllAssignedStores();
+        }
+    }
+
+    // UI Update methods
+    updateCounts() {
+        const availableCountEl = document.getElementById('availableCount');
+        const assignedCountEl = document.getElementById('assignedCount');
+        
+        if (availableCountEl) {
+            availableCountEl.textContent = this.filteredAvailableStores.length;
+        }
+        
+        if (assignedCountEl) {
+            assignedCountEl.textContent = this.assignedStoresList.length;
+        }
+    }
+
+    updateTransferButtons() {
+        const assignSelectedBtn = document.getElementById('assignSelectedBtn');
+        const assignAllBtn = document.getElementById('assignAllBtn');
+        const removeSelectedBtn = document.getElementById('removeSelectedBtn');
+        const removeAllBtn = document.getElementById('removeAllBtn');
+        
+        if (assignSelectedBtn) {
+            assignSelectedBtn.disabled = this.selectedAvailableStores.size === 0;
+        }
+        
+        if (assignAllBtn) {
+            assignAllBtn.disabled = this.filteredAvailableStores.length === 0;
+        }
+        
+        if (removeSelectedBtn) {
+            removeSelectedBtn.disabled = this.selectedAssignedStores.size === 0;
+        }
+        
+        if (removeAllBtn) {
+            removeAllBtn.disabled = this.assignedStoresList.length === 0;
+        }
+    }
+
     // User CRUD operations
-    showAddUserModal() {
+    async showAddUserModal() {
         this.editingUserId = null;
         document.getElementById('modalTitle').textContent = 'Thêm người dùng mới';
         document.getElementById('userForm').reset();
         document.getElementById('userId').value = '';
         document.getElementById('password').required = true;
         document.getElementById('userModal').style.display = 'flex';
+        
+        // Load stores for assignment with dual list interface
+        await this.renderStoreTransferInterface();
     }
 
     async editUser(userId) {
@@ -637,6 +1026,9 @@ class UserManagementApp {
                 document.getElementById('password').required = false;
                 document.getElementById('password').placeholder = 'Để trống nếu không đổi mật khẩu';
                 document.getElementById('password').value = '';
+                
+                // Load stores for assignment with dual list interface
+                await this.renderStoreTransferInterface(user.assignedStores || []);
                 
                 document.getElementById('userModal').style.display = 'flex';
             } else {
@@ -682,7 +1074,8 @@ class UserManagementApp {
                 loginid: formData.get('loginid'),
                 role: formData.get('role'),
                 leader: formData.get('leader') || null,
-                isActive: formData.get('isActive') === 'on'
+                isActive: formData.get('isActive') === 'on',
+                assignedStores: this.getSelectedStores()
             };
 
             // Only include password if provided
@@ -994,7 +1387,7 @@ class UserManagementApp {
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `users-export-${new Date().toISOString().split('T')[0]}.csv`;
+                a.download = `users-export-${new Date().toISOString().split('T')[0]}.xlsx`;
                 document.body.appendChild(a);
                 a.click();
                 window.URL.revokeObjectURL(url);

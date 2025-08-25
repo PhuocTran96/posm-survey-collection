@@ -80,19 +80,33 @@ const uploadStores = async (req, res) => {
             lineCount++;
             
             // Handle BOM and different column name formats
-            const nameValue = row.Name || row.name || row['﻿Name'];
-            const provinceValue = row.Province || row.province;
-            const leaderValue = row.Leader || row.leader;
+            const storeIdValue = row.store_id || row['﻿store_id'];
+            const storeCodeValue = row.store_code;
+            const storeNameValue = row.store_name;
+            const channelValue = row.channel;
+            const hcValue = row.hc;
+            const regionValue = row.region;
+            const provinceValue = row.province;
+            const mcpValue = row.mcp;
             
-            if (!nameValue || !provinceValue || !leaderValue) {
-                errors.push(`Row ${lineCount}: Missing required fields (Name, Province, Leader)`);
+            if (!storeIdValue || !storeNameValue || !channelValue || 
+                hcValue === undefined || !regionValue || !provinceValue || !mcpValue) {
+                errors.push(`Row ${lineCount}: Missing required fields (store_id, store_name, channel, hc, region, province, mcp)`);
                 continue;
             }
 
             const storeDoc = {
-                name: nameValue.trim(),
+                store_id: storeIdValue.trim(),
+                store_code: storeCodeValue?.trim() || null,
+                store_name: storeNameValue.trim(),
+                channel: channelValue.trim(),
+                hc: parseInt(hcValue) || 0,
+                region: regionValue.trim(),
                 province: provinceValue.trim(),
-                leader: leaderValue.trim()
+                mcp: mcpValue.trim().toUpperCase(),
+                isActive: true,
+                createdBy: 'csv-import',
+                updatedBy: 'csv-import'
             };
 
             storeData.push(storeDoc);
@@ -113,7 +127,7 @@ const uploadStores = async (req, res) => {
             const seen = new Set();
             
             for (const item of storeData) {
-                const key = `${item.name}-${item.province}-${item.leader}`;
+                const key = `${item.store_id}`;
                 if (!seen.has(key)) {
                     seen.add(key);
                     uniqueData.push(item);
@@ -160,7 +174,8 @@ const uploadStores = async (req, res) => {
         }
 
         const totalStores = await Store.countDocuments();
-        const uniqueLeaders = await Store.distinct('leader');
+        const uniqueChannels = await Store.distinct('channel');
+        const uniqueRegions = await Store.distinct('region');
 
         res.json({
             success: true,
@@ -169,7 +184,8 @@ const uploadStores = async (req, res) => {
                 uploaded: uploadedCount,
                 errors: errorCount,
                 totalInDatabase: totalStores,
-                uniqueLeaders: uniqueLeaders.length,
+                uniqueChannels: uniqueChannels.length,
+                uniqueRegions: uniqueRegions.length,
                 parseErrors: errors
             }
         });
@@ -353,11 +369,11 @@ const uploadPOSM = async (req, res) => {
 // Get upload statistics
 const getUploadStats = async (req, res) => {
     try {
-        const [storeCount, posmCount, uniqueModels, uniqueLeaders] = await Promise.all([
+        const [storeCount, posmCount, uniqueModels, uniqueChannels] = await Promise.all([
             Store.countDocuments(),
             ModelPosm.countDocuments(),
             ModelPosm.distinct('model'),
-            Store.distinct('leader')
+            Store.distinct('channel')
         ]);
 
         res.json({
@@ -365,7 +381,7 @@ const getUploadStats = async (req, res) => {
             stats: {
                 stores: {
                     total: storeCount,
-                    uniqueLeaders: uniqueLeaders.length
+                    uniqueChannels: uniqueChannels.length
                 },
                 posm: {
                     total: posmCount,

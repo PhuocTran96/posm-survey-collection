@@ -65,7 +65,12 @@ const userSchema = new mongoose.Schema({
   isSuperAdmin: {
     type: Boolean,
     default: false
-  }
+  },
+  assignedStores: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Store',
+    index: true
+  }]
 }, {
   timestamps: true,
   toJSON: {
@@ -85,6 +90,7 @@ userSchema.index({ loginid: 1 });
 userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1 });
 userSchema.index({ leader: 1 });
+userSchema.index({ assignedStores: 1 });
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
@@ -129,6 +135,15 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
 userSchema.methods.getSubordinates = async function() {
   const User = this.constructor;
   return await User.find({ leader: this.username, isActive: true });
+};
+
+// Instance method to get assigned stores with details
+userSchema.methods.getAssignedStores = async function() {
+  const Store = require('./Store');
+  return await Store.find({ 
+    _id: { $in: this.assignedStores },
+    isActive: true 
+  });
 };
 
 // Static method to validate hierarchy

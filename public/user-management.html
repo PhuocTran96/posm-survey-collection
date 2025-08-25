@@ -23,6 +23,9 @@
                 <a href="user-management.html" class="nav-item active">
                     👥 Quản lý người dùng
                 </a>
+                <a href="store-management.html" class="nav-item">
+                    🏪 Quản lý cửa hàng
+                </a>
             </div>
             <div class="nav-mobile-toggle" id="navMobileToggle">
                 <span></span>
@@ -115,6 +118,11 @@
             <!-- Users will be loaded here -->
         </div>
 
+        <!-- Pagination -->
+        <div class="pagination-container" id="usersPaginationContainer">
+            <!-- Pagination will be loaded here -->
+        </div>
+
         <!-- Loading overlay -->
         <div id="loadingOverlay" class="loading-overlay">
             <div class="loading-spinner"></div>
@@ -168,6 +176,89 @@
                             <label for="password">Mật khẩu <span class="required">*</span></label>
                             <input type="password" id="password" name="password" required>
                             <small>Ít nhất 6 ký tự</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="assignedStores">Cửa hàng được phân quyền</label>
+                            
+                            <!-- Store Assignment Chips Display -->
+                            <div id="assignedStoreChips" class="store-chips-container">
+                                <!-- Assigned stores will show as chips here -->
+                            </div>
+                            
+                            <!-- Dual List Box Interface -->
+                            <div id="storeTransferContainer" class="store-transfer-container">
+                                
+                                <!-- Search and Filters Row -->
+                                <div class="transfer-controls">
+                                    <div class="search-filters">
+                                        <input type="text" id="storeSearchInput" placeholder="🔍 Tìm kiếm theo tên, mã..." class="search-input">
+                                        <select id="regionFilterSelect" class="filter-select">
+                                            <option value="">🌍 Tất cả vùng</option>
+                                        </select>
+                                        <select id="statusFilterSelect" class="filter-select">
+                                            <option value="">📊 Tất cả trạng thái</option>
+                                            <option value="active">🟢 Hoạt động</option>
+                                            <option value="inactive">🔴 Tạm dừng</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <!-- Dual List Interface -->
+                                <div class="dual-list-container">
+                                    
+                                    <!-- Available Stores (Left) -->
+                                    <div class="list-panel">
+                                        <div class="list-header">
+                                            <h4>📋 Cửa hàng khả dụng</h4>
+                                            <div class="list-stats">
+                                                <span id="availableCount">0</span> cửa hàng
+                                            </div>
+                                            <div class="bulk-actions">
+                                                <button type="button" id="selectAllVisibleBtn" class="bulk-btn">Chọn tất cả</button>
+                                                <button type="button" id="selectByRegionBtn" class="bulk-btn">Chọn theo vùng</button>
+                                            </div>
+                                        </div>
+                                        <div class="list-body" id="availableStoresList">
+                                            <div class="loading-placeholder">Đang tải...</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Transfer Buttons -->
+                                    <div class="transfer-buttons">
+                                        <button type="button" id="assignSelectedBtn" class="transfer-btn assign-btn" title="Phân quyền các cửa hàng đã chọn">
+                                            <span>➡</span>
+                                        </button>
+                                        <button type="button" id="assignAllBtn" class="transfer-btn assign-all-btn" title="Phân quyền tất cả">
+                                            <span>⏩</span>
+                                        </button>
+                                        <button type="button" id="removeSelectedBtn" class="transfer-btn remove-btn" title="Bỏ phân quyền các cửa hàng đã chọn">
+                                            <span>⬅</span>
+                                        </button>
+                                        <button type="button" id="removeAllBtn" class="transfer-btn remove-all-btn" title="Bỏ phân quyền tất cả">
+                                            <span>⏪</span>
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Assigned Stores (Right) -->
+                                    <div class="list-panel">
+                                        <div class="list-header">
+                                            <h4>✅ Cửa hàng đã phân quyền</h4>
+                                            <div class="list-stats">
+                                                <span id="assignedCount">0</span> cửa hàng
+                                            </div>
+                                            <div class="bulk-actions">
+                                                <button type="button" id="selectAllAssignedBtn" class="bulk-btn">Chọn tất cả</button>
+                                                <button type="button" id="clearAllAssignedBtn" class="bulk-btn danger">Xóa tất cả</button>
+                                            </div>
+                                        </div>
+                                        <div class="list-body" id="assignedStoresList">
+                                            <div class="empty-placeholder">Chưa có cửa hàng nào được phân quyền</div>
+                                        </div>
+                                    </div>
+                                    
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="form-group">
@@ -251,6 +342,7 @@ ELUX00002,Le Thi C,lthic@company.com,TDS,Tran Van B,123456,true</pre>
         </div>
     </div>
 
+    <script src="pagination-component.js"></script>
     <script src="user-management.js"></script>
 </body>
 </html>

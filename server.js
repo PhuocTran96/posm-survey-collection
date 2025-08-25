@@ -138,6 +138,10 @@ app.get('/user-management.html', protectAdminPage, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'user-management.html'));
 });
 
+app.get('/store-management.html', protectAdminPage, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'store-management.html'));
+});
+
 // Static files (CSS, JS, images) - these should be served last
 app.use(express.static('public', {
   index: false // Prevent serving index.html automatically

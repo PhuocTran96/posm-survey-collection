@@ -14,38 +14,22 @@
         </header>
 
         <main>
-            <!-- Step 1: Select Leader -->
+            <!-- Step 1: Select Shop -->
             <div id="step1" class="step active">
-                <h2>Bước 1: Chọn Leader của bạn</h2>
-                <div class="form-group">
-                    <label for="leaderSelect">Leader:</label>
-                    <select id="leaderSelect" class="form-control">
-                        <option value="">-- Chọn Leader --</option>
-                    </select>
-                </div>
-                <button id="nextToStep2" class="btn btn-primary" disabled>Tiếp theo</button>
-            </div>
-
-            <!-- Step 2: Select Shop -->
-            <div id="step2" class="step">
-                <h2>Bước 2: Chọn Shop của bạn</h2>
+                <h2>Bước 1: Chọn Shop của bạn</h2>
                 <div class="form-group">
                     <label for="shopSelect">Shop Name:</label>
                     <select id="shopSelect" class="form-control">
                         <option value="">-- Chọn Shop --</option>
                     </select>
                 </div>
-                <div class="button-group">
-                    <button id="backToStep1" class="btn btn-secondary">Quay lại</button>
-                    <button id="nextToStep3" class="btn btn-primary" disabled>Tiếp theo</button>
-                </div>
+                <button id="nextToStep2" class="btn btn-primary" disabled>Tiếp theo</button>
             </div>
 
-            <!-- Step 3: POSM Selection -->
-            <div id="step3" class="step">
-                <h2>Bước 3: Chọn POSM đã triển khai</h2>
+            <!-- Step 2: POSM Selection -->
+            <div id="step2" class="step">
+                <h2>Bước 2: Chọn POSM đã triển khai</h2>
                 <div class="selected-info">
-                    <p><strong>Leader:</strong> <span id="selectedLeader"></span></p>
                     <p><strong>Shop:</strong> <span id="selectedShop"></span></p>
                 </div>
                 <!-- Model search and add -->
@@ -61,7 +45,7 @@
                     <!-- Models and POSM will be loaded here -->
                 </div>
                 <div class="button-group">
-                    <button id="backToStep2" class="btn btn-secondary">Quay lại</button>
+                    <button id="backToStep1" class="btn btn-secondary">Quay lại</button>
                     <button id="submitSurvey" class="btn btn-success">Gửi khảo sát</button>
                 </div>
             </div>

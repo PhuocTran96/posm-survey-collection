@@ -106,7 +106,7 @@ const getUserById = async (req, res) => {
  */
 const createUser = async (req, res) => {
   try {
-    const { userid, username, loginid, password, role, leader } = req.body;
+    const { userid, username, loginid, password, role, leader, isActive, assignedStores } = req.body;
     const currentUser = req.user;
 
     // Validation
@@ -171,6 +171,8 @@ const createUser = async (req, res) => {
       password: password.trim(),
       role: role.trim(),
       leader: leader?.trim() || null,
+      isActive: isActive !== undefined ? isActive : true,
+      assignedStores: assignedStores || [],
       createdBy: currentUser.username,
       updatedBy: currentUser.username
     };
@@ -209,7 +211,7 @@ const createUser = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { userid, username, loginid, role, leader, isActive } = req.body;
+    const { userid, username, loginid, role, leader, isActive, assignedStores, password } = req.body;
     const currentUser = req.user;
 
     const user = await User.findById(id);
@@ -308,6 +310,20 @@ const updateUser = async (req, res) => {
         });
       }
       user.isActive = isActive;
+    }
+
+    if (assignedStores !== undefined) {
+      user.assignedStores = assignedStores;
+    }
+
+    if (password && password.trim()) {
+      if (password.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: 'Password must be at least 6 characters long'
+        });
+      }
+      user.password = password.trim();
     }
 
     user.updatedBy = currentUser.username;
@@ -681,9 +697,9 @@ const exportUsersToCSV = async (req, res) => {
       leader: user.leader || '',
       isActive: user.isActive,
       lastLogin: user.lastLogin ? user.lastLogin.toISOString() : '',
-      createdAt: user.createdAt.toISOString(),
-      createdBy: user.createdBy,
-      updatedBy: user.updatedBy
+      createdAt: user.createdAt ? user.createdAt.toISOString() : '',
+      createdBy: user.createdBy || '',
+      updatedBy: user.updatedBy || ''
     }));
 
     // Create worksheet

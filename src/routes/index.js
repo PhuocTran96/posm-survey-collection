@@ -1,5 +1,6 @@
 const express = require('express');
 const surveyRoutes = require('./surveyRoutes');
+const surveyHistoryRoutes = require('./surveyHistoryRoutes');
 const adminRoutes = require('./adminRoutes');
 const uploadRoutes = require('./uploadRoutes');
 const dataUploadRoutes = require('./dataUploadRoutes');
@@ -21,6 +22,9 @@ router.use('/api/stores', storeRoutes);
 
 // Display management routes
 router.use('/api/displays', displayRoutes);
+
+// Survey history routes
+router.use('/api/survey-history', surveyHistoryRoutes);
 
 // Existing routes
 router.use('/api', uploadRoutes);

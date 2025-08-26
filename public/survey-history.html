@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survey History - POSM Survey Collection</title>
+    <link rel="stylesheet" href="styles-survey.css">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Survey History specific styles */
+        .survey-history-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .survey-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #2196F3;
+        }
+
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .filters-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            align-items: end;
+        }
+
+        .filter-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .filter-group input, .filter-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .survey-table-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .survey-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .survey-table th,
+        .survey-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .survey-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .survey-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .status-completed {
+            background: #e8f5e8;
+            color: #2e7d2e;
+        }
+
+        .status-pending {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .action-btn {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .action-btn:hover {
+            background: #1976D2;
+        }
+
+        /* Skeleton Loading Styles */
+        .skeleton-row {
+            animation: skeleton-loading 1.5s infinite ease-in-out;
+        }
+
+        .skeleton-cell {
+            background: #f0f0f0;
+            height: 16px;
+            border-radius: 4px;
+            margin: 4px 0;
+        }
+
+        .skeleton-cell.short {
+            width: 60%;
+        }
+
+        .skeleton-cell.medium {
+            width: 80%;
+        }
+
+        .skeleton-cell.long {
+            width: 100%;
+        }
+
+        .skeleton-cell.tiny {
+            width: 40%;
+        }
+
+        @keyframes skeleton-loading {
+            0% {
+                background-color: #f0f0f0;
+            }
+            50% {
+                background-color: #e0e0e0;
+            }
+            100% {
+                background-color: #f0f0f0;
+            }
+        }
+
+        /* Overlay Loader */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            z-index: 10;
+            border-radius: 8px;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #2196F3;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: #666;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        /* Button Loading State */
+        .btn-loading {
+            position: relative;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
+        .btn-loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 16px;
+            height: 16px;
+            margin: -8px 0 0 -8px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .btn-loading .btn-text {
+            opacity: 0;
+        }
+
+        /* Table Container for Relative Positioning */
+        .survey-table-container {
+            position: relative;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .empty-state i {
+            font-size: 4em;
+            color: #ddd;
+            margin-bottom: 20px;
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .survey-table-container {
+                overflow-x: auto;
+            }
+
+            .survey-table {
+                min-width: 600px;
+            }
+
+            .survey-history-container {
+                padding: 10px;
+            }
+
+            .filters-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .survey-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* Card view for mobile */
+        @media (max-width: 600px) {
+            .survey-table,
+            .survey-table thead,
+            .survey-table tbody,
+            .survey-table th,
+            .survey-table td,
+            .survey-table tr {
+                display: block;
+            }
+
+            .survey-table thead tr {
+                position: absolute;
+                top: -9999px;
+                left: -9999px;
+            }
+
+            .survey-table tr {
+                border: 1px solid #ccc;
+                margin-bottom: 10px;
+                padding: 10px;
+                border-radius: 8px;
+            }
+
+            .survey-table td {
+                border: none;
+                position: relative;
+                padding: 8px 8px 8px 35%;
+                text-align: left;
+            }
+
+            .survey-table td:before {
+                content: attr(data-label) ": ";
+                position: absolute;
+                left: 6px;
+                width: 30%;
+                font-weight: bold;
+                text-align: left;
+            }
+        }
+
+        .pagination-container {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        /* Navigation styles */
+        .main-nav {
+            background: #2196F3;
+            padding: 15px 0;
+            margin-bottom: 20px;
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+        }
+
+        .nav-brand {
+            color: white;
+            font-size: 1.5em;
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        .nav-menu {
+            display: flex;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            gap: 30px;
+        }
+
+        .nav-menu a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+
+        .nav-menu a:hover,
+        .nav-menu a.active {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .nav-user {
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .nav-user button {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .nav-user button:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        @media (max-width: 768px) {
+            .nav-container {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .nav-menu {
+                gap: 15px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="/" class="nav-brand">POSM Survey</a>
+            <ul class="nav-menu">
+                <li><a href="/">New Survey</a></li>
+                <li><a href="/survey-history.html" class="active">Survey History</a></li>
+            </ul>
+            <div class="nav-user">
+                <span id="userInfo">Loading...</span>
+                <button onclick="logout()">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="survey-history-container">
+        <!-- Page Header -->
+        <div class="page-header">
+            <h1>Survey History</h1>
+            <p>View and manage your survey submissions</p>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="survey-stats" id="surveyStats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalSurveys">-</div>
+                <div class="stat-label">Total Surveys</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalStores">-</div>
+                <div class="stat-label">Stores Surveyed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalModels">-</div>
+                <div class="stat-label">Models Recorded</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalImages">-</div>
+                <div class="stat-label">Images Captured</div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters-section">
+            <h3>Filter Surveys</h3>
+            <div class="filters-grid">
+                <div class="filter-group">
+                    <label for="startDate">Start Date</label>
+                    <input type="date" id="startDate" name="startDate">
+                </div>
+                <div class="filter-group">
+                    <label for="endDate">End Date</label>
+                    <input type="date" id="endDate" name="endDate">
+                </div>
+                <div class="filter-group">
+                    <label for="storeName">Store Name</label>
+                    <input type="text" id="storeName" name="storeName" placeholder="Search by store name...">
+                </div>
+                <div class="filter-group">
+                    <label>&nbsp;</label>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" id="applyFiltersBtn" onclick="applyFilters()" class="action-btn">
+                            <span class="btn-text">Apply Filters</span>
+                        </button>
+                        <button type="button" onclick="clearFilters()" class="action-btn" style="background: #666;">
+                            <span class="btn-text">Clear</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Survey Table -->
+        <div class="survey-table-container">
+            <!-- Loading Overlay -->
+            <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+                <div class="spinner"></div>
+                <div class="loading-text">Loading surveys...</div>
+            </div>
+
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <div style="font-size: 4em; color: #ddd; margin-bottom: 20px;">📋</div>
+                <h3>No Surveys Found</h3>
+                <p>You haven't submitted any surveys yet, or no surveys match your current filters.</p>
+            </div>
+            
+            <table class="survey-table" id="surveyTable">
+                <thead>
+                    <tr>
+                        <th>Date & Time</th>
+                        <th>Store Name</th>
+                        <th>Store ID</th>
+                        <th>Status</th>
+                        <th>Models</th>
+                        <th>Images</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="surveyTableBody">
+                    <!-- Skeleton rows will be inserted here -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination-container" id="paginationContainer"></div>
+    </div>
+
+    <!-- Survey Detail Modal -->
+    <div id="surveyDetailModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h2 id="modalTitle">Survey Details</h2>
+                <span class="close" onclick="closeSurveyDetailModal()">&times;</span>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Content will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeSurveyDetailModal()" class="action-btn" style="background: #666;">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Lightbox Modal -->
+    <div id="imageLightbox" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 90%; max-height: 90%; background: transparent; box-shadow: none;">
+            <span class="close" onclick="closeLightbox()" style="position: absolute; top: -40px; right: 10px; color: white; font-size: 2em;">&times;</span>
+            <img id="lightboxImage" style="width: 100%; height: auto; border-radius: 8px;">
+        </div>
+    </div>
+
+    <script src="pagination-component.js"></script>
+    <script src="survey-history.js"></script>
+</body>
+</html>

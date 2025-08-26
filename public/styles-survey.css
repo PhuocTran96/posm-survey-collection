@@ -79,6 +79,33 @@ header {
     gap: 15px;
 }
 
+.nav-links {
+    display: flex;
+    gap: 10px;
+}
+
+.nav-link {
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.nav-link:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.nav-link.active {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
 .user-info {
     display: flex;
     flex-direction: column;
@@ -127,18 +154,32 @@ header {
     .header-content {
         flex-direction: column;
         text-align: center;
+        gap: 15px;
     }
     
     .header-title {
         text-align: center;
     }
     
+    .header-actions {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .nav-links {
+        order: -1;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .nav-link {
+        font-size: 0.85rem;
+        padding: 6px 12px;
+    }
+    
     .user-info {
         text-align: center;
     }
-}
-    position: relative;
-    overflow: hidden;
 }
 
 header::before {

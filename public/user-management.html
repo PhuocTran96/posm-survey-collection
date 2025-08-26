@@ -299,12 +299,12 @@
                     <div class="import-info">
                         <h4>Định dạng file CSV:</h4>
                         <p>File CSV cần có các cột sau (hàng đầu tiên là header):</p>
-                        <code>userid,username,loginid,role,leader,password,isActive</code>
+                        <code>userid,username,loginid,role,leader,password,isActive,assignedStores</code>
                         
                         <h4>Ví dụ:</h4>
-                        <pre>userid,username,loginid,role,leader,password,isActive
-ELUX00001,Nguyen Van A,nvana@company.com,PRT,Tran Van B,123456,true
-ELUX00002,Le Thi C,lthic@company.com,TDS,Tran Van B,123456,true</pre>
+                        <pre>userid,username,loginid,role,leader,password,isActive,assignedStores
+ELUX00001,Nguyen Van A,nvana@company.com,PRT,Tran Van B,123456,true,STORE001;STORE002
+ELUX00002,Le Thi C,lthic@company.com,TDS,Tran Van B,,true,STORE003;STORE004</pre>
                         
                         <div class="import-notes">
                             <strong>Lưu ý:</strong>
@@ -312,7 +312,9 @@ ELUX00002,Le Thi C,lthic@company.com,TDS,Tran Van B,123456,true</pre>
                                 <li>File tối đa 5MB</li>
                                 <li>Chỉ hỗ trợ định dạng .csv, .xlsx, .xls</li>
                                 <li>Nếu userid đã tồn tại, thông tin sẽ được cập nhật</li>
+                                <li><strong>Password:</strong> Bắt buộc cho user mới, để trống để giữ nguyên mật khẩu cũ khi update</li>
                                 <li>isActive: true/false hoặc 1/0</li>
+                                <li>assignedStores: Danh sách store ID cách nhau bằng dấu ;</li>
                             </ul>
                         </div>
                     </div>
@@ -324,7 +326,7 @@ ELUX00002,Le Thi C,lthic@company.com,TDS,Tran Van B,123456,true</pre>
                                 <div class="file-drop-icon">📄</div>
                                 <div class="file-drop-text">
                                     <p><strong>Kéo thả file CSV vào đây</strong></p>
-                                    <p>hoặc <button type="button" id="selectFileBtn" class="btn-link">chọn file</button></p>
+                                    <p>hoặc <button type="button" id="selectFileBtn" class="btn btn-secondary" style="cursor: pointer; pointer-events: auto;">Chọn file</button></p>
                                 </div>
                             </div>
                         </div>

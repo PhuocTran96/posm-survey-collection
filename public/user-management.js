@@ -243,17 +243,31 @@ class UserManagementApp {
         // Import modal events
         document.getElementById('closeImportModalBtn').addEventListener('click', () => this.hideImportModal());
         document.getElementById('cancelImportBtn').addEventListener('click', () => this.hideImportModal());
-        document.getElementById('selectFileBtn').addEventListener('click', () => {
-            console.log('🔘 Select file button clicked');
-            const fileInput = document.getElementById('csvFileInput');
-            console.log('📁 File input element found:', fileInput);
-            if (fileInput) {
-                fileInput.click();
-                console.log('✅ File input clicked');
+        // Bind select file button event with fallback
+        const bindSelectFileBtn = () => {
+            const selectBtn = document.getElementById('selectFileBtn');
+            if (selectBtn) {
+                selectBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('🔘 Select file button clicked');
+                    const fileInput = document.getElementById('csvFileInput');
+                    console.log('📁 File input element found:', fileInput);
+                    if (fileInput) {
+                        fileInput.click();
+                        console.log('✅ File input clicked');
+                    } else {
+                        console.error('❌ File input element not found');
+                    }
+                });
+                console.log('✅ Select file button event listener attached');
             } else {
-                console.error('❌ File input element not found');
+                console.error('❌ Select file button not found');
             }
-        });
+        };
+        
+        // Try to bind immediately and also when import modal is shown
+        bindSelectFileBtn();
         document.getElementById('csvFileInput').addEventListener('change', (e) => this.handleFileSelect(e));
         document.getElementById('removeFileBtn').addEventListener('click', () => this.removeSelectedFile());
         document.getElementById('importBtn').addEventListener('click', () => this.importUsers());
@@ -264,6 +278,20 @@ class UserManagementApp {
 
         // File drop zone events
         const dropZone = document.getElementById('fileDropZone');
+        
+        // Make the entire drop zone clickable as a fallback
+        dropZone.addEventListener('click', (e) => {
+            // Don't trigger if the select button was clicked
+            if (e.target.id === 'selectFileBtn') return;
+            
+            console.log('🖱️ Drop zone clicked');
+            const fileInput = document.getElementById('csvFileInput');
+            if (fileInput) {
+                fileInput.click();
+                console.log('✅ File input clicked from drop zone');
+            }
+        });
+        
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
             dropZone.classList.add('drag-over');
@@ -1121,12 +1149,8 @@ class UserManagementApp {
                         .map(user => user.leader)
                 )];
                 
-                console.log('👥 Currently assigned leaders:', assignedLeaders);
-                
                 // Debug: Let's see what usernames actually exist in the database
                 const allUsernames = users.map(user => user.username).filter(name => name);
-                console.log('🔍 Sample usernames in database:', allUsernames.slice(0, 10));
-                console.log('🔍 Sample leader names:', assignedLeaders.slice(0, 5));
                 
                 // Find users who are currently acting as leaders to determine which roles can be leaders
                 const currentLeaderUsers = users.filter(user => {
@@ -1142,12 +1166,9 @@ class UserManagementApp {
                 });
                 
                 const leaderRoles = [...new Set(currentLeaderUsers.map(user => user.role))];
-                console.log('📋 Roles that are currently acting as leaders:', leaderRoles);
-                console.log('👥 Leader users found:', currentLeaderUsers.map(u => `${u.username} (${u.role})`));
                 
                 // Get potential leaders: users with roles that are currently acting as leaders, plus admin
                 const validLeaderRoles = [...new Set([...leaderRoles, 'admin', 'TDS', 'TDL'])]; // Include defaults just in case
-                console.log('✅ Valid leader roles:', validLeaderRoles);
                 
                 const potentialLeaders = users
                     .filter(user => 
@@ -1159,13 +1180,6 @@ class UserManagementApp {
                         user.username.trim()
                     );
                 
-                console.log('👑 Potential leaders by role:', 
-                    potentialLeaders.reduce((acc, user) => {
-                        acc[user.role] = acc[user.role] || [];
-                        acc[user.role].push(user.username);
-                        return acc;
-                    }, {})
-                );
                 
                 // Combine and deduplicate all leaders
                 const allLeaderNames = [...new Set([
@@ -1173,20 +1187,12 @@ class UserManagementApp {
                     ...potentialLeaders.map(user => user.username)
                 ])].sort();
                 
-                console.log('📋 All available leader names:', allLeaderNames);
-                
                 const result = {
                     assignedLeaders,
                     potentialLeaders,
                     allLeaderNames,
                     allUsers: users
                 };
-                
-                console.log('✅ Leader data compiled:', {
-                    assignedLeadersCount: assignedLeaders.length,
-                    potentialLeadersCount: potentialLeaders.length,
-                    allLeaderNamesCount: allLeaderNames.length
-                });
                 
                 return result;
             } else {
@@ -1213,13 +1219,8 @@ class UserManagementApp {
     // Load available leaders for dropdown (used in Edit User modal)
     async loadLeadersDropdown(selectedLeader = null, userRole = null) {
         try {
-            console.log('🔄 Loading leaders dropdown:', { selectedLeader, userRole });
-            
             const currentRole = userRole || document.getElementById('role')?.value;
             const leaderSelect = document.getElementById('leader');
-            
-            console.log('📋 Current role for leader selection:', currentRole);
-            console.log('🎯 Leader select element found:', !!leaderSelect);
             
             if (!leaderSelect) {
                 console.error('❌ Leader select element not found');
@@ -1227,7 +1228,6 @@ class UserManagementApp {
             }
             
             // Fetch leader data first to determine dynamic role hierarchy
-            console.log('📡 Fetching leader data...');
             const leaderData = await this.fetchAllLeaders();
             const potentialLeaders = leaderData.potentialLeaders;
             
@@ -1247,22 +1247,13 @@ class UserManagementApp {
             const needsLeader = rolesWithLeaders.includes(currentRole) || 
                                (!leaderRoles.includes(currentRole) && currentRole !== 'admin');
             
-            console.log('🤔 Role analysis:', {
-                currentRole,
-                rolesWithLeaders,
-                leaderRoles,
-                needsLeader
-            });
             
             if (!needsLeader) {
                 // No leader needed for this role
                 leaderSelect.innerHTML = '<option value="">Không cần Leader</option>';
                 leaderSelect.disabled = true;
-                console.log('✅ Role does not need leader - dropdown disabled');
                 return;
             }
-            
-            console.log('👥 Potential leaders found:', potentialLeaders.length, potentialLeaders.map(l => `${l.username} (${l.role})`));
             
             leaderSelect.disabled = false;
             leaderSelect.innerHTML = '<option value="">Chọn Leader</option>';
@@ -1270,7 +1261,6 @@ class UserManagementApp {
             // If no potential leaders found based on role, show all currently assigned leaders
             let leadersToShow = potentialLeaders;
             if (potentialLeaders.length === 0) {
-                console.log('⚠️ No potential leaders found by role, showing all current leaders');
                 
                 // Approach 1: Try to find user records for current leaders
                 let fallbackLeaders = leaderData.allUsers.filter(user =>
@@ -1282,7 +1272,6 @@ class UserManagementApp {
                 
                 // Approach 2: If we still can't find user records, create dummy entries for current leaders
                 if (fallbackLeaders.length === 0) {
-                    console.log('🔧 Creating dummy entries for current leaders');
                     fallbackLeaders = leaderData.assignedLeaders.map(leaderName => ({
                         username: leaderName,
                         role: 'Leader', // Generic role since we can't determine actual role
@@ -1291,7 +1280,6 @@ class UserManagementApp {
                 }
                 
                 leadersToShow = fallbackLeaders;
-                console.log('👥 Fallback leaders (current leaders):', leadersToShow.map(l => `${l.username} (${l.role})`));
             }
             
             if (leadersToShow.length === 0) {
@@ -1300,7 +1288,6 @@ class UserManagementApp {
                 option.textContent = 'Không có Leader khả dụng trong hệ thống';
                 option.disabled = true;
                 leaderSelect.appendChild(option);
-                console.log('⚠️ No leaders available in system');
             } else {
                 // Sort leaders by role hierarchy and then by name
                 const sortedLeaders = leadersToShow.sort((a, b) => {
@@ -1310,8 +1297,6 @@ class UserManagementApp {
                     if (roleComparison !== 0) return roleComparison;
                     return a.username.localeCompare(b.username);
                 });
-                
-                console.log('📊 Sorted leaders:', sortedLeaders.map(l => `${l.username} (${l.role})`));
                 
                 let selectedFound = false;
                 sortedLeaders.forEach(leader => {
@@ -1329,24 +1314,19 @@ class UserManagementApp {
                     if (isSelected) {
                         option.selected = true;
                         selectedFound = true;
-                        console.log('✅ Pre-selected leader:', leader.username);
                     }
                     
                     leaderSelect.appendChild(option);
                 });
                 
                 if (selectedLeader && !selectedFound) {
-                    console.log('⚠️ Selected leader not found in available leaders:', selectedLeader);
                     // Add the current leader as an option even if not in potential leaders list
                     const option = document.createElement('option');
                     option.value = selectedLeader;
                     option.textContent = `${selectedLeader} (Current)`;
                     option.selected = true;
                     leaderSelect.appendChild(option);
-                    console.log('✅ Added current leader as option:', selectedLeader);
                 }
-                
-                console.log('✅ Leader dropdown populated with', sortedLeaders.length, 'options');
             }
             
         } catch (error) {
@@ -1704,6 +1684,33 @@ class UserManagementApp {
         console.log('📤 Opening import modal');
         document.getElementById('importModal').style.display = 'flex';
         this.removeSelectedFile();
+        
+        // Re-bind the select file button after modal is shown
+        setTimeout(() => {
+            const selectBtn = document.getElementById('selectFileBtn');
+            if (selectBtn) {
+                // Remove any existing listeners to prevent duplicates
+                const newBtn = selectBtn.cloneNode(true);
+                selectBtn.parentNode.replaceChild(newBtn, selectBtn);
+                
+                // Add new listener
+                newBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('🔘 Select file button clicked (modal)');
+                    const fileInput = document.getElementById('csvFileInput');
+                    console.log('📁 File input element found:', fileInput);
+                    if (fileInput) {
+                        fileInput.click();
+                        console.log('✅ File input clicked');
+                    } else {
+                        console.error('❌ File input element not found');
+                    }
+                });
+                console.log('✅ Select file button re-bound after modal open');
+            }
+        }, 100);
+        
         console.log('✅ Import modal opened and reset');
     }
 

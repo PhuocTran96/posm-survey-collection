@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const mongoose = require('mongoose');
 
 const { config, validateConfig } = require('./src/config');
@@ -11,6 +12,25 @@ const { protectSurveyPage, protectAdminPage, redirectIfAuthenticated } = require
 const dataInitializer = require('./src/services/dataInitializer');
 
 validateConfig();
+
+// Ensure upload directories exist
+function ensureUploadDirectories() {
+  const uploadDirs = [
+    'uploads/',
+    'uploads/csv/',
+    'uploads/temp/'
+  ];
+  
+  uploadDirs.forEach(dir => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      console.log(`📁 Created upload directory: ${dir}`);
+    }
+  });
+}
+
+// Create upload directories on startup
+ensureUploadDirectories();
 
 const app = express();
 
@@ -45,6 +65,24 @@ app.get('/debug/users/count', async (req, res) => {
       error: 'Failed to count users',
       message: error.message 
     });
+  }
+});
+
+// Debug endpoint to check store IDs
+app.get('/debug/stores/ids', async (req, res) => {
+  try {
+    const Store = require('./src/models/Store');
+    
+    const stores = await Store.find({}).select('store_id store_name').limit(10);
+    const totalStores = await Store.countDocuments();
+    
+    res.json({
+      total: totalStores,
+      sampleStores: stores,
+      storeIds: stores.map(s => s.store_id)
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

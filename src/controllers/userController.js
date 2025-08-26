@@ -589,7 +589,16 @@ const importUsersFromCSV = async (req, res) => {
         .pipe(csv())
         .on('data', (data) => {
           lineNumber++;
-          results.push({ ...data, lineNumber });
+          
+          // Clean BOM and other invisible characters from keys
+          const cleanedData = {};
+          Object.keys(data).forEach(key => {
+            // Remove BOM (UTF-8 BOM: \uFEFF) and other whitespace from key
+            const cleanKey = key.replace(/^\uFEFF/, '').trim();
+            cleanedData[cleanKey] = data[key];
+          });
+          
+          results.push({ ...cleanedData, lineNumber });
         })
         .on('end', () => {
           console.log('✅ CSV processing completed. Records found:', results.length);
@@ -613,11 +622,10 @@ const importUsersFromCSV = async (req, res) => {
     for (const userData of results) {
       try {
         // Validate required fields
-        if (!userData.userid || !userData.username || !userData.loginid || 
-            !userData.password || !userData.role) {
+        if (!userData.userid || !userData.username || !userData.loginid || !userData.role) {
           errors.push({
             line: userData.lineNumber,
-            error: 'Missing required fields',
+            error: 'Missing required fields (userid, username, loginid, role)',
             data: userData
           });
           stats.errors++;
@@ -635,39 +643,103 @@ const importUsersFromCSV = async (req, res) => {
 
         // Process assigned stores - convert store_id to ObjectIds
         let assignedStoreIds = [];
-        if (userData.assignedStores) {
-          const storeIds = typeof userData.assignedStores === 'string' ? 
-            userData.assignedStores.split(';').map(s => s.trim()).filter(s => s) : 
-            userData.assignedStores;
+        // Handle different possible column names for assigned stores
+        const assignedStoresData = userData.assignedStores || userData['assignedStore:assignedStores'] || userData.assignedStore;
+        
+        if (assignedStoresData) {
+          console.log('🏪 Processing assigned stores for user:', userData.userid, 'Raw data:', assignedStoresData);
+          
+          const storeIds = typeof assignedStoresData === 'string' ? 
+            assignedStoresData.split(';').map(s => s.trim()).filter(s => s) : 
+            assignedStoresData;
+          
+          console.log('🏪 Parsed store IDs:', storeIds);
           
           if (storeIds.length > 0) {
             // Find stores by store_id and get their ObjectIds
             const foundStores = await Store.find({ 
               store_id: { $in: storeIds } 
-            }).select('_id');
+            }).select('_id store_id');
+            
+            console.log('🔍 Found stores in database:', foundStores.map(s => s.store_id));
+            
             assignedStoreIds = foundStores.map(store => store._id);
+            console.log('✅ Assigned store ObjectIds:', assignedStoreIds);
+            
+            // Log stores that were not found
+            const foundStoreIds = foundStores.map(s => s.store_id);
+            const notFoundStores = storeIds.filter(id => !foundStoreIds.includes(id));
+            if (notFoundStores.length > 0) {
+              console.log('⚠️ Store IDs not found in database:', notFoundStores);
+            }
           }
+        } else {
+          console.log('🏪 No assigned stores data found for user:', userData.userid);
         }
-
-        const cleanUserData = {
-          userid: userData.userid.trim(),
-          username: userData.username.trim(),
-          loginid: userData.loginid.trim(),
-          password: userData.password.trim(),
-          role: userData.role.trim(),
-          leader: userData.leader?.trim() || null,
-          assignedStores: assignedStoreIds,
-          createdBy: currentUser.username,
-          updatedBy: currentUser.username
-        };
 
         if (existingUser) {
           // Update existing user
-          Object.assign(existingUser, cleanUserData);
+          existingUser.userid = userData.userid.trim();
+          existingUser.username = userData.username.trim();
+          existingUser.loginid = userData.loginid.trim();
+          existingUser.role = userData.role.trim();
+          existingUser.leader = userData.leader?.trim() || null;
+          existingUser.assignedStores = assignedStoreIds;
+          existingUser.updatedBy = currentUser.username;
+          
+          // Only update password if provided and not empty
+          if (userData.password && userData.password.trim()) {
+            existingUser.password = userData.password.trim();
+          }
+          
+          // Handle isActive field
+          if (userData.isActive !== undefined && userData.isActive !== '') {
+            const isActiveValue = userData.isActive;
+            if (typeof isActiveValue === 'string') {
+              existingUser.isActive = isActiveValue.toLowerCase() === 'true' || isActiveValue === '1';
+            } else {
+              existingUser.isActive = Boolean(isActiveValue);
+            }
+          }
+          
           await existingUser.save();
           stats.updated++;
         } else {
-          // Create new user
+          // Create new user - password is required for new users
+          if (!userData.password || !userData.password.trim()) {
+            errors.push({
+              line: userData.lineNumber,
+              error: 'Password is required for new users',
+              data: userData
+            });
+            stats.errors++;
+            continue;
+          }
+          
+          const cleanUserData = {
+            userid: userData.userid.trim(),
+            username: userData.username.trim(),
+            loginid: userData.loginid.trim(),
+            password: userData.password.trim(),
+            role: userData.role.trim(),
+            leader: userData.leader?.trim() || null,
+            assignedStores: assignedStoreIds,
+            createdBy: currentUser.username,
+            updatedBy: currentUser.username
+          };
+          
+          // Handle isActive field for new users
+          if (userData.isActive !== undefined && userData.isActive !== '') {
+            const isActiveValue = userData.isActive;
+            if (typeof isActiveValue === 'string') {
+              cleanUserData.isActive = isActiveValue.toLowerCase() === 'true' || isActiveValue === '1';
+            } else {
+              cleanUserData.isActive = Boolean(isActiveValue);
+            }
+          } else {
+            cleanUserData.isActive = true; // Default to active for new users
+          }
+          
           const newUser = new User(cleanUserData);
           await newUser.save();
           stats.created++;

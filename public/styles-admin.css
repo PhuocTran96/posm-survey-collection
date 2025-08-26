@@ -2664,6 +2664,9 @@ body {
     text-align: center;
     cursor: pointer;
     transition: all 0.3s;
+    user-select: none;
+    position: relative;
+    z-index: 1;
 }
 
 .file-drop-zone:hover,

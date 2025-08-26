@@ -43,6 +43,7 @@ const getUsers = async (req, res) => {
     // Get users with pagination
     const users = await User.find(filters)
       .select('-password -refreshToken')
+      .populate('assignedStores', 'store_id store_name')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -78,7 +79,9 @@ const getUserById = async (req, res) => {
   try {
     const { id } = req.params;
     
-    const user = await User.findById(id).select('-password -refreshToken');
+    const user = await User.findById(id)
+      .select('-password -refreshToken')
+      .populate('assignedStores', 'store_id store_name channel region province');
     
     if (!user) {
       return res.status(404).json({
@@ -555,19 +558,28 @@ const resetUserPassword = async (req, res) => {
 const importUsersFromCSV = async (req, res) => {
   try {
     const currentUser = req.user;
+    console.log('🔄 User import request from:', currentUser?.username);
     
     if (!req.file) {
+      console.log('❌ No file uploaded');
       return res.status(400).json({
         success: false,
         message: 'CSV file is required'
       });
     }
+    
+    console.log('📁 Uploaded file:', {
+      originalname: req.file.originalname,
+      path: req.file.path,
+      size: req.file.size
+    });
 
     const results = [];
     const errors = [];
     let lineNumber = 0;
 
     // Process CSV file
+    console.log('📊 Processing CSV file...');
     await new Promise((resolve, reject) => {
       fs.createReadStream(req.file.path)
         .pipe(csv())
@@ -575,8 +587,14 @@ const importUsersFromCSV = async (req, res) => {
           lineNumber++;
           results.push({ ...data, lineNumber });
         })
-        .on('end', resolve)
-        .on('error', reject);
+        .on('end', () => {
+          console.log('✅ CSV processing completed. Records found:', results.length);
+          resolve();
+        })
+        .on('error', (error) => {
+          console.error('❌ CSV processing error:', error);
+          reject(error);
+        });
     });
 
     const stats = {

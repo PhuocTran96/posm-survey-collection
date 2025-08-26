@@ -67,3 +67,16 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+
+# Test files and data
+*test*.csv
+*test*.html
+*test*.js
+test_*
+debug_*
+fix_*
+check_*
+
+# Uploaded data files
+uploads/*.csv
+*.csv

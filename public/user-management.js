@@ -243,7 +243,17 @@ class UserManagementApp {
         // Import modal events
         document.getElementById('closeImportModalBtn').addEventListener('click', () => this.hideImportModal());
         document.getElementById('cancelImportBtn').addEventListener('click', () => this.hideImportModal());
-        document.getElementById('selectFileBtn').addEventListener('click', () => document.getElementById('csvFileInput').click());
+        document.getElementById('selectFileBtn').addEventListener('click', () => {
+            console.log('🔘 Select file button clicked');
+            const fileInput = document.getElementById('csvFileInput');
+            console.log('📁 File input element found:', fileInput);
+            if (fileInput) {
+                fileInput.click();
+                console.log('✅ File input clicked');
+            } else {
+                console.error('❌ File input element not found');
+            }
+        });
         document.getElementById('csvFileInput').addEventListener('change', (e) => this.handleFileSelect(e));
         document.getElementById('removeFileBtn').addEventListener('click', () => this.removeSelectedFile());
         document.getElementById('importBtn').addEventListener('click', () => this.importUsers());
@@ -265,8 +275,28 @@ class UserManagementApp {
             e.preventDefault();
             dropZone.classList.remove('drag-over');
             const files = e.dataTransfer.files;
+            console.log('📂 Files dropped:', files.length, 'files');
+            
             if (files.length > 0) {
-                this.handleFileSelect({ target: { files } });
+                const file = files[0];
+                console.log('📄 First dropped file:', file.name, file.type, file.size);
+                
+                // Set the file in the actual file input element
+                const fileInput = document.getElementById('csvFileInput');
+                if (fileInput) {
+                    // Create a new FileList-like object and assign it
+                    const dt = new DataTransfer();
+                    dt.items.add(file);
+                    fileInput.files = dt.files;
+                    
+                    console.log('✅ File set in input element:', fileInput.files[0]?.name);
+                    
+                    // Trigger the change event to handle file selection
+                    const changeEvent = new Event('change', { bubbles: true });
+                    fileInput.dispatchEvent(changeEvent);
+                } else {
+                    console.error('❌ File input element not found for drag-drop');
+                }
             }
         });
     }
@@ -1396,18 +1426,28 @@ class UserManagementApp {
 
     // Import/Export functions
     showImportModal() {
+        console.log('📤 Opening import modal');
         document.getElementById('importModal').style.display = 'flex';
         this.removeSelectedFile();
+        console.log('✅ Import modal opened and reset');
     }
 
     hideImportModal() {
+        console.log('📥 Closing import modal');
         document.getElementById('importModal').style.display = 'none';
         this.removeSelectedFile();
+        console.log('✅ Import modal closed and cleaned up');
     }
 
     handleFileSelect(event) {
+        console.log('📁 File selection event triggered:', event);
         const file = event.target.files[0];
-        if (!file) return;
+        console.log('📄 Selected file:', file);
+        
+        if (!file) {
+            console.log('❌ No file in event');
+            return;
+        }
 
         // Validate file type
         const allowedExtensions = ['.csv', '.xlsx', '.xls'];
@@ -1415,36 +1455,66 @@ class UserManagementApp {
         const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
 
         if (!hasValidExtension) {
+            console.log('❌ Invalid file extension:', fileName);
             this.showNotification('Chỉ hỗ trợ file CSV, XLSX, XLS', 'error');
+            // Clear the file input
+            event.target.value = '';
             return;
         }
 
         // Validate file size (5MB limit)
         if (file.size > 5 * 1024 * 1024) {
+            console.log('❌ File too large:', file.size);
             this.showNotification('File quá lớn. Tối đa 5MB', 'error');
+            // Clear the file input
+            event.target.value = '';
             return;
         }
+
+        console.log('✅ File validation passed:', fileName, 'Size:', file.size);
 
         // Show selected file
         document.getElementById('selectedFileName').textContent = file.name;
         document.getElementById('selectedFileInfo').style.display = 'flex';
         document.getElementById('fileDropZone').style.display = 'none';
-        document.getElementById('importBtn').disabled = false;
+        
+        // Enable import button
+        const importBtn = document.getElementById('importBtn');
+        importBtn.disabled = false;
+        console.log('✅ Import button enabled, file ready:', file.name);
     }
 
     removeSelectedFile() {
-        document.getElementById('csvFileInput').value = '';
+        console.log('🗑️ Removing selected file');
+        const fileInput = document.getElementById('csvFileInput');
+        if (fileInput) {
+            fileInput.value = '';
+            console.log('✅ File input cleared');
+        }
         document.getElementById('selectedFileInfo').style.display = 'none';
         document.getElementById('fileDropZone').style.display = 'flex';
         document.getElementById('importBtn').disabled = true;
+        console.log('✅ UI reset, import button disabled');
     }
 
     async importUsers() {
         const fileInput = document.getElementById('csvFileInput');
+        console.log('🔄 Import users called');
+        console.log('📁 File input element:', fileInput);
+        console.log('📁 Files in input:', fileInput ? fileInput.files : 'No input element');
+        
+        if (!fileInput) {
+            console.log('❌ File input element not found');
+            this.showNotification('Lỗi: Không tìm thấy file input element', 'error');
+            return;
+        }
+        
         const file = fileInput.files[0];
+        console.log('📄 Selected file:', file);
         
         if (!file) {
-            this.showNotification('Vui lòng chọn file để import', 'error');
+            console.log('❌ No file selected');
+            this.showNotification('Vui lòng chọn file CSV để import trước khi nhấn Import', 'error');
             return;
         }
 
@@ -1452,23 +1522,34 @@ class UserManagementApp {
             this.showLoading();
             const formData = new FormData();
             formData.append('csvFile', file);
+            
+            console.log('📤 Sending import request to /api/users/import/csv');
+            console.log('📁 File details:', {
+                name: file.name,
+                size: file.size,
+                type: file.type
+            });
 
             const response = await this.makeAuthenticatedRequest('/api/users/import/csv', {
                 method: 'POST',
                 body: formData
             });
+            
+            console.log('📥 Import response status:', response?.status);
 
             if (response && response.ok) {
                 const result = await response.json();
+                console.log('✅ Import successful:', result);
                 this.showNotification(result.message || 'Import thành công!', 'success');
                 this.hideImportModal();
                 this.loadUsers();
             } else {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Lỗi khi import dữ liệu');
+                const errorData = await response.json().catch(() => ({}));
+                console.error('❌ Import failed:', response?.status, errorData);
+                throw new Error(errorData.message || `Server error: ${response?.status || 'Unknown'}`);
             }
         } catch (error) {
-            console.error('Error importing users:', error);
+            console.error('❌ Error importing users:', error);
             this.showNotification('Lỗi khi import: ' + error.message, 'error');
         } finally {
             this.hideLoading();

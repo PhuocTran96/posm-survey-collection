@@ -38,6 +38,7 @@ router.use(verifyToken);
 
 // GET routes
 router.get('/', storeController.getStores);
+router.get('/search', storeController.searchStores);
 router.get('/stats', storeController.getStoreStats);
 router.get('/export', requireRole(['admin']), storeController.exportStoresToCSV);
 router.get('/:id', storeController.getStoreById);

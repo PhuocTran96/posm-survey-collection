@@ -31,11 +31,17 @@
             <!-- Step 1: Select Shop -->
             <div id="step1" class="step active">
                 <h2>Bước 1: Chọn Shop của bạn</h2>
-                <div class="form-group">
-                    <label for="shopSelect">Shop Name:</label>
-                    <select id="shopSelect" class="form-control">
-                        <option value="">-- Chọn Shop --</option>
-                    </select>
+                <div class="form-group" style="position:relative;">
+                    <label for="shopSearchInput">Shop Name:</label>
+                    <input type="text" 
+                           id="shopSearchInput" 
+                           class="form-control" 
+                           placeholder="Nhập tên shop hoặc mã shop để tìm kiếm..." 
+                           autocomplete="off">
+                    <div id="shopSuggestions" class="autocomplete-suggestions"></div>
+                </div>
+                <div id="selectedShopInfo" class="selected-shop-info" style="display:none;">
+                    <p><strong>Đã chọn:</strong> <span id="selectedShopText"></span></p>
                 </div>
                 <button id="nextToStep2" class="btn btn-primary" disabled>Tiếp theo</button>
             </div>

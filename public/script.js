@@ -11,6 +11,10 @@ class SurveyApp {
         this.modelQuantities = {}; // { model: number }
         this.user = null;
         this.assignedStores = [];
+        // Store search properties
+        this.shopSearchValue = '';
+        this.shopSearchSelected = '';
+        this.shopSearchDebounceTimer = null;
         this.init();
     }
 
@@ -22,7 +26,6 @@ class SurveyApp {
         }
         
         this.bindEvents();
-        this.loadAssignedStores();
         this.setupAuthUI();
     }
 
@@ -229,8 +232,19 @@ class SurveyApp {
         document.getElementById('submitSurvey').addEventListener('click', () => this.submitSurvey());
         document.getElementById('startNewSurvey').addEventListener('click', () => this.resetSurvey());
 
-        // Form changes
-        document.getElementById('shopSelect').addEventListener('change', (e) => this.onShopChange(e));
+        // Shop autocomplete events
+        const shopInput = document.getElementById('shopSearchInput');
+        const shopSuggestionsBox = document.getElementById('shopSuggestions');
+        shopInput.addEventListener('input', (e) => this.onShopInput(e));
+        shopInput.addEventListener('keydown', (e) => this.onShopInputKeydown(e));
+        shopSuggestionsBox.addEventListener('mousedown', (e) => this.onShopSuggestionClick(e));
+        
+        // Reposition dropdown on window events
+        window.addEventListener('resize', () => this.repositionVisibleDropdowns());
+        window.addEventListener('scroll', () => this.repositionVisibleDropdowns());
+        
+        // Hide dropdowns when clicking outside
+        document.addEventListener('click', (e) => this.handleOutsideClick(e));
 
         // Model autocomplete events
         const modelInput = document.getElementById('modelSearchInput');
@@ -250,46 +264,243 @@ class SurveyApp {
         document.getElementById('loadingOverlay').classList.remove('show');
     }
 
-    async loadAssignedStores() {
-        try {
-            this.showLoading();
-            
-            const select = document.getElementById('shopSelect');
-            select.innerHTML = '<option value="">-- Chọn Shop --</option>';
-            
-            if (this.assignedStores && this.assignedStores.length > 0) {
-                this.assignedStores.forEach(store => {
-                    const option = document.createElement('option');
-                    option.value = JSON.stringify(store);
-                    option.textContent = `${store.store_name} (${store.store_id})`;
-                    select.appendChild(option);
-                });
-            } else {
-                const option = document.createElement('option');
-                option.value = '';
-                option.textContent = 'Không có shop nào được phân quyền';
-                option.disabled = true;
-                select.appendChild(option);
+    // Shop autocomplete methods
+    async onShopInput(e) {
+        const value = e.target.value.trim();
+        this.shopSearchValue = value;
+        this.shopSearchSelected = '';
+        
+        const nextBtn = document.getElementById('nextToStep2');
+        nextBtn.disabled = true;
+        this.hideSelectedShopInfo();
+
+        // Clear existing timer
+        if (this.shopSearchDebounceTimer) {
+            clearTimeout(this.shopSearchDebounceTimer);
+        }
+
+        if (!value || value.length < 2) {
+            this.hideShopSuggestions();
+            return;
+        }
+
+        // Debounce search with 300ms delay
+        this.shopSearchDebounceTimer = setTimeout(async () => {
+            try {
+                console.log('🔍 Frontend: Searching for stores with query:', value);
+                const res = await this.authenticatedFetch(`/api/stores/search?q=${encodeURIComponent(value)}`);
+                if (res && res.ok) {
+                    const result = await res.json();
+                    console.log('📥 Frontend: Search API response:', result);
+                    if (result.success) {
+                        console.log('✅ Frontend: Showing suggestions for', result.data.length, 'stores');
+                        this.showShopSuggestions(result.data);
+                    } else {
+                        console.error('❌ Frontend: API returned error:', result.message);
+                    }
+                } else {
+                    console.error('❌ Frontend: HTTP error:', res.status, res.statusText);
+                }
+            } catch (error) {
+                console.error('❌ Frontend: Store search error:', error);
             }
-        } catch (error) {
-            console.error('Error loading assigned stores:', error);
-            alert('Lỗi khi tải danh sách shop. Vui lòng thử lại.');
-        } finally {
-            this.hideLoading();
+        }, 300);
+    }
+
+    showShopSuggestions(stores) {
+        const suggestionsBox = document.getElementById('shopSuggestions');
+        
+        if (!suggestionsBox) {
+            console.error('❌ Frontend: shopSuggestions element not found!');
+            return;
+        }
+        
+        suggestionsBox.innerHTML = '';
+        
+        if (!stores.length) {
+            suggestionsBox.style.display = 'none';
+            return;
+        }
+
+        stores.forEach((store, idx) => {
+            const div = document.createElement('div');
+            div.className = 'autocomplete-suggestion';
+            div.textContent = `${store.store_name} (${store.store_id})`;
+            div.dataset.value = JSON.stringify(store);
+            if (idx === 0) div.classList.add('active');
+            suggestionsBox.appendChild(div);
+        });
+        
+        // Position the dropdown relative to the input field
+        this.positionDropdown('shopSearchInput', 'shopSuggestions');
+        
+        suggestionsBox.style.display = 'block';
+        suggestionsBox.style.visibility = 'visible';
+        
+        // Reset scroll position to top when showing new suggestions
+        suggestionsBox.scrollTop = 0;
+    }
+
+    // Helper method to position fixed dropdown relative to input
+    positionDropdown(inputId, dropdownId) {
+        const input = document.getElementById(inputId);
+        const dropdown = document.getElementById(dropdownId);
+        
+        if (!input || !dropdown) return;
+        
+        const inputRect = input.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const dropdownHeight = 400; // max-height from CSS
+        
+        // Position dropdown below input by default
+        let top = inputRect.bottom + 4;
+        let left = inputRect.left;
+        let width = inputRect.width;
+        
+        // Check if dropdown would be cut off at bottom of viewport
+        if (top + dropdownHeight > viewportHeight) {
+            // Position above input if there's more space
+            const spaceAbove = inputRect.top;
+            const spaceBelow = viewportHeight - inputRect.bottom;
+            
+            if (spaceAbove > spaceBelow && spaceAbove > 200) {
+                top = inputRect.top - Math.min(dropdownHeight, spaceAbove) - 4;
+            }
+        }
+        
+        // Ensure dropdown stays within viewport horizontally
+        const maxLeft = window.innerWidth - width - 20;
+        left = Math.min(left, maxLeft);
+        left = Math.max(left, 20);
+        
+        dropdown.style.top = `${top}px`;
+        dropdown.style.left = `${left}px`;
+        dropdown.style.width = `${width}px`;
+    }
+
+    // Reposition any visible dropdowns when window changes
+    repositionVisibleDropdowns() {
+        const shopDropdown = document.getElementById('shopSuggestions');
+        const modelDropdown = document.getElementById('modelSuggestions');
+        
+        if (shopDropdown && shopDropdown.style.display === 'block') {
+            this.positionDropdown('shopSearchInput', 'shopSuggestions');
+        }
+        
+        if (modelDropdown && modelDropdown.style.display === 'block') {
+            this.positionDropdown('modelSearchInput', 'modelSuggestions');
         }
     }
 
-    async onShopChange(e) {
-        const shopData = e.target.value;
+    // Handle clicks outside dropdowns to close them
+    handleOutsideClick(e) {
+        const shopInput = document.getElementById('shopSearchInput');
+        const shopDropdown = document.getElementById('shopSuggestions');
+        const modelInput = document.getElementById('modelSearchInput');
+        const modelDropdown = document.getElementById('modelSuggestions');
+        
+        // Check if click is outside shop autocomplete
+        if (shopInput && shopDropdown && 
+            !shopInput.contains(e.target) && 
+            !shopDropdown.contains(e.target)) {
+            this.hideShopSuggestions();
+        }
+        
+        // Check if click is outside model autocomplete
+        if (modelInput && modelDropdown && 
+            !modelInput.contains(e.target) && 
+            !modelDropdown.contains(e.target)) {
+            this.hideModelSuggestions();
+        }
+    }
+
+    hideShopSuggestions() {
+        const suggestionsBox = document.getElementById('shopSuggestions');
+        suggestionsBox.innerHTML = '';
+        suggestionsBox.style.display = 'none';
+    }
+
+    onShopSuggestionClick(e) {
+        if (e.target.classList.contains('autocomplete-suggestion')) {
+            this.selectShopSuggestion(e.target.dataset.value);
+        }
+    }
+
+    onShopInputKeydown(e) {
+        const suggestionsBox = document.getElementById('shopSuggestions');
+        const items = Array.from(suggestionsBox.querySelectorAll('.autocomplete-suggestion'));
+        if (!items.length) return;
+
+        let idx = items.findIndex(item => item.classList.contains('active'));
+        
+        if (e.key === 'ArrowDown') {
+            if (idx < items.length - 1) {
+                if (idx >= 0) items[idx].classList.remove('active');
+                const newIdx = idx + 1;
+                items[newIdx].classList.add('active');
+                // Scroll into view if needed
+                this.scrollSuggestionIntoView(suggestionsBox, items[newIdx]);
+            }
+            e.preventDefault();
+        } else if (e.key === 'ArrowUp') {
+            if (idx > 0) {
+                items[idx].classList.remove('active');
+                const newIdx = idx - 1;
+                items[newIdx].classList.add('active');
+                // Scroll into view if needed
+                this.scrollSuggestionIntoView(suggestionsBox, items[newIdx]);
+            }
+            e.preventDefault();
+        } else if (e.key === 'Enter') {
+            if (idx >= 0) {
+                this.selectShopSuggestion(items[idx].dataset.value);
+                e.preventDefault();
+            }
+        } else if (e.key === 'Escape') {
+            this.hideShopSuggestions();
+            e.preventDefault();
+        }
+    }
+
+    // Helper method to scroll selected suggestion into view
+    scrollSuggestionIntoView(container, suggestion) {
+        const containerRect = container.getBoundingClientRect();
+        const suggestionRect = suggestion.getBoundingClientRect();
+        
+        if (suggestionRect.bottom > containerRect.bottom) {
+            // Scroll down
+            container.scrollTop += suggestionRect.bottom - containerRect.bottom + 5;
+        } else if (suggestionRect.top < containerRect.top) {
+            // Scroll up
+            container.scrollTop -= containerRect.top - suggestionRect.top + 5;
+        }
+    }
+
+    selectShopSuggestion(storeData) {
+        const store = JSON.parse(storeData);
+        const shopInput = document.getElementById('shopSearchInput');
+        
+        shopInput.value = `${store.store_name} (${store.store_id})`;
+        this.shopSearchSelected = store;
+        this.selectedShop = store;
+        
+        this.showSelectedShopInfo(store);
+        this.hideShopSuggestions();
         
         const nextBtn = document.getElementById('nextToStep2');
-        if (shopData) {
-            this.selectedShop = JSON.parse(shopData);
-            nextBtn.disabled = false;
-        } else {
-            this.selectedShop = '';
-            nextBtn.disabled = true;
-        }
+        nextBtn.disabled = false;
+    }
+
+    showSelectedShopInfo(store) {
+        const infoDiv = document.getElementById('selectedShopInfo');
+        const textSpan = document.getElementById('selectedShopText');
+        textSpan.textContent = `${store.store_name} (${store.store_id})`;
+        infoDiv.style.display = 'block';
+    }
+
+    hideSelectedShopInfo() {
+        const infoDiv = document.getElementById('selectedShopInfo');
+        infoDiv.style.display = 'none';
     }
 
     async loadModelsAndPOSM() {
@@ -743,18 +954,29 @@ class SurveyApp {
         this.modelQuantities = {};
         this.modelSearchValue = '';
         this.modelSearchSelected = '';
+        this.shopSearchValue = '';
+        this.shopSearchSelected = '';
+        
+        // Clear debounce timer
+        if (this.shopSearchDebounceTimer) {
+            clearTimeout(this.shopSearchDebounceTimer);
+            this.shopSearchDebounceTimer = null;
+        }
         
         // Reset form elements
-        document.getElementById('leaderSelect').value = '';
-        document.getElementById('shopSelect').value = '';
+        document.getElementById('shopSearchInput').value = '';
         document.getElementById('nextToStep2').disabled = true;
-        document.getElementById('nextToStep3').disabled = true;
         document.getElementById('modelSearchInput').value = '';
         document.getElementById('addModelBtn').disabled = true;
         
         // Clear containers
         document.getElementById('modelsContainer').innerHTML = '';
         document.getElementById('modelSuggestions').innerHTML = '';
+        document.getElementById('shopSuggestions').innerHTML = '';
+        
+        // Hide info displays
+        this.hideSelectedShopInfo();
+        this.hideShopSuggestions();
         
         // Hide success message and show step 1
         document.getElementById('successMessage').classList.remove('active');
@@ -862,7 +1084,12 @@ class SurveyApp {
             if (idx === 0) div.classList.add('active');
             suggestionsBox.appendChild(div);
         });
+        
+        // Position the dropdown relative to the input field
+        this.positionDropdown('modelSearchInput', 'modelSuggestions');
+        
         suggestionsBox.style.display = 'block';
+        suggestionsBox.scrollTop = 0;
     }
 
     hideModelSuggestions() {

@@ -42,6 +42,18 @@ body {
     border-radius: 12px;
     box-shadow: var(--card-shadow-lg);
     overflow: hidden;
+    position: relative; /* Needed for dropdown positioning */
+}
+
+/* Override overflow for main content to allow dropdowns */
+main {
+    overflow: visible;
+    position: relative;
+}
+
+.step {
+    overflow: visible;
+    position: relative;
 }
 header {
     background: var(--primary);
@@ -520,33 +532,92 @@ html, body {
     }
 }
 
-/* Model autocomplete suggestions styles */
-#modelSuggestions.autocomplete-suggestions {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    z-index: 10;
+/* Autocomplete suggestions styles for both shop and model search */
+#modelSuggestions,
+#shopSuggestions,
+.autocomplete-suggestions {
+    position: fixed; /* Changed from absolute to fixed for better positioning */
+    z-index: 9999; /* Higher z-index to ensure it's above everything */
     background: #fff;
     border-radius: 10px;
-    box-shadow: 0 4px 16px rgba(79,172,254,0.13);
+    box-shadow: 0 8px 24px rgba(79,172,254,0.15); /* Enhanced shadow for better separation */
     margin-top: 4px;
     padding: 0;
-    max-height: 220px;
+    max-height: 400px; /* Increased from 220px to show 8-10 items */
     overflow-y: auto;
+    overflow-x: hidden;
     border: 1px solid #e1e5e9;
+    display: none;
+    /* Custom scrollbar styling */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(79,172,254,0.3) transparent;
+    /* Ensure it doesn't get clipped */
+    min-width: 200px;
+    max-width: 500px;
+}
+
+/* Webkit scrollbar styling for better appearance */
+#modelSuggestions::-webkit-scrollbar,
+#shopSuggestions::-webkit-scrollbar,
+.autocomplete-suggestions::-webkit-scrollbar {
+    width: 6px;
+}
+
+#modelSuggestions::-webkit-scrollbar-track,
+#shopSuggestions::-webkit-scrollbar-track,
+.autocomplete-suggestions::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 10px;
+}
+
+#modelSuggestions::-webkit-scrollbar-thumb,
+#shopSuggestions::-webkit-scrollbar-thumb,
+.autocomplete-suggestions::-webkit-scrollbar-thumb {
+    background: rgba(79,172,254,0.3);
+    border-radius: 10px;
+    transition: background 0.2s ease;
+}
+
+#modelSuggestions::-webkit-scrollbar-thumb:hover,
+#shopSuggestions::-webkit-scrollbar-thumb:hover,
+.autocomplete-suggestions::-webkit-scrollbar-thumb:hover {
+    background: rgba(79,172,254,0.5);
 }
 .autocomplete-suggestion {
-    padding: 14px 18px;
-    font-size: 1.08em;
+    padding: 12px 18px; /* Reduced from 14px to 12px for better fit */
+    font-size: 1.05em; /* Slightly reduced from 1.08em */
     color: #333;
     cursor: pointer;
     border-bottom: 1px solid #f1f3f4;
     background: #fff;
     transition: background 0.15s, color 0.15s;
+    line-height: 1.4; /* Better line spacing */
+    white-space: nowrap; /* Prevent text wrapping */
+    overflow: hidden;
+    text-overflow: ellipsis; /* Show ellipsis for long store names */
 }
 .autocomplete-suggestion:last-child {
     border-bottom: none;
+    border-radius: 0 0 10px 10px;
+}
+
+/* Selected shop info styles */
+.selected-shop-info {
+    margin-top: 12px;
+    padding: 12px 16px;
+    background: var(--success-light);
+    border: 1px solid #a7f3d0;
+    border-radius: 8px;
+    font-size: 0.95em;
+}
+
+.selected-shop-info p {
+    margin: 0;
+    color: #065f46;
+}
+
+.selected-shop-info strong {
+    color: #064e3b;
 }
 .autocomplete-suggestion.active,
 .autocomplete-suggestion:hover {
@@ -554,14 +625,30 @@ html, body {
     color: #007bff;
     font-weight: 600;
 }
+
+/* Better visual feedback for keyboard navigation */
+.autocomplete-suggestion.active {
+    box-shadow: inset 3px 0 0 var(--primary);
+    background: #e3f0fc;
+    font-weight: 500;
+}
+
+/* Smooth scrolling behavior */
+#modelSuggestions,
+#shopSuggestions {
+    scroll-behavior: smooth;
+}
 @media (max-width: 600px) {
-    #modelSuggestions.autocomplete-suggestions {
+    #modelSuggestions,
+    #shopSuggestions,
+    .autocomplete-suggestions {
         font-size: 1.13em;
         border-radius: 12px;
         box-shadow: 0 6px 18px rgba(79,172,254,0.16);
+        max-height: 350px; /* Slightly smaller on mobile */
     }
     .autocomplete-suggestion {
-        padding: 16px 20px;
+        padding: 14px 20px; /* Increased for better touch targets */
         font-size: 1.13em;
     }
 } 

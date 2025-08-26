@@ -497,6 +497,59 @@ const exportStoresToCSV = async (req, res) => {
 };
 
 /**
+ * Search stores for autocomplete (limited to user's assigned stores)
+ */
+const searchStores = async (req, res) => {
+  try {
+    const { q } = req.query;
+    const user = req.user;
+    
+    if (!q || q.length < 2) {
+      return res.json({
+        success: true,
+        data: []
+      });
+    }
+
+    // Get user's assigned store IDs
+    const assignedStoreIds = user.assignedStores || [];
+    
+    if (assignedStoreIds.length === 0) {
+      return res.json({
+        success: true,
+        data: []
+      });
+    }
+
+    // Create search regex
+    const searchRegex = new RegExp(q, 'i');
+    
+    // Query actual Store documents that match user's assigned stores AND search criteria
+    const matchingStores = await Store.find({
+      _id: { $in: assignedStoreIds },
+      $or: [
+        { store_name: searchRegex },
+        { store_id: searchRegex }
+      ]
+    })
+    .select('store_id store_name channel region province')
+    .limit(20);
+
+    res.json({
+      success: true,
+      data: matchingStores
+    });
+
+  } catch (error) {
+    console.error('Store search error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to search stores'
+    });
+  }
+};
+
+/**
  * Get store statistics
  */
 const getStoreStats = async (req, res) => {
@@ -557,5 +610,6 @@ module.exports = {
   bulkDeleteStores,
   importStoresFromCSV,
   exportStoresToCSV,
+  searchStores,
   getStoreStats
 };

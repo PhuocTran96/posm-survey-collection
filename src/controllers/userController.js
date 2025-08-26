@@ -127,19 +127,20 @@ const createUser = async (req, res) => {
       });
     }
 
-    // Check for duplicate userid, username, or loginid
+    // Check for duplicate userid, username, or loginid (loginid case-insensitive)
     const existingUser = await User.findOne({
       $or: [
         { userid: userid.trim() },
         { username: username.trim() },
-        { loginid: loginid.trim() }
+        { loginid: { $regex: new RegExp(`^${loginid.trim()}$`, 'i') } }
       ]
     });
 
     if (existingUser) {
       const duplicateField = 
         existingUser.userid === userid.trim() ? 'userid' :
-        existingUser.username === username.trim() ? 'username' : 'loginid';
+        existingUser.username === username.trim() ? 'username' :
+        existingUser.loginid.toLowerCase() === loginid.trim().toLowerCase() ? 'loginid' : 'loginid';
         
       return res.status(400).json({
         success: false,
@@ -258,7 +259,10 @@ const updateUser = async (req, res) => {
     }
 
     if (loginid && loginid !== user.loginid) {
-      const existingUser = await User.findOne({ loginid: loginid.trim(), _id: { $ne: id } });
+      const existingUser = await User.findOne({ 
+        loginid: { $regex: new RegExp(`^${loginid.trim()}$`, 'i') }, 
+        _id: { $ne: id } 
+      });
       if (existingUser) {
         return res.status(400).json({
           success: false,
@@ -620,12 +624,12 @@ const importUsersFromCSV = async (req, res) => {
           continue;
         }
 
-        // Check if user exists
+        // Check if user exists (loginid case-insensitive)
         const existingUser = await User.findOne({
           $or: [
             { userid: userData.userid.trim() },
             { username: userData.username.trim() },
-            { loginid: userData.loginid.trim() }
+            { loginid: { $regex: new RegExp(`^${userData.loginid.trim()}$`, 'i') } }
           ]
         });
 

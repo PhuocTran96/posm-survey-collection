@@ -358,7 +358,7 @@ class UserManagementApp {
                     console.warn('Unexpected users response format:', usersData);
                 }
                 
-                this.populateFilters();
+                await this.populateFilters();
                 this.renderUsers();
             } else {
                 console.error('Failed to load users:', usersResponse ? usersResponse.status : 'No response');
@@ -405,10 +405,61 @@ class UserManagementApp {
         }
     }
 
-    populateFilters() {
-        // For server-side pagination, we'll keep the static filter options
-        // Leader filter will be populated from server data if needed
-        // For now, keep it simple with existing static options
+    async populateFilters() {
+        // Populate leader filter dropdown with available leaders
+        try {
+            // Fetch leader data using centralized function
+            const leaderData = await this.fetchAllLeaders();
+            const allLeaderNames = leaderData.allLeaderNames;
+            
+            const leaderFilterSelect = document.getElementById('leaderFilter');
+            if (leaderFilterSelect) {
+                // Keep the current selection
+                const currentValue = leaderFilterSelect.value;
+                
+                leaderFilterSelect.innerHTML = '<option value="">Tất cả Leader</option>';
+                
+                if (allLeaderNames.length === 0) {
+                    const option = document.createElement('option');
+                    option.value = '';
+                    option.textContent = 'Không có Leader trong hệ thống';
+                    option.disabled = true;
+                    leaderFilterSelect.appendChild(option);
+                } else {
+                    allLeaderNames.forEach(leader => {
+                        const option = document.createElement('option');
+                        option.value = leader;
+                        option.textContent = leader;
+                        if (leader === currentValue) {
+                            option.selected = true;
+                        }
+                        leaderFilterSelect.appendChild(option);
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error populating leader filter:', error);
+        }
+    }
+
+    // Update both filter and modal leader dropdowns
+    async refreshAllLeaderDropdowns() {
+        try {
+            // Update the main page filter dropdown
+            await this.populateFilters();
+            
+            // Update the modal dropdown if it exists (when modal is open)
+            const leaderSelect = document.getElementById('leader');
+            const roleSelect = document.getElementById('role');
+            
+            if (leaderSelect && roleSelect) {
+                const currentLeader = leaderSelect.value;
+                const currentRole = roleSelect.value;
+                await this.loadLeadersDropdown(currentLeader, currentRole);
+            }
+        } catch (error) {
+            console.error('Error refreshing leader dropdowns:', error);
+        }
     }
 
     applyFilters() {
@@ -1033,70 +1084,274 @@ class UserManagementApp {
         await this.loadLeadersDropdown(null, role);
     }
 
-    // Load available leaders for dropdown
-    async loadLeadersDropdown(selectedLeader = null, userRole = null) {
+    // Centralized function to fetch all available leaders
+    async fetchAllLeaders() {
         try {
-            const response = await this.makeAuthenticatedRequest('/api/users?limit=1000'); // Get all users for leader dropdown
+            console.log('🚀 Fetching all leaders from API...');
+            const response = await this.makeAuthenticatedRequest('/api/users?limit=5000&isActive=true');
+            
             if (response && response.ok) {
                 const usersData = await response.json();
                 const users = usersData.success && usersData.data ? usersData.data : [];
                 
-                // Filter users who can be leaders - show all potential leaders (TDS, TDL, admin)
-                // Let the server handle hierarchy validation
-                const currentRole = userRole || document.getElementById('role').value;
+                // Analyze all roles in database
+                const roleDistribution = users.reduce((acc, user) => {
+                    if (user.role) {
+                        acc[user.role] = (acc[user.role] || 0) + 1;
+                    }
+                    return acc;
+                }, {});
                 
-                // Always show all potential leaders regardless of current role
-                const potentialLeaders = users.filter(user => 
-                    ['TDS', 'TDL', 'admin'].includes(user.role) && user.isActive
+                console.log('📊 API Response:', { 
+                    success: usersData.success, 
+                    totalUsers: users.length,
+                    roleDistribution: roleDistribution,
+                    sampleUser: users[0] ? {
+                        username: users[0].username,
+                        role: users[0].role,
+                        leader: users[0].leader,
+                        isActive: users[0].isActive
+                    } : null
+                });
+                
+                // Get unique leaders from all users (currently assigned leaders)
+                const assignedLeaders = [...new Set(
+                    users
+                        .filter(user => user.leader && user.leader.trim())
+                        .map(user => user.leader)
+                )];
+                
+                console.log('👥 Currently assigned leaders:', assignedLeaders);
+                
+                // Debug: Let's see what usernames actually exist in the database
+                const allUsernames = users.map(user => user.username).filter(name => name);
+                console.log('🔍 Sample usernames in database:', allUsernames.slice(0, 10));
+                console.log('🔍 Sample leader names:', assignedLeaders.slice(0, 5));
+                
+                // Find users who are currently acting as leaders to determine which roles can be leaders
+                const currentLeaderUsers = users.filter(user => {
+                    const isLeader = assignedLeaders.includes(user.username);
+                    const isActive = user.isActive === true;
+                    
+                    // Debug individual matches
+                    if (assignedLeaders.includes(user.username)) {
+                        console.log(`✅ Found leader user: ${user.username} (${user.role}) - Active: ${user.isActive}`);
+                    }
+                    
+                    return isLeader && isActive;
+                });
+                
+                const leaderRoles = [...new Set(currentLeaderUsers.map(user => user.role))];
+                console.log('📋 Roles that are currently acting as leaders:', leaderRoles);
+                console.log('👥 Leader users found:', currentLeaderUsers.map(u => `${u.username} (${u.role})`));
+                
+                // Get potential leaders: users with roles that are currently acting as leaders, plus admin
+                const validLeaderRoles = [...new Set([...leaderRoles, 'admin', 'TDS', 'TDL'])]; // Include defaults just in case
+                console.log('✅ Valid leader roles:', validLeaderRoles);
+                
+                const potentialLeaders = users
+                    .filter(user => 
+                        user && 
+                        user.role && 
+                        validLeaderRoles.includes(user.role) && 
+                        user.isActive === true &&
+                        user.username && 
+                        user.username.trim()
+                    );
+                
+                console.log('👑 Potential leaders by role:', 
+                    potentialLeaders.reduce((acc, user) => {
+                        acc[user.role] = acc[user.role] || [];
+                        acc[user.role].push(user.username);
+                        return acc;
+                    }, {})
                 );
                 
-                console.log('📊 All users loaded:', users.length);
-                console.log('👥 Users by role:', users.reduce((acc, user) => {
-                    acc[user.role] = (acc[user.role] || 0) + 1;
-                    return acc;
-                }, {}));
-                console.log('👑 Potential leaders found:', potentialLeaders.map(u => `${u.username} (${u.role})`));
+                // Combine and deduplicate all leaders
+                const allLeaderNames = [...new Set([
+                    ...assignedLeaders,
+                    ...potentialLeaders.map(user => user.username)
+                ])].sort();
                 
-                // Check if the current role should have a leader
-                const rolesNeedingLeader = ['PRT', 'TDS', 'user'];
-                const needsLeader = rolesNeedingLeader.includes(currentRole);
+                console.log('📋 All available leader names:', allLeaderNames);
                 
-                const leaderSelect = document.getElementById('leader');
+                const result = {
+                    assignedLeaders,
+                    potentialLeaders,
+                    allLeaderNames,
+                    allUsers: users
+                };
                 
-                if (!needsLeader) {
-                    // No leader needed for this role (TDL, admin)
-                    leaderSelect.innerHTML = '<option value="">Không cần Leader</option>';
-                    leaderSelect.disabled = true;
-                } else {
-                    leaderSelect.disabled = false;
-                    leaderSelect.innerHTML = '<option value="">Chọn Leader</option>';
-                    
-                    if (potentialLeaders.length === 0) {
-                        const option = document.createElement('option');
-                        option.value = '';
-                        option.textContent = 'Không có Leader trong hệ thống';
-                        option.disabled = true;
-                        leaderSelect.appendChild(option);
-                    } else {
-                        potentialLeaders.forEach(leader => {
-                            const option = document.createElement('option');
-                            option.value = leader.username;
-                            option.textContent = `${leader.username} (${leader.role})`;
-                            if (selectedLeader && leader.username === selectedLeader) {
-                                option.selected = true;
-                            }
-                            leaderSelect.appendChild(option);
-                        });
-                        
-                        console.log(`✅ Loaded ${potentialLeaders.length} potential leaders for role: ${currentRole}`);
-                    }
-                }
+                console.log('✅ Leader data compiled:', {
+                    assignedLeadersCount: assignedLeaders.length,
+                    potentialLeadersCount: potentialLeaders.length,
+                    allLeaderNamesCount: allLeaderNames.length
+                });
                 
+                return result;
             } else {
-                console.error('Failed to load leaders for dropdown');
+                console.error('❌ Failed to fetch leaders - HTTP status:', response?.status);
+                const errorResult = {
+                    assignedLeaders: [],
+                    potentialLeaders: [],
+                    allLeaderNames: [],
+                    allUsers: []
+                };
+                return errorResult;
             }
         } catch (error) {
-            console.error('Error loading leaders dropdown:', error);
+            console.error('❌ Error fetching leaders:', error);
+            return {
+                assignedLeaders: [],
+                potentialLeaders: [],
+                allLeaderNames: [],
+                allUsers: []
+            };
+        }
+    }
+
+    // Load available leaders for dropdown (used in Edit User modal)
+    async loadLeadersDropdown(selectedLeader = null, userRole = null) {
+        try {
+            console.log('🔄 Loading leaders dropdown:', { selectedLeader, userRole });
+            
+            const currentRole = userRole || document.getElementById('role')?.value;
+            const leaderSelect = document.getElementById('leader');
+            
+            console.log('📋 Current role for leader selection:', currentRole);
+            console.log('🎯 Leader select element found:', !!leaderSelect);
+            
+            if (!leaderSelect) {
+                console.error('❌ Leader select element not found');
+                return;
+            }
+            
+            // Fetch leader data first to determine dynamic role hierarchy
+            console.log('📡 Fetching leader data...');
+            const leaderData = await this.fetchAllLeaders();
+            const potentialLeaders = leaderData.potentialLeaders;
+            
+            // Determine which roles need leaders dynamically
+            // If there are users with leaders assigned, those roles need leaders
+            const rolesWithLeaders = [...new Set(
+                leaderData.allUsers
+                    .filter(user => user.leader && user.leader.trim())
+                    .map(user => user.role)
+            )];
+            
+            const leaderRoles = [...new Set(potentialLeaders.map(user => user.role))];
+            
+            // A role needs a leader if:
+            // 1. Other users of this role currently have leaders, OR
+            // 2. This role is not a leader role itself (not in the leader roles list)
+            const needsLeader = rolesWithLeaders.includes(currentRole) || 
+                               (!leaderRoles.includes(currentRole) && currentRole !== 'admin');
+            
+            console.log('🤔 Role analysis:', {
+                currentRole,
+                rolesWithLeaders,
+                leaderRoles,
+                needsLeader
+            });
+            
+            if (!needsLeader) {
+                // No leader needed for this role
+                leaderSelect.innerHTML = '<option value="">Không cần Leader</option>';
+                leaderSelect.disabled = true;
+                console.log('✅ Role does not need leader - dropdown disabled');
+                return;
+            }
+            
+            console.log('👥 Potential leaders found:', potentialLeaders.length, potentialLeaders.map(l => `${l.username} (${l.role})`));
+            
+            leaderSelect.disabled = false;
+            leaderSelect.innerHTML = '<option value="">Chọn Leader</option>';
+            
+            // If no potential leaders found based on role, show all currently assigned leaders
+            let leadersToShow = potentialLeaders;
+            if (potentialLeaders.length === 0) {
+                console.log('⚠️ No potential leaders found by role, showing all current leaders');
+                
+                // Approach 1: Try to find user records for current leaders
+                let fallbackLeaders = leaderData.allUsers.filter(user =>
+                    leaderData.assignedLeaders.includes(user.username) &&
+                    user.isActive === true &&
+                    user.username && 
+                    user.username.trim()
+                );
+                
+                // Approach 2: If we still can't find user records, create dummy entries for current leaders
+                if (fallbackLeaders.length === 0) {
+                    console.log('🔧 Creating dummy entries for current leaders');
+                    fallbackLeaders = leaderData.assignedLeaders.map(leaderName => ({
+                        username: leaderName,
+                        role: 'Leader', // Generic role since we can't determine actual role
+                        isActive: true
+                    }));
+                }
+                
+                leadersToShow = fallbackLeaders;
+                console.log('👥 Fallback leaders (current leaders):', leadersToShow.map(l => `${l.username} (${l.role})`));
+            }
+            
+            if (leadersToShow.length === 0) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'Không có Leader khả dụng trong hệ thống';
+                option.disabled = true;
+                leaderSelect.appendChild(option);
+                console.log('⚠️ No leaders available in system');
+            } else {
+                // Sort leaders by role hierarchy and then by name
+                const sortedLeaders = leadersToShow.sort((a, b) => {
+                    // Dynamic role ordering based on what we found
+                    const roleOrder = { 'admin': 1, 'TDL': 2, 'TDS': 3 };
+                    const roleComparison = (roleOrder[a.role] || 99) - (roleOrder[b.role] || 99);
+                    if (roleComparison !== 0) return roleComparison;
+                    return a.username.localeCompare(b.username);
+                });
+                
+                console.log('📊 Sorted leaders:', sortedLeaders.map(l => `${l.username} (${l.role})`));
+                
+                let selectedFound = false;
+                sortedLeaders.forEach(leader => {
+                    const option = document.createElement('option');
+                    option.value = leader.username;
+                    option.textContent = `${leader.username} (${leader.role})`;
+                    
+                    // Check for exact match or partial match for pre-selection
+                    const isSelected = selectedLeader && (
+                        leader.username === selectedLeader ||
+                        leader.username.includes(selectedLeader) ||
+                        selectedLeader.includes(leader.username)
+                    );
+                    
+                    if (isSelected) {
+                        option.selected = true;
+                        selectedFound = true;
+                        console.log('✅ Pre-selected leader:', leader.username);
+                    }
+                    
+                    leaderSelect.appendChild(option);
+                });
+                
+                if (selectedLeader && !selectedFound) {
+                    console.log('⚠️ Selected leader not found in available leaders:', selectedLeader);
+                    // Add the current leader as an option even if not in potential leaders list
+                    const option = document.createElement('option');
+                    option.value = selectedLeader;
+                    option.textContent = `${selectedLeader} (Current)`;
+                    option.selected = true;
+                    leaderSelect.appendChild(option);
+                    console.log('✅ Added current leader as option:', selectedLeader);
+                }
+                
+                console.log('✅ Leader dropdown populated with', sortedLeaders.length, 'options');
+            }
+            
+        } catch (error) {
+            console.error('❌ Error loading leaders dropdown:', error);
+            this.showNotification('Lỗi khi tải danh sách Leader: ' + error.message, 'error');
         }
     }
 
@@ -1124,7 +1379,7 @@ class UserManagementApp {
             
             if (response && response.ok) {
                 const userData = await response.json();
-                console.log('Edit user API response:', userData);
+                console.log('📝 Edit user API response:', userData);
                 
                 // Handle the correct API response format
                 let user = null;
@@ -1135,6 +1390,15 @@ class UserManagementApp {
                 } else {
                     user = userData;
                 }
+                
+                console.log('👤 Parsed user data:', {
+                    _id: user?._id,
+                    userid: user?.userid,
+                    username: user?.username,
+                    role: user?.role,
+                    leader: user?.leader,
+                    isActive: user?.isActive
+                });
                 
                 if (!user || !user._id) {
                     throw new Error('Invalid user data received');
@@ -1148,8 +1412,13 @@ class UserManagementApp {
                 document.getElementById('loginid').value = user.loginid || '';
                 document.getElementById('role').value = user.role || '';
                 
-                // Load available leaders for dropdown and set current value
-                await this.loadLeadersDropdown(user.leader);
+                console.log('🔄 About to load leaders dropdown with:', {
+                    selectedLeader: user.leader,
+                    userRole: user.role
+                });
+                
+                // Load available leaders for dropdown with current role and selected leader
+                await this.loadLeadersDropdown(user.leader, user.role);
                 
                 document.getElementById('isActive').checked = user.isActive !== false;
                 document.getElementById('password').required = false;
@@ -1225,6 +1494,8 @@ class UserManagementApp {
                 this.showNotification(result.message || 'Lưu thành công!', 'success');
                 this.hideUserModal();
                 this.loadUsers();
+                // Refresh leader dropdowns to include newly created leaders
+                setTimeout(() => this.refreshAllLeaderDropdowns(), 500);
             } else {
                 const errorData = await response.json();
                 throw new Error(errorData.message || 'Lỗi khi lưu người dùng');
@@ -1319,6 +1590,8 @@ class UserManagementApp {
                 this.showNotification(result.message || 'Xóa thành công!', 'success');
                 this.cancelDelete();
                 this.loadUsers();
+                // Refresh leader dropdowns to remove deleted leaders
+                setTimeout(() => this.refreshAllLeaderDropdowns(), 500);
             } else {
                 const errorData = await response.json();
                 throw new Error(errorData.message || 'Lỗi khi xóa người dùng');
@@ -1412,6 +1685,8 @@ class UserManagementApp {
                 this.showNotification(result.message || 'Xóa thành công!', 'success');
                 this.selectedUserIds.clear();
                 this.loadUsers();
+                // Refresh leader dropdowns to remove deleted leaders
+                setTimeout(() => this.refreshAllLeaderDropdowns(), 500);
             } else {
                 const errorData = await response.json();
                 throw new Error(errorData.message || 'Lỗi khi xóa người dùng');
@@ -1543,6 +1818,8 @@ class UserManagementApp {
                 this.showNotification(result.message || 'Import thành công!', 'success');
                 this.hideImportModal();
                 this.loadUsers();
+                // Refresh leader dropdowns to include newly imported leaders
+                setTimeout(() => this.refreshAllLeaderDropdowns(), 500);
             } else {
                 const errorData = await response.json().catch(() => ({}));
                 console.error('❌ Import failed:', response?.status, errorData);
@@ -1637,6 +1914,48 @@ class UserManagementApp {
                     notification.remove();
                 }
             }, duration);
+        }
+    }
+
+    // Debug function to test leader dropdown functionality
+    async debugLeaderDropdown() {
+        console.log('🧪 Starting leader dropdown debug test...');
+        
+        try {
+            // Test 1: Fetch leaders data
+            console.log('📡 Test 1: Fetching leaders data...');
+            const leaderData = await this.fetchAllLeaders();
+            console.log('✅ Leaders data fetched:', leaderData);
+            
+            // Test 2: Check DOM elements
+            console.log('🎯 Test 2: Checking DOM elements...');
+            const leaderSelect = document.getElementById('leader');
+            const roleSelect = document.getElementById('role');
+            console.log('DOM Elements:', {
+                leaderSelect: !!leaderSelect,
+                roleSelect: !!roleSelect,
+                leaderSelectVisible: leaderSelect?.offsetParent !== null,
+                modalVisible: document.getElementById('userModal')?.style.display
+            });
+            
+            // Test 3: Test dropdown population
+            if (leaderSelect) {
+                console.log('🔧 Test 3: Testing dropdown population...');
+                await this.loadLeadersDropdown('Test Leader', 'PRT');
+                console.log('✅ Dropdown population test completed');
+                console.log('📊 Current dropdown options:', 
+                    Array.from(leaderSelect.options).map(opt => ({
+                        value: opt.value,
+                        text: opt.text,
+                        selected: opt.selected
+                    }))
+                );
+            }
+            
+            console.log('✅ Leader dropdown debug test completed');
+            
+        } catch (error) {
+            console.error('❌ Debug test failed:', error);
         }
     }
 }

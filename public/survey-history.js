@@ -39,7 +39,8 @@ class SurveyHistoryApp {
 
         try {
             this.user = JSON.parse(userStr);
-            document.getElementById('userInfo').textContent = `${this.user.username} (${this.user.role})`;
+            document.getElementById('userDisplayName').textContent = this.user.username;
+            document.getElementById('userRole').textContent = `(${this.user.role})`;
             
             // Verify token
             const response = await this.makeAuthenticatedRequest('/api/auth/verify');
@@ -82,6 +83,9 @@ class SurveyHistoryApp {
             clearTimeout(this.searchTimeout);
             this.searchTimeout = setTimeout(() => this.updateFilters(), 500);
         });
+
+        // Logout button
+        document.getElementById('logoutBtn').addEventListener('click', logout);
 
         // Modal close on outside click
         document.getElementById('surveyDetailModal').addEventListener('click', (e) => {

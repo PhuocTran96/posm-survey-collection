@@ -15,8 +15,10 @@ const login = async (req, res) => {
       });
     }
 
-    // Find user by loginid
-    const user = await User.findOne({ loginid: loginid.trim() });
+    // Find user by loginid (case-insensitive)
+    const user = await User.findOne({ 
+      loginid: { $regex: new RegExp(`^${loginid.trim()}$`, 'i') } 
+    });
     
     if (!user) {
       // Log failed login attempt
@@ -107,8 +109,10 @@ const adminLogin = async (req, res) => {
       });
     }
 
-    // Find user by loginid
-    const user = await User.findOne({ loginid: loginid.trim() });
+    // Find user by loginid (case-insensitive)
+    const user = await User.findOne({ 
+      loginid: { $regex: new RegExp(`^${loginid.trim()}$`, 'i') } 
+    });
     
     if (!user || user.role !== 'admin') {
       

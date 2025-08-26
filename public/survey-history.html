@@ -7,72 +7,149 @@
     <link rel="stylesheet" href="styles-survey.css">
     <link rel="stylesheet" href="styles.css">
     <style>
-        /* Survey History specific styles */
+        :root {
+            /* Modern Color Palette from survey page */
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --primary-light: #dbeafe;
+            --secondary: #64748b;
+            --secondary-hover: #475569;
+            --neutral: #f8fafc;
+            --neutral-border: #e2e8f0;
+            --neutral-text: #334155;
+            --success: #10b981;
+            --success-light: #d1fae5;
+            --warning: #f59e0b;
+            --warning-light: #fef3c7;
+            --error: #ef4444;
+            --error-light: #fee2e2;
+            --background: #f1f5f9;
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --card-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Survey History specific styles - Mobile-first approach */
         .survey-history-container {
-            max-width: 1200px;
+            max-width: 1000px;
             margin: 0 auto;
-            padding: 20px;
+            padding: clamp(8px, 2vw, 20px);
+            background: var(--background);
+            min-height: 100vh;
+        }
+
+        .page-header {
+            background: white;
+            border-radius: 12px;
+            padding: clamp(20px, 4vw, 30px);
+            margin-bottom: clamp(15px, 3vw, 25px);
+            box-shadow: var(--card-shadow);
+            text-align: center;
+        }
+
+        .page-header h1 {
+            font-size: clamp(1.5rem, 4vw, 2.2rem);
+            color: var(--primary);
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .page-header p {
+            color: var(--secondary);
+            font-size: clamp(0.9rem, 2vw, 1rem);
+            margin: 0;
         }
 
         .survey-stats {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 30px;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: clamp(12px, 3vw, 20px);
+            margin-bottom: clamp(20px, 4vw, 30px);
         }
 
         .stat-card {
             background: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            padding: clamp(15px, 4vw, 25px);
+            box-shadow: var(--card-shadow);
             text-align: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--card-shadow-lg);
         }
 
         .stat-number {
-            font-size: 2em;
-            font-weight: bold;
-            color: #2196F3;
+            font-size: clamp(1.5rem, 5vw, 2.5rem);
+            font-weight: 700;
+            color: var(--primary);
+            line-height: 1;
+            margin-bottom: 5px;
         }
 
         .stat-label {
-            color: #666;
-            margin-top: 5px;
+            color: var(--secondary);
+            font-size: clamp(0.8rem, 2vw, 0.9rem);
+            font-weight: 500;
+            margin: 0;
         }
 
         .filters-section {
             background: white;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            padding: clamp(15px, 4vw, 25px);
+            margin-bottom: clamp(15px, 3vw, 25px);
+            box-shadow: var(--card-shadow);
+        }
+
+        .filters-section h3 {
+            color: var(--neutral-text);
+            font-size: clamp(1.1rem, 3vw, 1.3rem);
+            margin-bottom: clamp(15px, 3vw, 20px);
+            font-weight: 600;
         }
 
         .filters-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: clamp(12px, 3vw, 20px);
             align-items: end;
         }
 
         .filter-group label {
             display: block;
-            margin-bottom: 5px;
-            font-weight: 500;
+            margin-bottom: 6px;
+            font-weight: 600;
+            color: var(--neutral-text);
+            font-size: clamp(0.85rem, 2vw, 0.95rem);
         }
 
-        .filter-group input, .filter-group select {
+        .filter-group input, 
+        .filter-group select {
             width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            padding: clamp(10px, 2.5vw, 12px);
+            border: 2px solid var(--neutral-border);
+            border-radius: 8px;
+            font-size: clamp(0.9rem, 2vw, 1rem);
+            transition: all 0.3s ease;
+            background: white;
+            color: var(--neutral-text);
+        }
+
+        .filter-group input:focus,
+        .filter-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
         }
 
         .survey-table-container {
             background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
             overflow: hidden;
+            margin-bottom: clamp(15px, 3vw, 25px);
         }
 
         .survey-table {
@@ -82,50 +159,81 @@
 
         .survey-table th,
         .survey-table td {
-            padding: 15px;
+            padding: clamp(10px, 3vw, 15px);
             text-align: left;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid var(--neutral-border);
         }
 
         .survey-table th {
-            background: #f8f9fa;
+            background: var(--neutral);
             font-weight: 600;
-            color: #333;
+            color: var(--neutral-text);
+            font-size: clamp(0.85rem, 2vw, 0.95rem);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .survey-table td {
+            font-size: clamp(0.8rem, 2vw, 0.9rem);
+        }
+
+        .survey-table tbody tr {
+            transition: background-color 0.2s ease;
         }
 
         .survey-table tbody tr:hover {
-            background: #f8f9fa;
+            background: var(--neutral);
         }
 
         .status-badge {
-            padding: 4px 12px;
-            border-radius: 15px;
-            font-size: 0.85em;
-            font-weight: 500;
+            padding: clamp(4px, 1vw, 6px) clamp(8px, 2vw, 12px);
+            border-radius: 20px;
+            font-size: clamp(0.75rem, 2vw, 0.85rem);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .status-completed {
-            background: #e8f5e8;
-            color: #2e7d2e;
+            background: var(--success-light);
+            color: var(--success);
+            border: 1px solid var(--success);
         }
 
         .status-pending {
-            background: #fff3e0;
-            color: #f57c00;
+            background: var(--warning-light);
+            color: var(--warning);
+            border: 1px solid var(--warning);
         }
 
         .action-btn {
-            background: #2196F3;
+            background: var(--primary);
             color: white;
             border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
+            padding: clamp(6px, 2vw, 8px) clamp(12px, 3vw, 16px);
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 0.9em;
+            font-size: clamp(0.8rem, 2vw, 0.9rem);
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
         }
 
         .action-btn:hover {
-            background: #1976D2;
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: var(--card-shadow);
+        }
+
+        .action-btn.secondary {
+            background: var(--secondary);
+        }
+
+        .action-btn.secondary:hover {
+            background: var(--secondary-hover);
         }
 
         /* Skeleton Loading Styles */
@@ -247,31 +355,59 @@
             margin-bottom: 20px;
         }
 
-        /* Mobile responsive */
+        /* Mobile responsive improvements */
         @media (max-width: 768px) {
+            .survey-stats {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+            }
+            
+            .filters-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+
+            .filter-group {
+                margin-bottom: 0;
+            }
+
             .survey-table-container {
                 overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
             }
 
             .survey-table {
-                min-width: 600px;
+                min-width: 650px;
             }
 
-            .survey-history-container {
-                padding: 10px;
+            .page-header {
+                margin-bottom: 20px;
             }
 
-            .filters-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .survey-stats {
-                grid-template-columns: repeat(2, 1fr);
+            .stat-card {
+                padding: 15px;
             }
         }
 
-        /* Card view for mobile */
+        /* Mobile card view for very small screens */
         @media (max-width: 600px) {
+            body {
+                padding: 8px;
+            }
+
+            .survey-stats {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .filters-section {
+                padding: 20px;
+            }
+
+            .survey-table-container {
+                overflow: visible;
+            }
+
+            /* Transform table to cards on mobile */
             .survey-table,
             .survey-table thead,
             .survey-table tbody,
@@ -287,138 +423,111 @@
                 left: -9999px;
             }
 
-            .survey-table tr {
-                border: 1px solid #ccc;
-                margin-bottom: 10px;
-                padding: 10px;
-                border-radius: 8px;
+            .survey-table tbody tr {
+                border: 2px solid var(--neutral-border);
+                border-radius: 12px;
+                margin-bottom: 15px;
+                padding: 15px;
+                background: white;
+                box-shadow: var(--card-shadow);
+                transition: all 0.2s ease;
+            }
+
+            .survey-table tbody tr:hover {
+                transform: translateY(-2px);
+                box-shadow: var(--card-shadow-lg);
+                background: white;
             }
 
             .survey-table td {
                 border: none;
                 position: relative;
-                padding: 8px 8px 8px 35%;
+                padding: 8px 0 8px 40%;
                 text-align: left;
+                border-bottom: 1px solid var(--neutral-border);
+                font-size: 0.9rem;
+                min-height: 40px;
+                display: flex;
+                align-items: center;
+            }
+
+            .survey-table td:last-child {
+                border-bottom: none;
+                padding-bottom: 5px;
             }
 
             .survey-table td:before {
-                content: attr(data-label) ": ";
+                content: attr(data-label);
                 position: absolute;
-                left: 6px;
-                width: 30%;
-                font-weight: bold;
+                left: 0;
+                width: 35%;
+                font-weight: 600;
+                color: var(--neutral-text);
+                font-size: 0.85rem;
                 text-align: left;
+                display: flex;
+                align-items: center;
+            }
+
+            .status-badge {
+                font-size: 0.75rem;
+                padding: 4px 8px;
+            }
+
+            .action-btn {
+                padding: 8px 12px;
+                font-size: 0.85rem;
+                width: auto;
+            }
+        }
+
+        /* Very small screens */
+        @media (max-width: 400px) {
+            .survey-stats {
+                grid-template-columns: 1fr;
+            }
+            
+            .stat-card {
+                padding: 20px 15px;
             }
         }
 
         .pagination-container {
-            margin-top: 20px;
             display: flex;
             justify-content: center;
-        }
-
-        /* Navigation styles */
-        .main-nav {
-            background: #2196F3;
-            padding: 15px 0;
-            margin-bottom: 20px;
-        }
-
-        .nav-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 20px;
-        }
-
-        .nav-brand {
-            color: white;
-            font-size: 1.5em;
-            font-weight: bold;
-            text-decoration: none;
-        }
-
-        .nav-menu {
-            display: flex;
-            list-style: none;
-            margin: 0;
-            padding: 0;
-            gap: 30px;
-        }
-
-        .nav-menu a {
-            color: white;
-            text-decoration: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            transition: background-color 0.3s;
-        }
-
-        .nav-menu a:hover,
-        .nav-menu a.active {
-            background: rgba(255,255,255,0.2);
-        }
-
-        .nav-user {
-            color: white;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .nav-user button {
-            background: rgba(255,255,255,0.2);
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        .nav-user button:hover {
-            background: rgba(255,255,255,0.3);
-        }
-
-        @media (max-width: 768px) {
-            .nav-container {
-                flex-direction: column;
-                gap: 10px;
-            }
-
-            .nav-menu {
-                gap: 15px;
-                flex-wrap: wrap;
-                justify-content: center;
-            }
+            margin-top: clamp(15px, 3vw, 25px);
+            padding: 0 clamp(8px, 2vw, 20px);
         }
     </style>
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="main-nav">
-        <div class="nav-container">
-            <a href="/" class="nav-brand">POSM Survey</a>
-            <ul class="nav-menu">
-                <li><a href="/">New Survey</a></li>
-                <li><a href="/survey-history.html" class="active">Survey History</a></li>
-            </ul>
-            <div class="nav-user">
-                <span id="userInfo">Loading...</span>
-                <button onclick="logout()">Logout</button>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="header-content">
+                <div class="header-title">
+                    <h1>Lịch sử khảo sát</h1>
+                    <p>Quản lý và xem lại các khảo sát đã thực hiện</p>
+                </div>
+                <div class="header-actions">
+                    <div class="nav-links">
+                        <a href="/" class="nav-link">New Survey</a>
+                        <a href="/survey-history.html" class="nav-link active">Survey History</a>
+                    </div>
+                    <div class="user-info">
+                        <span class="user-welcome">Xin chào, <span id="userDisplayName">User</span></span>
+                        <span class="user-role" id="userRole"></span>
+                    </div>
+                    <button id="logoutBtn" class="btn btn-logout">
+                        <span class="logout-icon">🚪</span>
+                        Đăng xuất
+                    </button>
+                </div>
             </div>
-        </div>
-    </nav>
+        </header>
 
-    <div class="survey-history-container">
-        <!-- Page Header -->
-        <div class="page-header">
-            <h1>Survey History</h1>
-            <p>View and manage your survey submissions</p>
-        </div>
-
-        <!-- Statistics Cards -->
+        <main class="survey-history-container">
+            <!-- Statistics Cards -->
         <div class="survey-stats" id="surveyStats">
             <div class="stat-card">
                 <div class="stat-number" id="totalSurveys">-</div>
@@ -460,7 +569,7 @@
                         <button type="button" id="applyFiltersBtn" onclick="applyFilters()" class="action-btn">
                             <span class="btn-text">Apply Filters</span>
                         </button>
-                        <button type="button" onclick="clearFilters()" class="action-btn" style="background: #666;">
+                        <button type="button" onclick="clearFilters()" class="action-btn secondary">
                             <span class="btn-text">Clear</span>
                         </button>
                     </div>
@@ -500,8 +609,9 @@
             </table>
         </div>
 
-        <!-- Pagination -->
-        <div class="pagination-container" id="paginationContainer"></div>
+            <!-- Pagination -->
+            <div class="pagination-container" id="paginationContainer"></div>
+        </main>
     </div>
 
     <!-- Survey Detail Modal -->
@@ -515,7 +625,7 @@
                 <!-- Content will be loaded here -->
             </div>
             <div class="modal-footer">
-                <button type="button" onclick="closeSurveyDetailModal()" class="action-btn" style="background: #666;">Close</button>
+                <button type="button" onclick="closeSurveyDetailModal()" class="action-btn secondary">Close</button>
             </div>
         </div>
     </div>

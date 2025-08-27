@@ -14,6 +14,9 @@ class SurveyHistoryApp {
         this.expandedSurveys = new Set(); // Track expanded survey cards
         this.surveyDetails = new Map(); // Cache loaded survey details
         this.debugMode = true; // Set to false to disable debug logging
+        this.storeNames = []; // Cache of store names for autocomplete
+        this.autocompleteVisible = false;
+        this.selectedSuggestionIndex = -1;
         
         this.init();
     }
@@ -34,6 +37,7 @@ class SurveyHistoryApp {
         this.setupEventListeners();
         this.initializePagination();
         await this.loadSurveyStats();
+        await this.loadStoreNames();
         await this.loadSurveyHistory();
     }
 
@@ -88,10 +92,7 @@ class SurveyHistoryApp {
         // Filter inputs
         document.getElementById('startDate').addEventListener('change', () => this.updateFilters());
         document.getElementById('endDate').addEventListener('change', () => this.updateFilters());
-        document.getElementById('storeName').addEventListener('input', (e) => {
-            clearTimeout(this.searchTimeout);
-            this.searchTimeout = setTimeout(() => this.updateFilters(), 500);
-        });
+        this.setupStoreNameAutocomplete();
 
         // Logout button
         document.getElementById('logoutBtn').addEventListener('click', logout);
@@ -108,6 +109,170 @@ class SurveyHistoryApp {
                 this.closeLightbox();
             }
         });
+
+        // Handle window resize for responsive layout
+        window.addEventListener('resize', () => {
+            if (this.resizeTimeout) {
+                clearTimeout(this.resizeTimeout);
+            }
+            this.resizeTimeout = setTimeout(() => {
+                this.renderSurveyTable();
+            }, 250);
+        });
+    }
+
+    setupStoreNameAutocomplete() {
+        const storeNameInput = document.getElementById('storeName');
+        
+        // Input event for typing
+        storeNameInput.addEventListener('input', (e) => {
+            this.handleStoreNameInput(e);
+        });
+        
+        // Keydown for navigation
+        storeNameInput.addEventListener('keydown', (e) => {
+            this.handleStoreNameKeydown(e);
+        });
+        
+        // Focus event
+        storeNameInput.addEventListener('focus', (e) => {
+            if (e.target.value.trim().length >= 2) {
+                this.showStoreSuggestions(e.target.value.trim());
+            }
+        });
+        
+        // Hide dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.autocomplete-container')) {
+                this.hideAutocomplete();
+            }
+        });
+    }
+
+    async loadStoreNames() {
+        try {
+            const response = await this.makeAuthenticatedRequest('/api/stores?limit=2000');
+            if (response.ok) {
+                const result = await response.json();
+                this.storeNames = result.data.map(store => store.store_name).sort();
+                this.debug('Loaded store names:', this.storeNames.length);
+            }
+        } catch (error) {
+            console.error('Failed to load store names:', error);
+            this.storeNames = [];
+        }
+    }
+
+    handleStoreNameInput(e) {
+        const query = e.target.value.trim();
+        
+        if (query.length >= 2) {
+            this.showStoreSuggestions(query);
+        } else {
+            this.hideAutocomplete();
+        }
+        
+        // Reset selection index
+        this.selectedSuggestionIndex = -1;
+        
+        // Existing debounced filter update
+        clearTimeout(this.searchTimeout);
+        this.searchTimeout = setTimeout(() => this.updateFilters(), 500);
+    }
+
+    showStoreSuggestions(query) {
+        const dropdown = document.getElementById('storeNameSuggestions');
+        if (!dropdown) return;
+        
+        // Filter matching store names
+        const suggestions = this.storeNames
+            .filter(name => name.toLowerCase().includes(query.toLowerCase()))
+            .slice(0, 8); // Limit to 8 suggestions for performance
+        
+        if (suggestions.length > 0) {
+            dropdown.innerHTML = suggestions.map((name, index) => `
+                <div class="autocomplete-item" 
+                     data-index="${index}" 
+                     onclick="app.selectStoreName('${this.escapeHtml(name)}')">
+                    ${this.highlightMatch(name, query)}
+                </div>
+            `).join('');
+            dropdown.style.display = 'block';
+            this.autocompleteVisible = true;
+        } else {
+            dropdown.innerHTML = '<div class="autocomplete-no-results">No matching stores found</div>';
+            dropdown.style.display = 'block';
+            this.autocompleteVisible = true;
+        }
+    }
+
+    handleStoreNameKeydown(e) {
+        if (!this.autocompleteVisible) return;
+        
+        const items = document.querySelectorAll('.autocomplete-item:not(.autocomplete-no-results)');
+        
+        switch(e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                this.selectedSuggestionIndex = Math.min(this.selectedSuggestionIndex + 1, items.length - 1);
+                this.highlightSuggestion();
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                this.selectedSuggestionIndex = Math.max(this.selectedSuggestionIndex - 1, -1);
+                this.highlightSuggestion();
+                break;
+            case 'Enter':
+                e.preventDefault();
+                if (this.selectedSuggestionIndex >= 0 && items[this.selectedSuggestionIndex]) {
+                    const selectedText = items[this.selectedSuggestionIndex].textContent;
+                    this.selectStoreName(selectedText);
+                }
+                break;
+            case 'Escape':
+                this.hideAutocomplete();
+                break;
+        }
+    }
+
+    highlightSuggestion() {
+        const items = document.querySelectorAll('.autocomplete-item:not(.autocomplete-no-results)');
+        items.forEach((item, index) => {
+            if (index === this.selectedSuggestionIndex) {
+                item.classList.add('highlighted');
+            } else {
+                item.classList.remove('highlighted');
+            }
+        });
+    }
+
+    selectStoreName(storeName) {
+        const storeNameInput = document.getElementById('storeName');
+        storeNameInput.value = storeName;
+        this.hideAutocomplete();
+        
+        // Trigger filter update
+        clearTimeout(this.searchTimeout);
+        this.updateFilters();
+        this.loadSurveyHistory(true);
+    }
+
+    hideAutocomplete() {
+        const dropdown = document.getElementById('storeNameSuggestions');
+        if (dropdown) {
+            dropdown.style.display = 'none';
+        }
+        this.autocompleteVisible = false;
+        this.selectedSuggestionIndex = -1;
+    }
+
+    highlightMatch(text, query) {
+        const regex = new RegExp(`(${this.escapeRegex(query)})`, 'gi');
+        return text.replace(regex, '<span class="match-highlight">$1</span>');
+    }
+
+    escapeRegex(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
     initializePagination() {
@@ -209,10 +374,27 @@ class SurveyHistoryApp {
         }
     }
 
+    isMobileDevice() {
+        return window.innerWidth <= 768;
+    }
+
     renderSurveyTable() {
+        if (this.isMobileDevice()) {
+            this.renderMobileCards();
+        } else {
+            this.renderDesktopTable();
+        }
+    }
+
+    renderDesktopTable() {
         const tableBody = document.getElementById('surveyTableBody');
         const table = document.getElementById('surveyTable');
         const emptyState = document.getElementById('emptyState');
+        const tableContainer = document.querySelector('.survey-table-container');
+
+        // Ensure desktop view classes
+        tableContainer.classList.add('desktop-view');
+        tableContainer.classList.remove('mobile-view');
 
         if (this.surveys.length === 0) {
             table.style.display = 'none';
@@ -261,11 +443,93 @@ class SurveyHistoryApp {
         }).join('');
     }
 
+    renderMobileCards() {
+        const tableContainer = document.querySelector('.survey-table-container');
+        const emptyState = document.getElementById('emptyState');
+
+        // Ensure mobile view classes
+        tableContainer.classList.add('mobile-view');
+        tableContainer.classList.remove('desktop-view');
+
+        if (this.surveys.length === 0) {
+            tableContainer.innerHTML = `
+                <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+                    <div class="spinner"></div>
+                    <div class="loading-text">Loading surveys...</div>
+                </div>
+                <div id="emptyState" class="empty-state">
+                    <div style="font-size: 4em; color: #ddd; margin-bottom: 20px;">📋</div>
+                    <h3>No Surveys Found</h3>
+                    <p>You haven't submitted any surveys yet, or no surveys match your current filters.</p>
+                </div>
+            `;
+            return;
+        }
+
+        const cardsHtml = this.surveys.map(survey => {
+            const surveyId = survey.id || survey._id || survey.surveyId;
+            const isExpanded = this.expandedSurveys.has(surveyId);
+            const totalImages = this.calculateTotalImages(survey);
+            const modelCount = this.calculateModelCount(survey);
+            
+            return `
+                <div class="mobile-survey-card ${isExpanded ? 'expanded' : ''}" 
+                     data-survey-id="${surveyId}" 
+                     onclick="app.toggleSurveyDetail('${surveyId}')">
+                    <div class="mobile-card-header">
+                        <div class="mobile-store-name">${this.escapeHtml(survey.storeName || survey.shopName || 'Unknown Store')}</div>
+                        <div class="mobile-store-id">ID: ${this.escapeHtml(survey.storeId || survey.shopId || survey.store_id || 'N/A')}</div>
+                        <div class="mobile-date-time">${this.formatDateTime(survey.date || survey.createdAt)}</div>
+                        <div class="mobile-card-footer">
+                            <span class="mobile-status-badge status-badge status-${(survey.status || 'unknown').toLowerCase()}">
+                                ${survey.status || 'UNKNOWN'}
+                            </span>
+                            <span class="mobile-count-chip mobile-models-chip">📦 ${modelCount}</span>
+                            <span class="mobile-count-chip mobile-images-chip">📸 ${totalImages}</span>
+                        </div>
+                        <div class="mobile-expand-icon">▼</div>
+                    </div>
+                    ${isExpanded ? `
+                        <div class="mobile-detail-overlay expanded">
+                            <div class="mobile-detail-content" id="detail-${surveyId}">
+                                ${this.surveyDetails.has(surveyId) 
+                                    ? this.renderMobileSurveyDetailContent(this.surveyDetails.get(surveyId))
+                                    : this.renderDetailSkeleton()
+                                }
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }).join('');
+
+        tableContainer.innerHTML = `
+            <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+                <div class="spinner"></div>
+                <div class="loading-text">Loading surveys...</div>
+            </div>
+            <div class="mobile-survey-cards">
+                ${cardsHtml}
+            </div>
+        `;
+    }
+
     renderSkeletonRows(count = 8) {
+        if (this.isMobileDevice()) {
+            this.renderMobileSkeletonCards(count);
+        } else {
+            this.renderDesktopSkeletonRows(count);
+        }
+    }
+
+    renderDesktopSkeletonRows(count = 8) {
         const tableBody = document.getElementById('surveyTableBody');
         const table = document.getElementById('surveyTable');
         const emptyState = document.getElementById('emptyState');
+        const tableContainer = document.querySelector('.survey-table-container');
 
+        tableContainer.classList.add('desktop-view');
+        tableContainer.classList.remove('mobile-view');
         table.style.display = 'table';
         emptyState.style.display = 'none';
 
@@ -282,6 +546,34 @@ class SurveyHistoryApp {
         `).join('');
 
         tableBody.innerHTML = skeletonRows;
+    }
+
+    renderMobileSkeletonCards(count = 8) {
+        const tableContainer = document.querySelector('.survey-table-container');
+
+        tableContainer.classList.add('mobile-view');
+        tableContainer.classList.remove('desktop-view');
+
+        const skeletonCards = Array.from({ length: count }, (_, i) => `
+            <div class="mobile-survey-card">
+                <div class="mobile-card-header">
+                    <div class="skeleton-cell long" style="height: 18px; margin-bottom: 8px;"></div>
+                    <div class="skeleton-cell short" style="height: 14px; margin-bottom: 8px;"></div>
+                    <div class="skeleton-cell medium" style="height: 12px; margin-bottom: 10px;"></div>
+                    <div class="mobile-card-footer" style="gap: 8px;">
+                        <div class="skeleton-cell tiny" style="height: 20px; width: 60px;"></div>
+                        <div class="skeleton-cell tiny" style="height: 20px; width: 40px;"></div>
+                        <div class="skeleton-cell tiny" style="height: 20px; width: 40px;"></div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        tableContainer.innerHTML = `
+            <div class="mobile-survey-cards">
+                ${skeletonCards}
+            </div>
+        `;
     }
 
     async viewSurveyDetail(surveyId) {
@@ -443,14 +735,65 @@ class SurveyHistoryApp {
         if (show) {
             if (fromFilter) {
                 // Show overlay for filter operations
-                overlay.style.display = 'flex';
+                if (overlay) {
+                    overlay.style.display = 'flex';
+                } else {
+                    // Create mobile loading state if overlay doesn't exist
+                    this.showMobileFilterLoading(true);
+                }
             } else {
                 // Show skeleton for initial/page load
                 this.renderSkeletonRows();
             }
         } else {
             // Hide all loading states
-            overlay.style.display = 'none';
+            if (overlay) {
+                overlay.style.display = 'none';
+            }
+            this.showMobileFilterLoading(false);
+        }
+    }
+
+    showMobileFilterLoading(show) {
+        const tableContainer = document.querySelector('.survey-table-container');
+        if (!tableContainer) return;
+
+        const existingMobileLoader = tableContainer.querySelector('.mobile-filter-loader');
+        
+        if (show) {
+            // Create mobile loading overlay if it doesn't exist
+            if (!existingMobileLoader) {
+                const mobileLoader = document.createElement('div');
+                mobileLoader.className = 'mobile-filter-loader';
+                mobileLoader.style.cssText = `
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(255, 255, 255, 0.9);
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 15px;
+                    z-index: 20;
+                    border-radius: 8px;
+                `;
+                mobileLoader.innerHTML = `
+                    <div class="spinner"></div>
+                    <div class="loading-text">Filtering surveys...</div>
+                `;
+                tableContainer.style.position = 'relative';
+                tableContainer.appendChild(mobileLoader);
+            } else {
+                existingMobileLoader.style.display = 'flex';
+            }
+        } else {
+            // Hide mobile loading overlay
+            if (existingMobileLoader) {
+                existingMobileLoader.style.display = 'none';
+            }
         }
     }
 
@@ -634,33 +977,41 @@ class SurveyHistoryApp {
 
     async toggleSurveyDetail(surveyId) {
         console.log('Toggling survey detail for ID:', surveyId);
-        const isExpanded = this.expandedSurveys.has(surveyId);
-        console.log('Currently expanded:', isExpanded);
         
-        if (isExpanded) {
-            // Collapse
-            this.expandedSurveys.delete(surveyId);
-            console.log('Collapsed survey:', surveyId);
-        } else {
-            // Expand
-            this.expandedSurveys.add(surveyId);
-            console.log('Expanding survey:', surveyId);
-            
-            // Load survey details if not cached
-            if (!this.surveyDetails.has(surveyId)) {
-                console.log('Loading details for survey:', surveyId);
-                await this.loadSurveyDetailData(surveyId);
-            } else {
-                console.log('Using cached details for survey:', surveyId);
-            }
+        // Debounce rapid taps
+        if (this.tapTimeout) {
+            clearTimeout(this.tapTimeout);
         }
-
-        // Re-render to show/hide detail panel
-        console.log('Re-rendering survey table...');
-        this.renderSurveyTable();
         
-        // Preserve scroll position
-        this.preserveScrollPosition(surveyId, !isExpanded);
+        this.tapTimeout = setTimeout(async () => {
+            const isExpanded = this.expandedSurveys.has(surveyId);
+            console.log('Currently expanded:', isExpanded);
+            
+            if (isExpanded) {
+                // Collapse
+                this.expandedSurveys.delete(surveyId);
+                console.log('Collapsed survey:', surveyId);
+            } else {
+                // Expand
+                this.expandedSurveys.add(surveyId);
+                console.log('Expanding survey:', surveyId);
+                
+                // Load survey details if not cached
+                if (!this.surveyDetails.has(surveyId)) {
+                    console.log('Loading details for survey:', surveyId);
+                    await this.loadSurveyDetailData(surveyId);
+                } else {
+                    console.log('Using cached details for survey:', surveyId);
+                }
+            }
+
+            // Re-render to show/hide detail panel
+            console.log('Re-rendering survey table...');
+            this.renderSurveyTable();
+            
+            // Preserve scroll position
+            this.preserveScrollPosition(surveyId, !isExpanded);
+        }, 150);
     }
 
     async loadSurveyDetailData(surveyId) {
@@ -691,7 +1042,10 @@ class SurveyHistoryApp {
                 if (this.expandedSurveys.has(surveyId)) {
                     const detailElement = document.getElementById(`detail-${surveyId}`);
                     if (detailElement) {
-                        detailElement.innerHTML = this.renderSurveyDetailContent(surveyData);
+                        const detailContent = this.isMobileDevice() 
+                            ? this.renderMobileSurveyDetailContent(surveyData)
+                            : this.renderSurveyDetailContent(surveyData);
+                        detailElement.innerHTML = detailContent;
                     }
                 }
             } else {
@@ -825,6 +1179,66 @@ class SurveyHistoryApp {
         `;
     }
 
+    renderMobileSurveyDetailContent(survey) {
+        if (!survey) return '<p>No survey data available.</p>';
+
+        const storeName = survey.storeName || survey.shopName || 'Unknown Store';
+        const storeId = survey.storeId || survey.shopId || 'N/A';
+        const submittedAt = survey.submittedAt || survey.createdAt || survey.date;
+        const submittedBy = survey.submittedBy || survey.leader || 'N/A';
+        const status = survey.status || 'UNKNOWN';
+
+        let storeInfo = `<strong>Store:</strong> ${this.escapeHtml(storeName)} (ID: ${this.escapeHtml(storeId)})`;
+        if (survey.storeDetails) {
+            if (survey.storeDetails.channel) storeInfo += `<br><strong>Channel:</strong> ${this.escapeHtml(survey.storeDetails.channel)}`;
+            if (survey.storeDetails.region) storeInfo += `<br><strong>Region:</strong> ${this.escapeHtml(survey.storeDetails.region)}`;
+            if (survey.storeDetails.province) storeInfo += `<br><strong>Province:</strong> ${this.escapeHtml(survey.storeDetails.province)}`;
+        }
+
+        const totalImages = this.calculateTotalImages(survey);
+        const responseCount = (survey.responses && survey.responses.length) || survey.responseCount || 0;
+        const surveyId = survey.id || survey._id || 'unknown';
+
+        return `
+            <div class="mobile-detail-content" style="padding: 12px;">
+                <!-- Mobile Survey Information Section -->
+                <div class="detail-section collapsible-section">
+                    <div class="section-header" onclick="app.toggleDetailSection('info-${surveyId}')" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 12px 8px; border-bottom: 1px solid var(--neutral-border); margin-bottom: 12px; min-height: 44px;">
+                        <h4 style="margin: 0; color: var(--primary); font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
+                            <span>📋</span>
+                            <span>Survey Information</span>
+                        </h4>
+                        <span class="section-toggle-icon" id="info-${surveyId}-icon" style="color: var(--secondary); transition: transform 0.3s ease;">▼</span>
+                    </div>
+                    <div class="section-content expanded" id="info-${surveyId}" style="max-height: 300px; overflow: hidden; transition: all 0.3s ease;">
+                        <div class="detail-info-card">
+                            ${storeInfo}<br>
+                            <strong>Submitted:</strong> ${this.formatDateTime(submittedAt)}<br>
+                            <strong>Submitted by:</strong> ${this.escapeHtml(submittedBy)} ${survey.submittedByRole ? `(${this.escapeHtml(survey.submittedByRole)})` : ''}<br>
+                            <strong>Status:</strong> <span class="status-badge status-${status.toLowerCase()}">${status}</span><br>
+                            <strong>Total Models:</strong> ${responseCount}<br>
+                            <strong>Total Images:</strong> ${totalImages}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mobile Survey Responses Section -->
+                <div class="detail-section collapsible-section">
+                    <div class="section-header" onclick="app.toggleDetailSection('responses-${surveyId}')" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 12px 8px; border-bottom: 1px solid var(--neutral-border); margin-bottom: 12px; min-height: 44px;">
+                        <h4 style="margin: 0; color: var(--primary); font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
+                            <span>📝</span>
+                            <span>Survey Responses</span>
+                        </h4>
+                        <span class="section-toggle-icon" id="responses-${surveyId}-icon" style="color: var(--secondary); transition: transform 0.3s ease;">▼</span>
+                    </div>
+                    <div class="section-content expanded" id="responses-${surveyId}" style="max-height: 1000px; overflow: hidden; transition: all 0.3s ease;">
+                        ${this.renderMobileDetailedSurveyResponses(survey)}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
     renderDetailedSurveyResponses(survey) {
         // Handle different data structures
         const responses = survey.responses || survey.models || survey.answers || [];
@@ -863,6 +1277,124 @@ class SurveyHistoryApp {
         }).join('');
     }
 
+    renderMobileDetailedSurveyResponses(survey) {
+        // Handle different data structures
+        const responses = survey.responses || survey.models || survey.answers || [];
+        
+        if (!responses || responses.length === 0) {
+            return '<div style="padding: 16px; text-align: center; color: var(--secondary); background: white; border-radius: 8px; border: 1px solid var(--neutral-border);">No responses recorded for this survey.</div>';
+        }
+
+        return responses.map((response, index) => {
+            const modelName = response.model || response.modelName || response.question || `Model ${index + 1}`;
+            const quantity = response.quantity || 1;
+            const allSelected = response.allSelected || false;
+            const images = response.images || response.photos || [];
+            const posmSelections = response.posmSelections || response.selections || [];
+
+            return `
+                <div class="model-response-detail" style="border: 1px solid #ddd; border-radius: 8px; margin-bottom: 12px; overflow: hidden; background: white;">
+                    <div class="model-header" style="background: #f8f9fa; padding: 10px; border-bottom: 1px solid #ddd; min-height: 44px; display: flex; align-items: center;">
+                        <h5 style="margin: 0; color: var(--neutral-text); font-size: 0.9rem;">
+                            📦 ${this.escapeHtml(modelName)}
+                        </h5>
+                    </div>
+                    <div style="padding: 10px; font-size: 0.85rem;">
+                        <div style="margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.8rem; color: var(--secondary);">
+                            <span><strong>Qty:</strong> ${quantity}</span>
+                            <span><strong>All POSM:</strong> ${allSelected ? 'Yes' : 'No'}</span>
+                            <span><strong>Images:</strong> ${images.length}</span>
+                        </div>
+                        ${this.renderMobilePosmSelectionsDetail(posmSelections, allSelected)}
+                        ${this.renderMobileImageGallery(images, `${modelName} - Model ${index + 1}`)}
+                        ${response.notes ? `<div style="margin-top: 10px; font-size: 0.8rem;"><strong>Notes:</strong> ${this.escapeHtml(response.notes)}</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    renderMobilePosmSelectionsDetail(posmSelections, allSelected) {
+        if (allSelected) {
+            return `
+                <div style="margin-bottom: 10px;">
+                    <strong style="color: var(--primary); font-size: 0.8rem;">🏷️ POSM:</strong>
+                    <span style="display: inline-block; margin-left: 6px; padding: 3px 6px; background: var(--error-light); color: var(--error); border-radius: 10px; font-size: 0.7rem; font-weight: 600;">
+                        ALL SELECTED
+                    </span>
+                </div>
+            `;
+        }
+
+        if (!posmSelections || posmSelections.length === 0) {
+            return `
+                <div style="margin-bottom: 10px;">
+                    <strong style="color: var(--primary); font-size: 0.8rem;">🏷️ POSM:</strong>
+                    <span style="color: var(--secondary); margin-left: 6px; font-style: italic; font-size: 0.75rem;">None selected</span>
+                </div>
+            `;
+        }
+
+        const selectedPosm = posmSelections.filter(p => p.selected || p.isSelected !== false);
+        
+        if (selectedPosm.length === 0) {
+            return `
+                <div style="margin-bottom: 10px;">
+                    <strong style="color: var(--primary); font-size: 0.8rem;">🏷️ POSM:</strong>
+                    <span style="color: var(--secondary); margin-left: 6px; font-style: italic; font-size: 0.75rem;">None selected</span>
+                </div>
+            `;
+        }
+
+        return `
+            <div style="margin-bottom: 10px;">
+                <strong style="color: var(--primary); font-size: 0.8rem;">🏷️ POSM:</strong>
+                <div class="mobile-posm-container" style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px;">
+                    ${selectedPosm.map(posm => `
+                        <span class="mobile-posm-chip" style="padding: 3px 6px; background: var(--primary-light); color: var(--primary); border-radius: 10px; font-size: 0.7rem; border: 1px solid var(--primary);">
+                            ${this.escapeHtml(posm.posmName || posm.name || posm.posmCode || posm.code)}
+                        </span>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    renderMobileImageGallery(images, altPrefix = '') {
+        if (!images || images.length === 0) {
+            return `
+                <div style="margin-bottom: 10px;">
+                    <strong style="color: var(--primary); font-size: 0.8rem;">📸 Images:</strong>
+                    <span style="color: var(--secondary); margin-left: 6px; font-style: italic; font-size: 0.75rem;">No images</span>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="image-gallery-container" style="margin-bottom: 10px;">
+                <strong style="color: var(--primary); font-size: 0.8rem;">📸 Images (${images.length}):</strong>
+                <div class="image-gallery" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 4px; margin-top: 6px; max-width: 100%;">
+                    ${images.map((imageUrl, imgIndex) => `
+                        <div class="image-thumbnail" style="position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; border: 2px solid var(--neutral-border); cursor: pointer; transition: all 0.2s ease; min-height: 70px;"
+                             onclick="app.openImageLightbox('${imageUrl}', '${altPrefix} - Image ${imgIndex + 1}')">
+                            <img src="${imageUrl}" 
+                                 alt="${altPrefix} - Image ${imgIndex + 1}"
+                                 style="width: 100%; height: 100%; object-fit: cover;"
+                                 loading="lazy"
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <div style="display: none; width: 100%; height: 100%; background: #f5f5f5; align-items: center; justify-content: center; color: var(--secondary); font-size: 0.6rem;">
+                                Error
+                            </div>
+                            <div style="position: absolute; bottom: 1px; right: 1px; background: rgba(0,0,0,0.7); color: white; padding: 1px 3px; border-radius: 2px; font-size: 0.6rem;">
+                                ${imgIndex + 1}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
     renderPosmSelectionsDetail(posmSelections, allSelected) {
         if (allSelected) {
             return `
@@ -898,9 +1430,9 @@ class SurveyHistoryApp {
         return `
             <div style="margin-bottom: 12px;">
                 <strong style="color: var(--primary);">🏷️ POSM Selections:</strong>
-                <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;">
+                <div class="mobile-posm-container" style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;">
                     ${selectedPosm.map(posm => `
-                        <span style="padding: 3px 8px; background: var(--primary-light); color: var(--primary); border-radius: 12px; font-size: 0.8rem; border: 1px solid var(--primary);">
+                        <span class="mobile-posm-chip" style="padding: 4px 8px; background: var(--primary-light); color: var(--primary); border-radius: 12px; font-size: 0.75rem; border: 1px solid var(--primary);">
                             ${this.escapeHtml(posm.posmName || posm.name || posm.posmCode || posm.code)}
                         </span>
                     `).join('')}

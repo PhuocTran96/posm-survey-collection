@@ -4,6 +4,8 @@ class SurveyResultsApp {
         this.filteredResponses = [];
         this.deleteID = null;
         this.selectedIds = new Set();
+        this.expandedSurveys = new Set(); // Track which surveys are expanded
+        this.allShops = []; // Store all shop names for autocomplete
         this.currentPage = 1;
         this.itemsPerPage = 20;
         this.totalPages = 1;
@@ -181,29 +183,20 @@ class SurveyResultsApp {
             exportDataBtn.addEventListener('click', () => this.exportData());
         }
         
-        // Handle leader filter change
-        const leaderFilter = document.getElementById('leaderFilter');
-        if (leaderFilter) {
-            leaderFilter.addEventListener('change', () => {
-                // Clear shop selection when leader changes
-                const shopFilter = document.getElementById('shopFilter');
-                if (shopFilter) {
-                    shopFilter.value = '';
-                }
+        // Handle submittedBy filter change
+        const submittedByFilter = document.getElementById('submittedByFilter');
+        if (submittedByFilter) {
+            submittedByFilter.addEventListener('change', () => {
                 // Reset to page 1 and reload with filters
                 this.currentPage = 1;
                 this.loadResponses(1);
             });
         }
 
+        // Handle shop filter with autocomplete
+        this.setupShopAutocomplete();
+
         // Handle other filter changes
-        const shopFilter = document.getElementById('shopFilter');
-        if (shopFilter) {
-            shopFilter.addEventListener('change', () => {
-                this.currentPage = 1;
-                this.loadResponses(1);
-            });
-        }
         
         const dateFromFilter = document.getElementById('dateFromFilter');
         if (dateFromFilter) {
@@ -281,14 +274,14 @@ class SurveyResultsApp {
             });
 
             // Add filters
-            const leaderFilter = document.getElementById('leaderFilter');
-            if (leaderFilter && leaderFilter.value) {
-                params.append('leader', leaderFilter.value);
+            const submittedByFilter = document.getElementById('submittedByFilter');
+            if (submittedByFilter && submittedByFilter.value) {
+                params.append('submittedBy', submittedByFilter.value);
             }
 
             const shopFilter = document.getElementById('shopFilter');
-            if (shopFilter && shopFilter.value) {
-                params.append('shop', shopFilter.value);
+            if (shopFilter && shopFilter.value.trim()) {
+                params.append('shop', shopFilter.value.trim());
             }
 
             const dateFromFilter = document.getElementById('dateFromFilter');
@@ -368,46 +361,31 @@ class SurveyResultsApp {
 
     populateFilters(responses = null) {
         const responsesToUse = responses || this.responses;
-        const leaderFilter = document.getElementById('leaderFilter');
-        const leaderSelect = document.getElementById('leaderFilter');
         
-        if (!leaderSelect) return;
-        
-        const currentSelectedLeader = leaderSelect.value; // Store current selection
-        
-        // Populate leader filter
-        const leaders = [...new Set(responsesToUse.map(r => r.leader))];
-        leaderSelect.innerHTML = '<option value="">Tất cả Leader</option>';
-        leaders.forEach(leader => {
-            const option = document.createElement('option');
-            option.value = leader;
-            option.textContent = leader;
-            option.selected = leader === currentSelectedLeader; // Restore selection
-            leaderSelect.appendChild(option);
-        });
+        // Populate submittedBy dropdown
+        const submittedByUsers = [...new Set(responsesToUse
+            .map(r => r.submittedBy)
+            .filter(Boolean)
+        )].sort();
 
-        // Populate shop filter based on selected leader
-        let filteredShops;
-        if (leaderFilter && leaderFilter.value) {
-            // If leader is selected, only show shops for that leader
-            filteredShops = [...new Set(responsesToUse
-                .filter(r => r.leader === leaderFilter.value)
-                .map(r => r.shopName))];
-        } else {
-            // If no leader selected, show all shops
-            filteredShops = [...new Set(responsesToUse.map(r => r.shopName))];
-        }
-
-        const shopSelect = document.getElementById('shopFilter');
-        if (shopSelect) {
-            shopSelect.innerHTML = '<option value="">Tất cả Shop</option>';
-            filteredShops.forEach(shop => {
+        const submittedBySelect = document.getElementById('submittedByFilter');
+        if (submittedBySelect) {
+            const currentValue = submittedBySelect.value;
+            submittedBySelect.innerHTML = '<option value="">Tất cả người dùng</option>';
+            submittedByUsers.forEach(user => {
                 const option = document.createElement('option');
-                option.value = shop;
-                option.textContent = shop;
-                shopSelect.appendChild(option);
+                option.value = user;
+                option.textContent = user;
+                option.selected = user === currentValue;
+                submittedBySelect.appendChild(option);
             });
         }
+
+        // Store all shop names for autocomplete
+        this.allShops = [...new Set(responsesToUse
+            .map(r => r.shopName)
+            .filter(Boolean)
+        )].sort();
     }
 
     renderStats() {
@@ -415,7 +393,7 @@ class SurveyResultsApp {
         if (!statsContainer) return;
 
         const totalResponses = this.totalCount || this.responses.length;
-        const uniqueLeaders = [...new Set(this.responses.map(r => r.leader))].length;
+        const uniqueSubmitters = [...new Set(this.responses.map(r => r.submittedBy).filter(Boolean))].length;
         const uniqueShops = [...new Set(this.responses.map(r => r.shopName))].length;
         
         let totalModels = 0;
@@ -429,8 +407,8 @@ class SurveyResultsApp {
                 <div class="stat-label">Tổng khảo sát</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number">${uniqueLeaders}</div>
-                <div class="stat-label">Leader</div>
+                <div class="stat-number">${uniqueSubmitters}</div>
+                <div class="stat-label">Người dùng</div>
             </div>
             <div class="stat-card">
                 <div class="stat-number">${uniqueShops}</div>
@@ -456,27 +434,45 @@ class SurveyResultsApp {
         this.responses.forEach(response => {
             const responseDate = new Date(response.createdAt).toLocaleString('vi-VN');
             const isSelected = this.selectedIds.has(response._id);
+            const isExpanded = this.expandedSurveys.has(response._id);
+            const totalModels = response.responses ? response.responses.length : 0;
+            const totalImages = response.responses ? 
+                response.responses.reduce((sum, r) => sum + (r.images ? r.images.length : 0), 0) : 0;
 
             html += `
-                <div class="response-item">
-                    <div class="response-header">
-                        <div class="response-info">
-                            <h3>
-                                <input type="checkbox" ${isSelected ? 'checked' : ''} 
-                                       onchange="surveyResultsApp.toggleSelection('${response._id}')"
-                                       style="margin-right: 10px;">
-                                ${response.leader} - ${response.shopName}
-                            </h3>
-                            <div class="response-meta">
-                                Ngày khảo sát: ${responseDate}
+                <div class="accordion-survey-item ${isExpanded ? 'expanded' : ''}">
+                    <div class="accordion-header" onclick="surveyResultsApp.toggleSurveyExpansion('${response._id}')">
+                        <div class="accordion-left">
+                            <input type="checkbox" ${isSelected ? 'checked' : ''} 
+                                   onchange="surveyResultsApp.toggleSelection('${response._id}')"
+                                   onclick="event.stopPropagation()"
+                                   class="survey-checkbox">
+                            <div class="survey-summary">
+                                <div class="survey-title">
+                                    <span class="survey-date">${responseDate}</span>
+                                    <span class="survey-info">${response.submittedBy || 'Unknown User'} - ${response.shopName}</span>
+                                </div>
+                                <div class="survey-stats">
+                                    <span class="stat-badge models">📋 ${totalModels} models</span>
+                                    <span class="stat-badge images">📷 ${totalImages} images</span>
+                                </div>
                             </div>
                         </div>
-                        <button class="delete-btn" onclick="surveyResultsApp.showDeleteDialog('${response._id}')">
-                            🗑️ Xóa
-                        </button>
+                        <div class="accordion-right">
+                            <button class="expand-btn" title="${isExpanded ? 'Thu gọn' : 'Mở rộng'} chi tiết">
+                                <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6,9 12,15 18,9"></polyline>
+                                </svg>
+                            </button>
+                            <button class="delete-btn" onclick="event.stopPropagation(); surveyResultsApp.showDeleteDialog('${response._id}')" title="Xóa khảo sát">
+                                🗑️
+                            </button>
+                        </div>
                     </div>
-                    <div class="response-details">
-                        ${this.renderModelResponses(response.responses)}
+                    <div class="accordion-content">
+                        <div class="accordion-details">
+                            ${this.renderModelResponses(response.responses)}
+                        </div>
                     </div>
                 </div>
             `;
@@ -755,14 +751,14 @@ class SurveyResultsApp {
             // Build query parameters for export (same as current filters)
             const params = new URLSearchParams();
 
-            const leaderFilter = document.getElementById('leaderFilter');
-            if (leaderFilter && leaderFilter.value) {
-                params.append('leader', leaderFilter.value);
+            const submittedByFilter = document.getElementById('submittedByFilter');
+            if (submittedByFilter && submittedByFilter.value) {
+                params.append('submittedBy', submittedByFilter.value);
             }
 
             const shopFilter = document.getElementById('shopFilter');
-            if (shopFilter && shopFilter.value) {
-                params.append('shop', shopFilter.value);
+            if (shopFilter && shopFilter.value.trim()) {
+                params.append('shop', shopFilter.value.trim());
             }
 
             const dateFromFilter = document.getElementById('dateFromFilter');
@@ -807,7 +803,7 @@ class SurveyResultsApp {
         // Headers
         worksheetData.push([
             'Ngày khảo sát',
-            'Leader', 
+            'TDL', 
             'Shop',
             'Model',
             'Số lượng',
@@ -832,7 +828,7 @@ class SurveyResultsApp {
                     
                     worksheetData.push([
                         responseDate,
-                        response.leader,
+                        response.leader || 'Unknown User',
                         response.shopName,
                         modelResponse.model,
                         modelResponse.quantity || 1,
@@ -846,7 +842,7 @@ class SurveyResultsApp {
             } else {
                 worksheetData.push([
                     responseDate,
-                    response.leader,
+                    response.submittedBy || 'Unknown User',
                     response.shopName,
                     '',
                     '',
@@ -878,7 +874,7 @@ class SurveyResultsApp {
             let detailsHtml = '';
             if (selectedResponses.length > 0) {
                 detailsHtml = selectedResponses.slice(0, 5).map(r => 
-                    `<li>${r.leader} - ${r.shopName} (${new Date(r.createdAt).toLocaleDateString('vi-VN')})</li>`
+                    `<li>${r.submittedBy || 'Unknown User'} - ${r.shopName} (${new Date(r.createdAt).toLocaleDateString('vi-VN')})</li>`
                 ).join('');
                 if (selectedCount > 5) {
                     detailsHtml += `<li style="font-style: italic;">... và ${selectedCount - 5} khảo sát khác</li>`;
@@ -991,6 +987,125 @@ class SurveyResultsApp {
                     notification.remove();
                 }
             }, duration);
+        }
+    }
+
+    toggleSurveyExpansion(surveyId) {
+        if (this.expandedSurveys.has(surveyId)) {
+            this.expandedSurveys.delete(surveyId);
+        } else {
+            this.expandedSurveys.add(surveyId);
+        }
+        this.renderResponses();
+    }
+
+    setupShopAutocomplete() {
+        const shopFilter = document.getElementById('shopFilter');
+        const dropdown = document.getElementById('shopDropdown');
+        
+        if (!shopFilter || !dropdown) return;
+
+        let highlightedIndex = -1;
+
+        // Handle input events
+        shopFilter.addEventListener('input', (e) => {
+            const value = e.target.value.toLowerCase();
+            highlightedIndex = -1;
+            
+            if (value.length === 0) {
+                dropdown.classList.remove('show');
+                dropdown.innerHTML = '';
+                return;
+            }
+
+            // Filter shops based on input
+            const filteredShops = (this.allShops || []).filter(shop => 
+                shop.toLowerCase().includes(value)
+            );
+
+            if (filteredShops.length === 0) {
+                dropdown.classList.remove('show');
+                dropdown.innerHTML = '';
+                return;
+            }
+
+            // Populate dropdown
+            dropdown.innerHTML = filteredShops.map((shop, index) => 
+                `<div class="autocomplete-item" data-index="${index}" data-shop="${shop}">
+                    ${shop}
+                </div>`
+            ).join('');
+
+            dropdown.classList.add('show');
+
+            // Add click handlers to dropdown items
+            dropdown.querySelectorAll('.autocomplete-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    shopFilter.value = item.dataset.shop;
+                    dropdown.classList.remove('show');
+                    dropdown.innerHTML = '';
+                    
+                    // Trigger filter reload
+                    this.currentPage = 1;
+                    this.loadResponses(1);
+                });
+            });
+        });
+
+        // Handle keyboard navigation
+        shopFilter.addEventListener('keydown', (e) => {
+            const items = dropdown.querySelectorAll('.autocomplete-item');
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                highlightedIndex = Math.min(highlightedIndex + 1, items.length - 1);
+                this.updateHighlight(items, highlightedIndex);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                highlightedIndex = Math.max(highlightedIndex - 1, -1);
+                this.updateHighlight(items, highlightedIndex);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (highlightedIndex >= 0 && items[highlightedIndex]) {
+                    items[highlightedIndex].click();
+                }
+            } else if (e.key === 'Escape') {
+                dropdown.classList.remove('show');
+                dropdown.innerHTML = '';
+                highlightedIndex = -1;
+            }
+        });
+
+        // Handle filter change to reload data
+        shopFilter.addEventListener('blur', () => {
+            // Delay to allow click events to fire
+            setTimeout(() => {
+                dropdown.classList.remove('show');
+                dropdown.innerHTML = '';
+                
+                // Trigger filter reload if value changed
+                this.currentPage = 1;
+                this.loadResponses(1);
+            }, 150);
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!shopFilter.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.classList.remove('show');
+                dropdown.innerHTML = '';
+            }
+        });
+    }
+
+    updateHighlight(items, index) {
+        items.forEach((item, i) => {
+            item.classList.toggle('highlighted', i === index);
+        });
+        
+        // Scroll highlighted item into view
+        if (index >= 0 && items[index]) {
+            items[index].scrollIntoView({ block: 'nearest' });
         }
     }
 }

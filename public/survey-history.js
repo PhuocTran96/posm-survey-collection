@@ -11,8 +11,17 @@ class SurveyHistoryApp {
         };
         this.pagination = null;
         this.user = null;
+        this.expandedSurveys = new Set(); // Track expanded survey cards
+        this.surveyDetails = new Map(); // Cache loaded survey details
+        this.debugMode = true; // Set to false to disable debug logging
         
         this.init();
+    }
+
+    debug(...args) {
+        if (this.debugMode) {
+            console.log('[Survey History Debug]', ...args);
+        }
     }
 
     async init() {
@@ -171,6 +180,17 @@ class SurveyHistoryApp {
             
             if (response.ok) {
                 const result = await response.json();
+                
+                // Store current expanded surveys before updating
+                const currentSurveyIds = new Set(result.data.map(s => s.id));
+                
+                // Remove expanded states for surveys no longer in current page
+                for (const surveyId of this.expandedSurveys) {
+                    if (!currentSurveyIds.has(surveyId)) {
+                        this.expandedSurveys.delete(surveyId);
+                    }
+                }
+                
                 this.surveys = result.data;
                 this.renderSurveyTable();
                 
@@ -203,27 +223,42 @@ class SurveyHistoryApp {
         table.style.display = 'table';
         emptyState.style.display = 'none';
 
-        tableBody.innerHTML = this.surveys.map(survey => `
-            <tr>
-                <td data-label="Date & Time">${this.formatDateTime(survey.date)}</td>
-                <td data-label="Store Name">${this.escapeHtml(survey.storeName)}</td>
-                <td data-label="Store ID">${this.escapeHtml(survey.storeId)}</td>
-                <td data-label="Status">
-                    <span class="status-badge status-${survey.status.toLowerCase()}">
-                        ${survey.status}
-                    </span>
-                </td>
-                <td data-label="Models">${survey.responseCount || 0}</td>
-                <td data-label="Images">
-                    ${survey.hasImages ? '✓' : '-'}
-                </td>
-                <td data-label="Action">
-                    <button class="action-btn" onclick="app.viewSurveyDetail('${survey.id}')">
-                        View Details
-                    </button>
-                </td>
-            </tr>
-        `).join('');
+        tableBody.innerHTML = this.surveys.map(survey => {
+            const surveyId = survey.id || survey._id || survey.surveyId;
+            console.log('Rendering survey with ID:', surveyId, 'Full survey:', survey);
+            
+            const isExpanded = this.expandedSurveys.has(surveyId);
+            const totalImages = this.calculateTotalImages(survey);
+            const modelCount = this.calculateModelCount(survey);
+            
+            return `
+                <tr data-survey-id="${surveyId}" class="survey-row ${isExpanded ? 'expanded' : ''}" 
+                    onclick="app.toggleSurveyDetail('${surveyId}')" 
+                    title="Click to ${isExpanded ? 'collapse' : 'expand'} details"
+                    style="cursor: pointer;">
+                    <td data-label="Date & Time">${this.formatDateTime(survey.date || survey.createdAt)}</td>
+                    <td data-label="Store Name">${this.escapeHtml(survey.storeName || survey.shopName || 'Unknown Store')}</td>
+                    <td data-label="Store ID">${this.escapeHtml(survey.storeId || survey.shopId || survey.store_id || 'N/A')}</td>
+                    <td data-label="Status">
+                        <span class="status-badge status-${(survey.status || 'unknown').toLowerCase()}">
+                            ${survey.status || 'UNKNOWN'}
+                        </span>
+                    </td>
+                    <td data-label="Models">${modelCount}</td>
+                    <td data-label="Images">${totalImages}</td>
+                    ${isExpanded ? `
+                        <td colspan="6" class="survey-detail-panel expanded">
+                            <div id="detail-${surveyId}">
+                                ${this.surveyDetails.has(surveyId) 
+                                    ? this.renderSurveyDetailContent(this.surveyDetails.get(surveyId))
+                                    : this.renderDetailSkeleton()
+                                }
+                            </div>
+                        </td>
+                    ` : ''}
+                </tr>
+            `;
+        }).join('');
     }
 
     renderSkeletonRows(count = 8) {
@@ -452,9 +487,535 @@ class SurveyHistoryApp {
         div.textContent = text;
         return div.innerHTML;
     }
+
+    calculateModelCount(survey) {
+        // Priority 1: Use responseCount from API if available
+        if (survey.responseCount !== undefined && survey.responseCount !== null) {
+            return survey.responseCount;
+        }
+
+        // Priority 2: Use modelsCount if available
+        if (survey.modelsCount !== undefined && survey.modelsCount !== null) {
+            return survey.modelsCount;
+        }
+
+        // Priority 3: Count from arrays
+        if (survey.responses && Array.isArray(survey.responses)) {
+            return survey.responses.length;
+        }
+
+        if (survey.models && Array.isArray(survey.models)) {
+            return survey.models.length;
+        }
+
+        if (survey.answers && Array.isArray(survey.answers)) {
+            return survey.answers.length;
+        }
+
+        return 0;
+    }
+
+    calculateTotalImages(survey) {
+        // Debug: log the actual survey structure to understand the data
+        console.log('Survey structure for image counting:', {
+            id: survey.id || survey._id,
+            storeName: survey.storeName || survey.shopName,
+            totalImages: survey.totalImages,
+            imageCount: survey.imageCount,
+            hasImages: survey.hasImages,
+            responses: survey.responses ? `Array[${survey.responses.length}]` : 'undefined',
+            models: survey.models ? `Array[${survey.models.length}]` : 'undefined',
+            answers: survey.answers ? `Array[${survey.answers.length}]` : 'undefined',
+            keys: Object.keys(survey)
+        });
+        
+        // Priority 1: Use totalImages from summary API if available
+        if (survey.totalImages !== undefined && survey.totalImages !== null && survey.totalImages > 0) {
+            console.log('Using totalImages from API:', survey.totalImages);
+            return survey.totalImages;
+        }
+
+        // Priority 2: Use imageCount if available (alternative API field)
+        if (survey.imageCount !== undefined && survey.imageCount !== null && survey.imageCount > 0) {
+            console.log('Using imageCount from API:', survey.imageCount);
+            return survey.imageCount;
+        }
+
+        // Priority 2.5: Check other potential image count fields
+        if (survey.totalImageCount !== undefined && survey.totalImageCount !== null && survey.totalImageCount > 0) {
+            console.log('Using totalImageCount from API:', survey.totalImageCount);
+            return survey.totalImageCount;
+        }
+
+        if (survey.images_count !== undefined && survey.images_count !== null && survey.images_count > 0) {
+            console.log('Using images_count from API:', survey.images_count);
+            return survey.images_count;
+        }
+
+        // Priority 3: Calculate from responses/models arrays
+        let totalImages = 0;
+        const imageUrls = new Set(); // Use Set to deduplicate
+
+        // Check responses array
+        if (survey.responses && Array.isArray(survey.responses)) {
+            survey.responses.forEach(response => {
+                // Check images array
+                if (response.images && Array.isArray(response.images)) {
+                    response.images.forEach(img => {
+                        if (img && typeof img === 'string' && img.trim()) {
+                            imageUrls.add(img.trim());
+                        }
+                    });
+                }
+                // Check photos array (alternative field name)
+                if (response.photos && Array.isArray(response.photos)) {
+                    response.photos.forEach(photo => {
+                        if (photo && typeof photo === 'string' && photo.trim()) {
+                            imageUrls.add(photo.trim());
+                        }
+                    });
+                }
+            });
+        }
+
+        // Check models array (alternative structure)
+        if (survey.models && Array.isArray(survey.models)) {
+            survey.models.forEach(model => {
+                if (model.images && Array.isArray(model.images)) {
+                    model.images.forEach(img => {
+                        if (img && typeof img === 'string' && img.trim()) {
+                            imageUrls.add(img.trim());
+                        }
+                    });
+                }
+                // Also check for photos in models
+                if (model.photos && Array.isArray(model.photos)) {
+                    model.photos.forEach(photo => {
+                        if (photo && typeof photo === 'string' && photo.trim()) {
+                            imageUrls.add(photo.trim());
+                        }
+                    });
+                }
+            });
+        }
+
+        // Check answers array (another potential structure)
+        if (survey.answers && Array.isArray(survey.answers)) {
+            survey.answers.forEach(answer => {
+                if (answer.photos && Array.isArray(answer.photos)) {
+                    answer.photos.forEach(photo => {
+                        if (photo && typeof photo === 'string' && photo.trim()) {
+                            imageUrls.add(photo.trim());
+                        }
+                    });
+                }
+                if (answer.images && Array.isArray(answer.images)) {
+                    answer.images.forEach(img => {
+                        if (img && typeof img === 'string' && img.trim()) {
+                            imageUrls.add(img.trim());
+                        }
+                    });
+                }
+            });
+        }
+
+        totalImages = imageUrls.size;
+        console.log('Calculated image count:', totalImages, 'from URLs:', Array.from(imageUrls));
+        
+        // Fallback: if we still have 0 but hasImages is true, show indication of images
+        if (totalImages === 0 && survey.hasImages === true) {
+            console.log('No images calculated but hasImages=true, using responseCount as estimate');
+            // Use responseCount as estimate since each response likely has images
+            return survey.responseCount || 1;
+        }
+        
+        return totalImages;
+    }
+
+    async toggleSurveyDetail(surveyId) {
+        console.log('Toggling survey detail for ID:', surveyId);
+        const isExpanded = this.expandedSurveys.has(surveyId);
+        console.log('Currently expanded:', isExpanded);
+        
+        if (isExpanded) {
+            // Collapse
+            this.expandedSurveys.delete(surveyId);
+            console.log('Collapsed survey:', surveyId);
+        } else {
+            // Expand
+            this.expandedSurveys.add(surveyId);
+            console.log('Expanding survey:', surveyId);
+            
+            // Load survey details if not cached
+            if (!this.surveyDetails.has(surveyId)) {
+                console.log('Loading details for survey:', surveyId);
+                await this.loadSurveyDetailData(surveyId);
+            } else {
+                console.log('Using cached details for survey:', surveyId);
+            }
+        }
+
+        // Re-render to show/hide detail panel
+        console.log('Re-rendering survey table...');
+        this.renderSurveyTable();
+        
+        // Preserve scroll position
+        this.preserveScrollPosition(surveyId, !isExpanded);
+    }
+
+    async loadSurveyDetailData(surveyId) {
+        try {
+            console.log('Loading survey detail for ID:', surveyId);
+            
+            // Try the correct survey detail endpoint
+            console.log('Trying endpoint: /api/surveys/' + surveyId);
+            let response = await this.makeAuthenticatedRequest(`/api/surveys/${surveyId}`);
+            console.log('Primary endpoint response status:', response.status);
+            
+            // Fallback to survey-history endpoint if the first one fails
+            if (!response.ok) {
+                console.log('Primary endpoint failed, trying fallback: /api/survey-history/' + surveyId);
+                response = await this.makeAuthenticatedRequest(`/api/survey-history/${surveyId}`);
+                console.log('Fallback endpoint response status:', response.status);
+            }
+            
+            if (response.ok) {
+                const result = await response.json();
+                console.log('Survey detail API response:', result);
+                
+                // Handle different response formats
+                const surveyData = result.data || result;
+                this.surveyDetails.set(surveyId, surveyData);
+                
+                // Update the detail panel if currently expanded
+                if (this.expandedSurveys.has(surveyId)) {
+                    const detailElement = document.getElementById(`detail-${surveyId}`);
+                    if (detailElement) {
+                        detailElement.innerHTML = this.renderSurveyDetailContent(surveyData);
+                    }
+                }
+            } else {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error('Error loading survey detail:', error);
+            const detailElement = document.getElementById(`detail-${surveyId}`);
+            if (detailElement) {
+                detailElement.innerHTML = `
+                    <div style="color: var(--error); padding: 20px; text-align: center; border: 1px solid var(--error-light); border-radius: 8px; background: var(--error-light);">
+                        <p><strong>Failed to load survey details</strong></p>
+                        <p style="font-size: 0.9rem; margin-top: 8px;">Error: ${error.message}</p>
+                        <button onclick="app.loadSurveyDetailData('${surveyId}')" style="margin-top: 12px; padding: 6px 12px; background: var(--error); color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Retry
+                        </button>
+                    </div>
+                `;
+            }
+        }
+    }
+
+    renderDetailSkeleton() {
+        return `
+            <div class="detail-skeleton" style="padding: 16px;">
+                <div style="margin-bottom: 20px;">
+                    <div class="skeleton-item" style="width: 140px; height: 18px; margin-bottom: 12px; border-radius: 4px;"></div>
+                    <div style="background: white; padding: 12px; border-radius: 8px; border: 1px solid var(--neutral-border);">
+                        <div class="skeleton-item" style="width: 80%; height: 16px; margin-bottom: 8px; border-radius: 3px;"></div>
+                        <div class="skeleton-item" style="width: 60%; height: 16px; margin-bottom: 8px; border-radius: 3px;"></div>
+                        <div class="skeleton-item" style="width: 70%; height: 16px; margin-bottom: 8px; border-radius: 3px;"></div>
+                        <div class="skeleton-item" style="width: 50%; height: 16px; border-radius: 3px;"></div>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="skeleton-item" style="width: 160px; height: 18px; margin-bottom: 12px; border-radius: 4px;"></div>
+                    
+                    <!-- Model response skeletons -->
+                    <div style="border: 1px solid #ddd; border-radius: 8px; margin-bottom: 16px; overflow: hidden;">
+                        <div style="background: #f0f0f0; padding: 12px;">
+                            <div class="skeleton-item" style="width: 180px; height: 16px; margin-bottom: 8px; border-radius: 3px;"></div>
+                            <div class="skeleton-item" style="width: 120px; height: 14px; border-radius: 3px;"></div>
+                        </div>
+                        <div style="padding: 12px;">
+                            <div class="skeleton-item" style="width: 100px; height: 14px; margin-bottom: 12px; border-radius: 3px;"></div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px;">
+                                <div class="skeleton-item" style="height: 80px; border-radius: 6px;"></div>
+                                <div class="skeleton-item" style="height: 80px; border-radius: 6px;"></div>
+                                <div class="skeleton-item" style="height: 80px; border-radius: 6px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
+                        <div style="background: #f0f0f0; padding: 12px;">
+                            <div class="skeleton-item" style="width: 160px; height: 16px; margin-bottom: 8px; border-radius: 3px;"></div>
+                            <div class="skeleton-item" style="width: 140px; height: 14px; border-radius: 3px;"></div>
+                        </div>
+                        <div style="padding: 12px;">
+                            <div class="skeleton-item" style="width: 80px; height: 14px; margin-bottom: 12px; border-radius: 3px;"></div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px;">
+                                <div class="skeleton-item" style="height: 80px; border-radius: 6px;"></div>
+                                <div class="skeleton-item" style="height: 80px; border-radius: 6px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    renderSurveyDetailContent(survey) {
+        if (!survey) return '<p>No survey data available.</p>';
+
+        // Handle different survey data structures
+        const storeName = survey.storeName || survey.shopName || 'Unknown Store';
+        const storeId = survey.storeId || survey.shopId || 'N/A';
+        const submittedAt = survey.submittedAt || survey.createdAt || survey.date;
+        const submittedBy = survey.submittedBy || survey.leader || 'N/A';
+        const status = survey.status || 'UNKNOWN';
+
+        let storeInfo = `<strong>Store:</strong> ${this.escapeHtml(storeName)} (ID: ${this.escapeHtml(storeId)})`;
+        if (survey.storeDetails) {
+            if (survey.storeDetails.channel) storeInfo += `<br><strong>Channel:</strong> ${this.escapeHtml(survey.storeDetails.channel)}`;
+            if (survey.storeDetails.region) storeInfo += `<br><strong>Region:</strong> ${this.escapeHtml(survey.storeDetails.region)}`;
+            if (survey.storeDetails.province) storeInfo += `<br><strong>Province:</strong> ${this.escapeHtml(survey.storeDetails.province)}`;
+        }
+
+        const totalImages = this.calculateTotalImages(survey);
+        const responseCount = (survey.responses && survey.responses.length) || survey.responseCount || 0;
+        const surveyId = survey.id || survey._id || 'unknown';
+
+        return `
+            <div class="survey-detail-content" style="padding: 16px;">
+                <!-- Collapsible Survey Information Section -->
+                <div class="detail-section collapsible-section">
+                    <div class="section-header" onclick="app.toggleDetailSection('info-${surveyId}')" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--neutral-border); margin-bottom: 12px;">
+                        <h4 style="margin: 0; color: var(--primary); font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+                            <span>📋</span>
+                            <span>Survey Information</span>
+                        </h4>
+                        <span class="section-toggle-icon" id="info-${surveyId}-icon" style="color: var(--secondary); transition: transform 0.3s ease;">▼</span>
+                    </div>
+                    <div class="section-content expanded" id="info-${surveyId}" style="max-height: 200px; overflow: hidden; transition: all 0.3s ease;">
+                        <div class="detail-info-card">
+                            ${storeInfo}<br>
+                            <strong>Submitted:</strong> ${this.formatDateTime(submittedAt)}<br>
+                            <strong>Submitted by:</strong> ${this.escapeHtml(submittedBy)} ${survey.submittedByRole ? `(${this.escapeHtml(survey.submittedByRole)})` : ''}<br>
+                            <strong>Status:</strong> <span class="status-badge status-${status.toLowerCase()}">${status}</span><br>
+                            <strong>Total Models:</strong> ${responseCount}<br>
+                            <strong>Total Images:</strong> ${totalImages}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Collapsible Survey Responses Section -->
+                <div class="detail-section collapsible-section">
+                    <div class="section-header" onclick="app.toggleDetailSection('responses-${surveyId}')" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--neutral-border); margin-bottom: 12px;">
+                        <h4 style="margin: 0; color: var(--primary); font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+                            <span>📝</span>
+                            <span>Survey Responses</span>
+                        </h4>
+                        <span class="section-toggle-icon" id="responses-${surveyId}-icon" style="color: var(--secondary); transition: transform 0.3s ease;">▼</span>
+                    </div>
+                    <div class="section-content expanded" id="responses-${surveyId}" style="max-height: 1000px; overflow: hidden; transition: all 0.3s ease;">
+                        ${this.renderDetailedSurveyResponses(survey)}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    renderDetailedSurveyResponses(survey) {
+        // Handle different data structures
+        const responses = survey.responses || survey.models || survey.answers || [];
+        
+        if (!responses || responses.length === 0) {
+            return '<div style="padding: 20px; text-align: center; color: var(--secondary); background: white; border-radius: 8px; border: 1px solid var(--neutral-border);">No responses recorded for this survey.</div>';
+        }
+
+        return responses.map((response, index) => {
+            const modelName = response.model || response.modelName || response.question || `Model ${index + 1}`;
+            const quantity = response.quantity || 1;
+            const allSelected = response.allSelected || false;
+            const images = response.images || response.photos || [];
+            const posmSelections = response.posmSelections || response.selections || [];
+
+            return `
+                <div class="model-response-detail" style="border: 1px solid #ddd; border-radius: 8px; margin-bottom: 16px; overflow: hidden; background: white;">
+                    <div class="model-header" style="background: #f8f9fa; padding: 12px; border-bottom: 1px solid #ddd;">
+                        <h5 style="margin: 0 0 8px; color: var(--neutral-text); font-size: 0.95rem;">
+                            📦 ${this.escapeHtml(modelName)}
+                        </h5>
+                        <div style="font-size: 0.85rem; color: var(--secondary); display: flex; gap: 16px; flex-wrap: wrap;">
+                            <span><strong>Quantity:</strong> ${quantity}</span>
+                            <span><strong>All POSM Selected:</strong> ${allSelected ? 'Yes' : 'No'}</span>
+                            <span><strong>Images:</strong> ${images.length}</span>
+                        </div>
+                    </div>
+                    
+                    <div style="padding: 12px;">
+                        ${this.renderPosmSelectionsDetail(posmSelections, allSelected)}
+                        ${this.renderImageGallery(images, `${modelName} - Model ${index + 1}`)}
+                        ${response.notes ? `<div style="margin-top: 12px;"><strong>Notes:</strong> ${this.escapeHtml(response.notes)}</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    renderPosmSelectionsDetail(posmSelections, allSelected) {
+        if (allSelected) {
+            return `
+                <div style="margin-bottom: 12px;">
+                    <strong style="color: var(--primary);">🏷️ POSM Selections:</strong>
+                    <span style="display: inline-block; margin-left: 8px; padding: 4px 8px; background: var(--error-light); color: var(--error); border-radius: 12px; font-size: 0.8rem; font-weight: 600;">
+                        ALL POSM SELECTED
+                    </span>
+                </div>
+            `;
+        }
+
+        if (!posmSelections || posmSelections.length === 0) {
+            return `
+                <div style="margin-bottom: 12px;">
+                    <strong style="color: var(--primary);">🏷️ POSM Selections:</strong>
+                    <span style="color: var(--secondary); margin-left: 8px; font-style: italic;">None selected</span>
+                </div>
+            `;
+        }
+
+        const selectedPosm = posmSelections.filter(p => p.selected || p.isSelected !== false);
+        
+        if (selectedPosm.length === 0) {
+            return `
+                <div style="margin-bottom: 12px;">
+                    <strong style="color: var(--primary);">🏷️ POSM Selections:</strong>
+                    <span style="color: var(--secondary); margin-left: 8px; font-style: italic;">None selected</span>
+                </div>
+            `;
+        }
+
+        return `
+            <div style="margin-bottom: 12px;">
+                <strong style="color: var(--primary);">🏷️ POSM Selections:</strong>
+                <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;">
+                    ${selectedPosm.map(posm => `
+                        <span style="padding: 3px 8px; background: var(--primary-light); color: var(--primary); border-radius: 12px; font-size: 0.8rem; border: 1px solid var(--primary);">
+                            ${this.escapeHtml(posm.posmName || posm.name || posm.posmCode || posm.code)}
+                        </span>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    renderImageGallery(images, altPrefix = '') {
+        if (!images || images.length === 0) {
+            return `
+                <div style="margin-bottom: 12px;">
+                    <strong style="color: var(--primary);">📸 Images:</strong>
+                    <span style="color: var(--secondary); margin-left: 8px; font-style: italic;">No images uploaded</span>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="image-gallery-container" style="margin-bottom: 12px;">
+                <strong style="color: var(--primary);">📸 Images (${images.length}):</strong>
+                <div class="image-gallery" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 6px; margin-top: 8px; max-width: 100%;">
+                    ${images.map((imageUrl, imgIndex) => `
+                        <div class="image-thumbnail" style="position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; border: 2px solid var(--neutral-border); cursor: pointer; transition: all 0.2s ease; max-width: 120px;"
+                             onclick="app.openImageLightbox('${imageUrl}', '${altPrefix} - Image ${imgIndex + 1}')"
+                             onmouseover="this.style.borderColor='var(--primary)'; this.style.transform='scale(1.02)'"
+                             onmouseout="this.style.borderColor='var(--neutral-border)'; this.style.transform='scale(1)'">
+                            <img src="${imageUrl}" 
+                                 alt="${altPrefix} - Image ${imgIndex + 1}"
+                                 style="width: 100%; height: 100%; object-fit: cover;"
+                                 loading="lazy"
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <div style="display: none; width: 100%; height: 100%; background: #f5f5f5; align-items: center; justify-content: center; color: var(--secondary); font-size: 0.7rem;">
+                                Image not found
+                            </div>
+                            <div style="position: absolute; bottom: 2px; right: 2px; background: rgba(0,0,0,0.7); color: white; padding: 1px 4px; border-radius: 2px; font-size: 0.6rem;">
+                                ${imgIndex + 1}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    openImageLightbox(imageUrl, altText = '') {
+        // Use the existing lightbox modal
+        const lightboxImage = document.getElementById('lightboxImage');
+        const lightboxModal = document.getElementById('imageLightbox');
+        
+        if (lightboxImage && lightboxModal) {
+            lightboxImage.src = imageUrl;
+            lightboxImage.alt = altText;
+            lightboxModal.style.display = 'flex';
+        } else {
+            // Fallback: open in new window
+            window.open(imageUrl, '_blank');
+        }
+    }
+
+    preserveScrollPosition(surveyId, isExpanding) {
+        if (isExpanding) {
+            // When expanding, scroll the expanded card into view
+            setTimeout(() => {
+                const cardElement = document.querySelector(`[data-survey-id="${surveyId}"]`);
+                if (cardElement) {
+                    cardElement.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'nearest',
+                        inline: 'nearest' 
+                    });
+                }
+            }, 100);
+        }
+    }
+
+    toggleDetailSection(sectionId) {
+        const sectionContent = document.getElementById(sectionId);
+        const sectionIcon = document.getElementById(sectionId + '-icon');
+        
+        if (!sectionContent || !sectionIcon) return;
+        
+        if (sectionContent.classList.contains('expanded')) {
+            // Collapse section
+            sectionContent.classList.remove('expanded');
+            sectionContent.style.maxHeight = '0';
+            sectionIcon.style.transform = 'rotate(-90deg)';
+        } else {
+            // Expand section
+            sectionContent.classList.add('expanded');
+            // Set appropriate max-height based on content
+            if (sectionId.includes('info-')) {
+                sectionContent.style.maxHeight = '200px';
+            } else if (sectionId.includes('responses-')) {
+                sectionContent.style.maxHeight = '1000px';
+            }
+            sectionIcon.style.transform = 'rotate(0deg)';
+        }
+    }
 }
 
 // Global functions for HTML onclick handlers
+function toggleFilters() {
+    const filtersContent = document.getElementById('filtersContent');
+    const toggleIcon = document.getElementById('filterToggleIcon');
+    
+    if (filtersContent.classList.contains('expanded')) {
+        filtersContent.classList.remove('expanded');
+        toggleIcon.classList.remove('expanded');
+    } else {
+        filtersContent.classList.add('expanded');
+        toggleIcon.classList.add('expanded');
+    }
+}
+
 async function applyFilters() {
     app.showButtonLoading('applyFiltersBtn', true);
     app.updateFilters();

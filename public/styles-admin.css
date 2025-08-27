@@ -1304,6 +1304,225 @@
     padding: 40px;
     color: #666;
 }
+
+/* Accordion Survey Items */
+.accordion-survey-item {
+    border-bottom: 1px solid #eee;
+    background: white;
+    transition: all 0.3s ease;
+}
+
+.accordion-survey-item:last-child {
+    border-bottom: none;
+}
+
+.accordion-survey-item:hover {
+    background: #f8f9fa;
+}
+
+.accordion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.accordion-header:hover {
+    background: rgba(0, 123, 255, 0.05);
+}
+
+.accordion-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.survey-checkbox {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.survey-summary {
+    flex: 1;
+    min-width: 0;
+}
+
+.survey-title {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.survey-date {
+    font-size: 0.85rem;
+    color: #666;
+    font-weight: 500;
+}
+
+.survey-info {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.survey-stats {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.stat-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.stat-badge.models {
+    background: rgba(0, 123, 255, 0.1);
+    color: #007bff;
+}
+
+.stat-badge.images {
+    background: rgba(40, 167, 69, 0.1);
+    color: #28a745;
+}
+
+.accordion-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.expand-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    color: #666;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.expand-btn:hover {
+    background: rgba(0, 123, 255, 0.1);
+    color: #007bff;
+}
+
+.expand-btn .chevron {
+    transition: transform 0.3s ease;
+}
+
+.accordion-survey-item.expanded .expand-btn .chevron {
+    transform: rotate(180deg);
+}
+
+.accordion-content {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.3s ease-out;
+}
+
+.accordion-survey-item.expanded .accordion-content {
+    max-height: 2000px;
+    transition: max-height 0.4s ease-in;
+}
+
+.accordion-details {
+    padding: 0 15px 15px 15px;
+    border-top: 1px solid #eee;
+}
+
+/* Autocomplete Styles */
+.autocomplete-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-top: none;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.autocomplete-dropdown.show {
+    display: block;
+}
+
+.autocomplete-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+    transition: background-color 0.2s ease;
+}
+
+.autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item.highlighted {
+    background-color: #f0f8ff;
+}
+
+.autocomplete-item.selected {
+    background-color: #007bff;
+    color: white;
+}
+
+#submittedByFilter {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background: white;
+}
+
+/* Filter Layout Styles */
+.filter-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 20px;
+    margin-bottom: 16px;
+}
+
+.filter-row:last-child {
+    margin-bottom: 0;
+}
+
+.filter-row .filter-group {
+    margin: 0;
+}
+
+#shopFilter {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background: white;
+}
 .delete-btn {
     background: #dc3545;
     color: white;
@@ -1366,12 +1585,91 @@
         flex-direction: column;
         align-items: stretch;
     }
+    
+    .filter-row {
+        grid-template-columns: 1fr;
+        gap: 16px;
+        margin-bottom: 12px;
+    }
+    
+    .filter-row:first-child .filter-group:first-child,
+    .filter-row:first-child .filter-group:nth-child(2) {
+        margin-bottom: 8px;
+    }
     .response-header {
         flex-direction: column;
         align-items: flex-start;
     }
     .stats-container {
         grid-template-columns: 1fr;
+    }
+    
+    /* Accordion mobile styles */
+    .accordion-header {
+        padding: 12px;
+    }
+    
+    .accordion-left {
+        gap: 10px;
+    }
+    
+    .survey-title {
+        gap: 2px;
+    }
+    
+    .survey-date {
+        font-size: 0.8rem;
+    }
+    
+    .survey-info {
+        font-size: 0.9rem;
+    }
+    
+    .survey-stats {
+        gap: 6px;
+    }
+    
+    .stat-badge {
+        font-size: 0.7rem;
+        padding: 1px 6px;
+    }
+    
+    .accordion-right {
+        gap: 6px;
+    }
+    
+    .expand-btn {
+        padding: 6px;
+    }
+    
+    .delete-btn {
+        padding: 4px 8px;
+        font-size: 0.7rem;
+    }
+    
+    .accordion-details {
+        padding: 0 12px 12px 12px;
+    }
+    
+    /* Autocomplete mobile styles */
+    .autocomplete-dropdown {
+        max-height: 150px;
+    }
+    
+    .autocomplete-item {
+        padding: 10px 12px;
+        font-size: 14px;
+    }
+    
+    #submittedByFilter,
+    #shopFilter {
+        font-size: 16px; /* Prevent zoom on iOS */
+        padding: 10px 12px;
+    }
+    
+    .filter-group label {
+        font-size: 14px;
+        margin-bottom: 6px;
     }
 }
 

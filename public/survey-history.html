@@ -98,16 +98,64 @@
         .filters-section {
             background: white;
             border-radius: 12px;
-            padding: clamp(15px, 4vw, 25px);
+            padding: 0;
             margin-bottom: clamp(15px, 3vw, 25px);
             box-shadow: var(--card-shadow);
+            overflow: hidden;
+        }
+
+        .filter-toggle-header {
+            padding: clamp(15px, 4vw, 20px);
+            background: var(--primary);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.3s ease;
+            user-select: none;
+        }
+
+        .filter-toggle-header:hover {
+            background: var(--primary-hover);
+        }
+
+        .filter-toggle-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: clamp(1rem, 3vw, 1.1rem);
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .filter-toggle-icon {
+            transition: transform 0.3s ease;
+            font-size: 1.2em;
+        }
+
+        .filter-toggle-icon.expanded {
+            transform: rotate(180deg);
+        }
+
+        .filters-content {
+            padding: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .filters-content.expanded {
+            max-height: 300px;
+            padding: clamp(15px, 4vw, 25px);
+            opacity: 1;
+            visibility: visible;
         }
 
         .filters-section h3 {
-            color: var(--neutral-text);
-            font-size: clamp(1.1rem, 3vw, 1.3rem);
-            margin-bottom: clamp(15px, 3vw, 20px);
-            font-weight: 600;
+            display: none;
         }
 
         .filters-grid {
@@ -195,16 +243,31 @@
             letter-spacing: 0.5px;
         }
 
-        .status-completed {
+        .status-completed,
+        .status-complete {
             background: var(--success-light);
             color: var(--success);
             border: 1px solid var(--success);
         }
 
-        .status-pending {
+        .status-pending,
+        .status-incomplete {
             background: var(--warning-light);
             color: var(--warning);
             border: 1px solid var(--warning);
+        }
+
+        .status-draft {
+            background: var(--neutral);
+            color: var(--secondary);
+            border: 1px solid var(--secondary);
+        }
+
+        .status-failed,
+        .status-error {
+            background: var(--error-light);
+            color: var(--error);
+            border: 1px solid var(--error);
         }
 
         .action-btn {
@@ -371,6 +434,21 @@
                 margin-bottom: 0;
             }
 
+            .filter-toggle-header {
+                padding: 12px 16px;
+            }
+
+            .filter-toggle-title {
+                font-size: 0.95rem;
+            }
+
+            .filters-content.expanded {
+                max-height: 400px;
+                padding: 16px;
+                opacity: 1;
+                visibility: visible;
+            }
+
             .survey-table-container {
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
@@ -390,7 +468,7 @@
         }
 
         /* Mobile card view for very small screens */
-        @media (max-width: 600px) {
+        @media (max-width: 768px) {
             body {
                 padding: 8px;
             }
@@ -426,11 +504,14 @@
             .survey-table tbody tr {
                 border: 2px solid var(--neutral-border);
                 border-radius: 12px;
-                margin-bottom: 15px;
-                padding: 15px;
+                margin-bottom: 12px;
+                padding: 0;
                 background: white;
                 box-shadow: var(--card-shadow);
-                transition: all 0.2s ease;
+                transition: all 0.3s ease;
+                overflow: hidden;
+                cursor: pointer;
+                position: relative;
             }
 
             .survey-table tbody tr:hover {
@@ -439,45 +520,406 @@
                 background: white;
             }
 
+            .survey-table tbody tr:active {
+                transform: translateY(0);
+                box-shadow: var(--card-shadow);
+            }
+
             .survey-table td {
                 border: none;
                 position: relative;
-                padding: 8px 0 8px 40%;
+                padding: 0;
                 text-align: left;
-                border-bottom: 1px solid var(--neutral-border);
-                font-size: 0.9rem;
-                min-height: 40px;
-                display: flex;
-                align-items: center;
-            }
-
-            .survey-table td:last-child {
                 border-bottom: none;
-                padding-bottom: 5px;
+                font-size: 0.9rem;
+                min-height: auto;
+                display: block;
             }
 
-            .survey-table td:before {
-                content: attr(data-label);
-                position: absolute;
-                left: 0;
-                width: 35%;
+            /* Date/time header - compact */
+            .survey-table td:first-child {
+                background: var(--neutral);
+                padding: 6px 12px 4px;
+                font-size: 0.75rem;
+                color: var(--secondary);
+                font-weight: 500;
+                border-bottom: 1px solid var(--neutral-border);
+                text-align: right;
+            }
+
+            .survey-table td:first-child:before {
+                display: none;
+            }
+
+            /* Store name - prominent header */
+            .survey-table td:nth-child(2) {
+                padding: 10px 12px 4px;
+                font-size: 1rem;
+                font-weight: 700;
+                color: var(--primary);
+                line-height: 1.2;
+                max-height: 2.4em;
+                overflow: hidden;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+            }
+
+            .survey-table td:nth-child(2):before {
+                display: none;
+            }
+
+            /* Store ID - compact inline */
+            .survey-table td:nth-child(3) {
+                padding: 0 12px 6px;
+                font-size: 0.8rem;
+                color: var(--secondary);
+                font-weight: 500;
+            }
+
+            .survey-table td:nth-child(3):before {
+                content: "ID: ";
+                position: static;
+                width: auto;
                 font-weight: 600;
                 color: var(--neutral-text);
-                font-size: 0.85rem;
+                font-size: 0.75rem;
+            }
+
+            /* Bottom info row - status, models, images */
+            .survey-table td:nth-child(4),
+            .survey-table td:nth-child(5),
+            .survey-table td:nth-child(6) {
+                padding: 0 12px 10px;
+                display: inline-block;
+                vertical-align: top;
+            }
+
+            .survey-table td:nth-child(4) {
+                width: 45%;
                 text-align: left;
-                display: flex;
-                align-items: center;
+            }
+
+            .survey-table td:nth-child(5),
+            .survey-table td:nth-child(6) {
+                width: 25%;
+                text-align: center;
+                font-weight: 600;
+                color: var(--neutral-text);
+                font-size: 0.8rem;
+            }
+
+            .survey-table td:nth-child(4):before,
+            .survey-table td:nth-child(5):before,
+            .survey-table td:nth-child(6):before {
+                display: none;
+            }
+
+            /* Add icons for better visual hierarchy */
+            .survey-table td:nth-child(5):before {
+                content: "📦 ";
+                display: inline;
+                margin-right: 2px;
+            }
+
+            .survey-table td:nth-child(6):before {
+                content: "📸 ";
+                display: inline;
+                margin-right: 2px;
+            }
+
+            /* Mobile card styling improvements */
+            .survey-table tbody tr {
+                transition: all 0.3s ease;
+                position: relative;
+            }
+
+            .survey-table tbody tr:hover {
+                transform: translateY(-2px);
+                box-shadow: var(--card-shadow-lg);
+                background: white;
+            }
+
+            .survey-table tbody tr:active {
+                transform: translateY(0);
+                box-shadow: var(--card-shadow);
+            }
+
+            /* Visual indicator for expanded state */
+            .survey-table tbody tr.expanded {
+                box-shadow: var(--card-shadow-lg);
+                border-color: var(--primary);
+            }
+
+            /* Add expand indicator */
+            .survey-table tbody tr::after {
+                content: '▼';
+                position: absolute;
+                top: 50%;
+                right: 16px;
+                transform: translateY(-50%);
+                color: var(--secondary);
+                font-size: 14px;
+                transition: all 0.3s ease;
+                pointer-events: none;
+            }
+
+            .survey-table tbody tr.expanded::after {
+                transform: translateY(-50%) rotate(180deg);
+                color: var(--primary);
+            }
+
+            .survey-table tbody tr:hover::after {
+                color: var(--primary);
+            }
+
+            /* Collapsible section styles */
+            .collapsible-section {
+                margin-bottom: 16px;
+            }
+
+            .section-header {
+                transition: background-color 0.2s ease;
+                border-radius: 4px;
+                padding: 8px 4px !important;
+            }
+
+            .section-header:hover {
+                background-color: var(--neutral);
+            }
+
+            .section-content {
+                transition: max-height 0.3s ease, padding 0.3s ease;
+                overflow: hidden;
+            }
+
+            .section-content:not(.expanded) {
+                max-height: 0 !important;
+                padding-top: 0 !important;
+                padding-bottom: 0 !important;
+            }
+
+            .section-toggle-icon {
+                font-size: 0.9em;
+                transition: transform 0.3s ease;
+            }
+
+            /* Mobile survey detail content fixes */
+            @media (max-width: 768px) {
+                .survey-detail-panel {
+                    padding: 8px !important;
+                    margin: 0 !important;
+                }
+
+                .survey-detail-content {
+                    padding: 8px !important;
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+
+                .detail-info-card {
+                    padding: 10px !important;
+                    font-size: 0.85rem !important;
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+
+                .collapsible-section {
+                    margin-bottom: 12px;
+                    width: 100%;
+                }
+
+                .section-header {
+                    padding: 6px 2px !important;
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+
+                .section-content {
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+
+                .model-response-detail {
+                    margin-bottom: 12px !important;
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+
+                .model-header {
+                    padding: 8px !important;
+                    font-size: 0.9rem;
+                }
+
+                .model-header h5 {
+                    font-size: 0.9rem !important;
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                }
+
+                /* Ensure text content doesn't overflow */
+                .detail-info-card strong,
+                .model-header strong {
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                }
+
+                /* Mobile image gallery fixes */
+                .image-gallery-container {
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+
+                .image-gallery {
+                    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)) !important;
+                    gap: 4px !important;
+                    max-width: 100% !important;
+                }
+
+                .image-thumbnail {
+                    max-width: 90px !important;
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+
+                .image-thumbnail img {
+                    max-width: 100%;
+                    height: auto;
+                }
+
+                /* POSM selections mobile styling */
+                .detail-section div[style*="flex-wrap"] {
+                    display: flex !important;
+                    flex-wrap: wrap !important;
+                    gap: 4px !important;
+                    margin-top: 6px !important;
+                }
+
+                .detail-section span[style*="padding: 3px 8px"] {
+                    font-size: 0.75rem !important;
+                    padding: 2px 6px !important;
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                    max-width: 100%;
+                }
+
+                /* Modal mobile fixes */
+                .modal .modal-content {
+                    width: 95% !important;
+                    max-width: none !important;
+                    margin: 5% auto !important;
+                    max-height: 85vh !important;
+                }
+
+                .modal-header {
+                    padding: 12px !important;
+                }
+
+                .modal-header h2 {
+                    font-size: 1.1rem !important;
+                    margin: 0 !important;
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                    padding-right: 30px;
+                }
+
+                .modal-body {
+                    padding: 8px !important;
+                    overflow-x: hidden;
+                }
+
+                .close {
+                    font-size: 1.5rem !important;
+                    top: 10px !important;
+                    right: 15px !important;
+                }
+            }
+
+            /* Detail panel (initially hidden) */
+            .survey-detail-panel {
+                display: none;
+                padding: 16px;
+                background: var(--neutral);
+                border-top: 1px solid var(--neutral-border);
+                animation: slideDown 0.3s ease-out;
+            }
+
+            .survey-detail-panel.expanded {
+                display: block;
+            }
+
+            @keyframes slideDown {
+                from {
+                    opacity: 0;
+                    transform: translateY(-10px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
             }
 
             .status-badge {
                 font-size: 0.75rem;
                 padding: 4px 8px;
+                border-radius: 12px;
+                font-weight: 700;
+                letter-spacing: 0.3px;
             }
 
-            .action-btn {
-                padding: 8px 12px;
-                font-size: 0.85rem;
-                width: auto;
+            /* Count chips for models and images */
+            .count-chip {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                padding: 4px 8px;
+                border-radius: 8px;
+                font-size: 0.75rem;
+                font-weight: 600;
+                white-space: nowrap;
+            }
+
+            .models-chip {
+                background: rgba(37, 99, 235, 0.1);
+                color: var(--primary);
+                border: 1px solid rgba(37, 99, 235, 0.2);
+            }
+
+            .images-chip {
+                background: rgba(16, 185, 129, 0.1);
+                color: var(--success);
+                border: 1px solid rgba(16, 185, 129, 0.2);
+            }
+
+            /* Detail content styles */
+            .detail-info-card {
+                background: white;
+                padding: 12px;
+                border-radius: 8px;
+                border: 1px solid var(--neutral-border);
+                font-size: 0.9rem;
+                line-height: 1.5;
+            }
+
+            .detail-section {
+                margin-bottom: 16px;
+            }
+
+            .detail-section:last-child {
+                margin-bottom: 0;
+            }
+
+            /* Skeleton loading animation */
+            .skeleton-item {
+                animation: skeleton-pulse 1.5s ease-in-out infinite;
+            }
+
+            @keyframes skeleton-pulse {
+                0% { background-color: #e0e0e0; }
+                50% { background-color: #f0f0f0; }
+                100% { background-color: #e0e0e0; }
             }
         }
 
@@ -490,6 +932,47 @@
             .stat-card {
                 padding: 20px 15px;
             }
+
+            .survey-table tbody tr {
+                margin-bottom: 14px;
+                border-radius: 10px;
+            }
+
+            .survey-table td:nth-child(2) {
+                font-size: 0.95rem;
+                padding: 10px 10px 5px;
+                line-height: 1.15;
+            }
+
+            .survey-table td:nth-child(3) {
+                padding: 0 10px 6px;
+                font-size: 0.8rem;
+            }
+
+            .survey-table td:nth-child(4) {
+                padding: 0 10px 10px;
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+
+            .status-badge {
+                font-size: 0.7rem;
+                padding: 3px 6px;
+            }
+
+            .survey-table tbody tr::after {
+                right: 10px;
+                font-size: 12px;
+            }
+
+            .survey-detail-panel {
+                padding: 12px;
+            }
+
+            .detail-info-card {
+                padding: 10px;
+                font-size: 0.85rem;
+            }
         }
 
         .pagination-container {
@@ -497,6 +980,26 @@
             justify-content: center;
             margin-top: clamp(15px, 3vw, 25px);
             padding: 0 clamp(8px, 2vw, 20px);
+        }
+
+        /* Pagination mobile improvements */
+        @media (max-width: 768px) {
+            .pagination-container {
+                padding: 0 16px;
+                margin-top: 20px;
+            }
+            
+            .pagination-container .pagination-controls {
+                flex-wrap: wrap;
+                gap: 8px;
+                justify-content: center;
+            }
+            
+            .pagination-container .pagination-btn {
+                min-width: 40px;
+                height: 40px;
+                font-size: 14px;
+            }
         }
     </style>
 </head>
@@ -549,29 +1052,37 @@
 
         <!-- Filters -->
         <div class="filters-section">
-            <h3>Filter Surveys</h3>
-            <div class="filters-grid">
-                <div class="filter-group">
-                    <label for="startDate">Start Date</label>
-                    <input type="date" id="startDate" name="startDate">
+            <div class="filter-toggle-header" onclick="toggleFilters()">
+                <div class="filter-toggle-title">
+                    <span>🔍</span>
+                    <span>Filter Surveys</span>
                 </div>
-                <div class="filter-group">
-                    <label for="endDate">End Date</label>
-                    <input type="date" id="endDate" name="endDate">
-                </div>
-                <div class="filter-group">
-                    <label for="storeName">Store Name</label>
-                    <input type="text" id="storeName" name="storeName" placeholder="Search by store name...">
-                </div>
-                <div class="filter-group">
-                    <label>&nbsp;</label>
-                    <div style="display: flex; gap: 10px;">
-                        <button type="button" id="applyFiltersBtn" onclick="applyFilters()" class="action-btn">
-                            <span class="btn-text">Apply Filters</span>
-                        </button>
-                        <button type="button" onclick="clearFilters()" class="action-btn secondary">
-                            <span class="btn-text">Clear</span>
-                        </button>
+                <span class="filter-toggle-icon" id="filterToggleIcon">▼</span>
+            </div>
+            <div class="filters-content" id="filtersContent">
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label for="startDate">Start Date</label>
+                        <input type="date" id="startDate" name="startDate">
+                    </div>
+                    <div class="filter-group">
+                        <label for="endDate">End Date</label>
+                        <input type="date" id="endDate" name="endDate">
+                    </div>
+                    <div class="filter-group">
+                        <label for="storeName">Store Name</label>
+                        <input type="text" id="storeName" name="storeName" placeholder="Search by store name...">
+                    </div>
+                    <div class="filter-group">
+                        <label>&nbsp;</label>
+                        <div style="display: flex; gap: 10px;">
+                            <button type="button" id="applyFiltersBtn" onclick="applyFilters()" class="action-btn">
+                                <span class="btn-text">Apply Filters</span>
+                            </button>
+                            <button type="button" onclick="clearFilters()" class="action-btn secondary">
+                                <span class="btn-text">Clear</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -600,7 +1111,6 @@
                         <th>Status</th>
                         <th>Models</th>
                         <th>Images</th>
-                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody id="surveyTableBody">
@@ -616,7 +1126,7 @@
 
     <!-- Survey Detail Modal -->
     <div id="surveyDetailModal" class="modal" style="display: none;">
-        <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+        <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto; width: 95%; box-sizing: border-box;">
             <div class="modal-header">
                 <h2 id="modalTitle">Survey Details</h2>
                 <span class="close" onclick="closeSurveyDetailModal()">&times;</span>

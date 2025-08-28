@@ -104,8 +104,17 @@ class SurveyHistoryApp {
             }
         });
 
+        // Lightbox click outside to close
         document.getElementById('imageLightbox').addEventListener('click', (e) => {
-            if (e.target.id === 'imageLightbox') {
+            if (e.target.classList.contains('lightbox-overlay')) {
+                this.closeLightbox();
+            }
+        });
+        
+        // Keyboard support for lightbox (ESC key)
+        document.addEventListener('keydown', (e) => {
+            const lightbox = document.getElementById('imageLightbox');
+            if (lightbox && lightbox.style.display === 'flex' && e.key === 'Escape') {
                 this.closeLightbox();
             }
         });
@@ -704,12 +713,28 @@ class SurveyHistoryApp {
     }
 
     openLightbox(imageUrl) {
-        document.getElementById('lightboxImage').src = imageUrl;
-        document.getElementById('imageLightbox').style.display = 'flex';
+        const lightboxImage = document.getElementById('lightboxImage');
+        const lightboxOverlay = document.getElementById('imageLightbox');
+        
+        if (lightboxImage && lightboxOverlay) {
+            lightboxImage.src = imageUrl;
+            lightboxOverlay.style.display = 'flex';
+            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+            
+            // Focus on close button for accessibility
+            setTimeout(() => {
+                const closeButton = lightboxOverlay.querySelector('.lightbox-close');
+                if (closeButton) closeButton.focus();
+            }, 100);
+        }
     }
 
     closeLightbox() {
-        document.getElementById('imageLightbox').style.display = 'none';
+        const lightboxOverlay = document.getElementById('imageLightbox');
+        if (lightboxOverlay) {
+            lightboxOverlay.style.display = 'none';
+            document.body.style.overflow = ''; // Restore scrolling
+        }
     }
 
     closeSurveyDetailModal() {

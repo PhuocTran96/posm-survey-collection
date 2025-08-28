@@ -89,10 +89,9 @@ class SurveyHistoryApp {
     }
 
     setupEventListeners() {
-        // Filter inputs
-        document.getElementById('startDate').addEventListener('change', () => this.updateFilters());
-        document.getElementById('endDate').addEventListener('change', () => this.updateFilters());
-        this.setupStoreNameAutocomplete();
+        // Filter inputs - new search input
+        this.setupStoreSearchAutocomplete();
+        this.setupDateFilter();
 
         // Logout button
         document.getElementById('logoutBtn').addEventListener('click', logout);
@@ -130,30 +129,42 @@ class SurveyHistoryApp {
         });
     }
 
-    setupStoreNameAutocomplete() {
-        const storeNameInput = document.getElementById('storeName');
+    setupStoreSearchAutocomplete() {
+        const storeSearchInput = document.getElementById('storeSearch');
         
         // Input event for typing
-        storeNameInput.addEventListener('input', (e) => {
-            this.handleStoreNameInput(e);
+        storeSearchInput.addEventListener('input', (e) => {
+            this.handleStoreSearchInput(e);
         });
         
         // Keydown for navigation
-        storeNameInput.addEventListener('keydown', (e) => {
-            this.handleStoreNameKeydown(e);
+        storeSearchInput.addEventListener('keydown', (e) => {
+            this.handleStoreSearchKeydown(e);
         });
         
         // Focus event
-        storeNameInput.addEventListener('focus', (e) => {
+        storeSearchInput.addEventListener('focus', (e) => {
             if (e.target.value.trim().length >= 2) {
-                this.showStoreSuggestions(e.target.value.trim());
+                this.showStoreSearchSuggestions(e.target.value.trim());
             }
         });
         
         // Hide dropdown when clicking outside
         document.addEventListener('click', (e) => {
-            if (!e.target.closest('.autocomplete-container')) {
-                this.hideAutocomplete();
+            if (!e.target.closest('.search-input-wrapper')) {
+                this.hideSearchAutocomplete();
+            }
+        });
+    }
+
+    setupDateFilter() {
+        // Apply default 7-day filter
+        this.applyDateFilter(7);
+        
+        // Hide dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.date-filter-container')) {
+                this.hideDateFilter();
             }
         });
     }
@@ -172,13 +183,13 @@ class SurveyHistoryApp {
         }
     }
 
-    handleStoreNameInput(e) {
+    handleStoreSearchInput(e) {
         const query = e.target.value.trim();
         
         if (query.length >= 2) {
-            this.showStoreSuggestions(query);
+            this.showStoreSearchSuggestions(query);
         } else {
-            this.hideAutocomplete();
+            this.hideSearchAutocomplete();
         }
         
         // Reset selection index
@@ -189,8 +200,8 @@ class SurveyHistoryApp {
         this.searchTimeout = setTimeout(() => this.updateFilters(), 500);
     }
 
-    showStoreSuggestions(query) {
-        const dropdown = document.getElementById('storeNameSuggestions');
+    showStoreSearchSuggestions(query) {
+        const dropdown = document.getElementById('storeSearchSuggestions');
         if (!dropdown) return;
         
         // Filter matching store names
@@ -202,7 +213,7 @@ class SurveyHistoryApp {
             dropdown.innerHTML = suggestions.map((name, index) => `
                 <div class="autocomplete-item" 
                      data-index="${index}" 
-                     onclick="app.selectStoreName('${this.escapeHtml(name)}')">
+                     onclick="app.selectStoreSearch('${this.escapeHtml(name)}')">
                     ${this.highlightMatch(name, query)}
                 </div>
             `).join('');
@@ -215,7 +226,7 @@ class SurveyHistoryApp {
         }
     }
 
-    handleStoreNameKeydown(e) {
+    handleStoreSearchKeydown(e) {
         if (!this.autocompleteVisible) return;
         
         const items = document.querySelectorAll('.autocomplete-item:not(.autocomplete-no-results)');
@@ -235,11 +246,11 @@ class SurveyHistoryApp {
                 e.preventDefault();
                 if (this.selectedSuggestionIndex >= 0 && items[this.selectedSuggestionIndex]) {
                     const selectedText = items[this.selectedSuggestionIndex].textContent;
-                    this.selectStoreName(selectedText);
+                    this.selectStoreSearch(selectedText);
                 }
                 break;
             case 'Escape':
-                this.hideAutocomplete();
+                this.hideSearchAutocomplete();
                 break;
         }
     }
@@ -255,10 +266,10 @@ class SurveyHistoryApp {
         });
     }
 
-    selectStoreName(storeName) {
-        const storeNameInput = document.getElementById('storeName');
-        storeNameInput.value = storeName;
-        this.hideAutocomplete();
+    selectStoreSearch(storeName) {
+        const storeSearchInput = document.getElementById('storeSearch');
+        storeSearchInput.value = storeName;
+        this.hideSearchAutocomplete();
         
         // Trigger filter update
         clearTimeout(this.searchTimeout);
@@ -266,8 +277,8 @@ class SurveyHistoryApp {
         this.loadSurveyHistory(true);
     }
 
-    hideAutocomplete() {
-        const dropdown = document.getElementById('storeNameSuggestions');
+    hideSearchAutocomplete() {
+        const dropdown = document.getElementById('storeSearchSuggestions');
         if (dropdown) {
             dropdown.style.display = 'none';
         }
@@ -311,9 +322,12 @@ class SurveyHistoryApp {
     }
 
     updateFilters() {
-        this.filters.startDate = document.getElementById('startDate').value;
-        this.filters.endDate = document.getElementById('endDate').value;
-        this.filters.storeName = document.getElementById('storeName').value.trim();
+        // Get values from new inputs
+        const storeSearchInput = document.getElementById('storeSearch');
+        if (storeSearchInput) {
+            this.filters.storeName = storeSearchInput.value.trim();
+        }
+        // startDate and endDate are managed by date filter functions
     }
 
     async loadSurveyStats() {
@@ -423,10 +437,7 @@ class SurveyHistoryApp {
             const modelCount = this.calculateModelCount(survey);
             
             return `
-                <tr data-survey-id="${surveyId}" class="survey-row ${isExpanded ? 'expanded' : ''}" 
-                    onclick="app.toggleSurveyDetail('${surveyId}')" 
-                    title="Click to ${isExpanded ? 'collapse' : 'expand'} details"
-                    style="cursor: pointer;">
+                <tr data-survey-id="${surveyId}" class="survey-row ${isExpanded ? 'expanded' : ''}">
                     <td data-label="Date & Time">${this.formatDateTime(survey.date || survey.createdAt)}</td>
                     <td data-label="Store Name">${this.escapeHtml(survey.storeName || survey.shopName || 'Unknown Store')}</td>
                     <td data-label="Store ID">${this.escapeHtml(survey.storeId || survey.shopId || survey.store_id || 'N/A')}</td>
@@ -437,6 +448,16 @@ class SurveyHistoryApp {
                     </td>
                     <td data-label="Models">${modelCount}</td>
                     <td data-label="Images">${totalImages}</td>
+                    <td data-label="Actions">
+                        <button class="toggle-details-btn" 
+                                onclick="app.toggleSurveyDetail('${surveyId}')"
+                                title="${isExpanded ? 'Collapse' : 'Expand'} details"
+                                style="background: none; border: none; cursor: pointer; color: var(--secondary); font-size: 16px; padding: 8px; transition: all 0.2s ease; border-radius: 4px;"
+                                onmouseover="this.style.backgroundColor='var(--neutral)'; this.style.color='var(--primary)'"
+                                onmouseout="this.style.backgroundColor='transparent'; this.style.color='var(--secondary)'">
+                            ${isExpanded ? '▲' : '▼'}
+                        </button>
+                    </td>
                     ${isExpanded ? `
                         <td colspan="6" class="survey-detail-panel expanded">
                             <div id="detail-${surveyId}">
@@ -483,8 +504,7 @@ class SurveyHistoryApp {
             
             return `
                 <div class="mobile-survey-card ${isExpanded ? 'expanded' : ''}" 
-                     data-survey-id="${surveyId}" 
-                     onclick="app.toggleSurveyDetail('${surveyId}')">
+                     data-survey-id="${surveyId}">
                     <div class="mobile-card-header">
                         <div class="mobile-store-name">${this.escapeHtml(survey.storeName || survey.shopName || 'Unknown Store')}</div>
                         <div class="mobile-store-id">ID: ${this.escapeHtml(survey.storeId || survey.shopId || survey.store_id || 'N/A')}</div>
@@ -496,7 +516,12 @@ class SurveyHistoryApp {
                             <span class="mobile-count-chip mobile-models-chip">📦 ${modelCount}</span>
                             <span class="mobile-count-chip mobile-images-chip">📸 ${totalImages}</span>
                         </div>
-                        <div class="mobile-expand-icon">▼</div>
+                        <div class="mobile-expand-icon" 
+                             onclick="app.toggleSurveyDetail('${surveyId}')"
+                             style="cursor: pointer;"
+                             title="${isExpanded ? 'Collapse' : 'Expand'} details">
+                            ${isExpanded ? '▲' : '▼'}
+                        </div>
                     </div>
                     ${isExpanded ? `
                         <div class="mobile-detail-overlay expanded">
@@ -550,7 +575,7 @@ class SurveyHistoryApp {
                 <td><div class="skeleton-cell tiny"></div></td>
                 <td><div class="skeleton-cell tiny"></div></td>
                 <td><div class="skeleton-cell tiny"></div></td>
-                <td><div class="skeleton-cell medium"></div></td>
+                <td><div class="skeleton-cell tiny"></div></td>
             </tr>
         `).join('');
 
@@ -694,12 +719,12 @@ class SurveyHistoryApp {
         return `
             <div>
                 <strong>Images (${images.length}):</strong>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 10px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 8px; margin-top: 10px;">
                     ${images.map((imageUrl, index) => `
                         <div style="position: relative;">
                             <img src="${imageUrl}" 
                                  alt="Survey Image ${index + 1}"
-                                 style="width: 100%; height: 120px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 1px solid #ddd;"
+                                 style="width: 100%; height: 60px; object-fit: cover; border-radius: 4px; cursor: pointer; border: 1px solid #ddd;"
                                  onclick="app.openLightbox('${imageUrl}')"
                                  onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE2IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+SW1hZ2U8L3RleHQ+PC9zdmc+'">
                             <div style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.7); color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.8em;">
@@ -1000,6 +1025,87 @@ class SurveyHistoryApp {
         return totalImages;
     }
 
+    // Date filter functionality
+    toggleDateFilter() {
+        const dropdown = document.getElementById('dateFilterDropdown');
+        const button = document.getElementById('dateFilterBtn');
+        
+        if (dropdown.style.display === 'none' || !dropdown.style.display) {
+            dropdown.style.display = 'block';
+            button.classList.add('active');
+        } else {
+            dropdown.style.display = 'none';
+            button.classList.remove('active');
+            this.hideCustomDateInputs();
+        }
+    }
+
+    hideDateFilter() {
+        const dropdown = document.getElementById('dateFilterDropdown');
+        const button = document.getElementById('dateFilterBtn');
+        
+        if (dropdown && button) {
+            dropdown.style.display = 'none';
+            button.classList.remove('active');
+            this.hideCustomDateInputs();
+        }
+    }
+
+    applyDateFilter(days) {
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(endDate.getDate() - days);
+        
+        this.filters.startDate = startDate.toISOString().split('T')[0];
+        this.filters.endDate = endDate.toISOString().split('T')[0];
+        
+        // Update button text
+        const dateFilterText = document.getElementById('dateFilterText');
+        if (dateFilterText) {
+            dateFilterText.textContent = `Last ${days} days`;
+        }
+        
+        this.hideDateFilter();
+        this.loadSurveyHistory(true);
+    }
+
+    showCustomDateInputs() {
+        const customInputs = document.getElementById('customDateInputs');
+        if (customInputs) {
+            customInputs.style.display = 'flex';
+        }
+    }
+
+    hideCustomDateInputs() {
+        const customInputs = document.getElementById('customDateInputs');
+        if (customInputs) {
+            customInputs.style.display = 'none';
+        }
+    }
+
+    applyCustomDateRange() {
+        const startDateInput = document.getElementById('customStartDate');
+        const endDateInput = document.getElementById('customEndDate');
+        
+        if (startDateInput.value && endDateInput.value) {
+            this.filters.startDate = startDateInput.value;
+            this.filters.endDate = endDateInput.value;
+            
+            // Update button text
+            const dateFilterText = document.getElementById('dateFilterText');
+            if (dateFilterText) {
+                const startDate = new Date(startDateInput.value);
+                const endDate = new Date(endDateInput.value);
+                dateFilterText.textContent = `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
+            }
+            
+            this.hideDateFilter();
+            this.loadSurveyHistory(true);
+        } else {
+            alert('Please select both start and end dates.');
+        }
+    }
+
     async toggleSurveyDetail(surveyId) {
         console.log('Toggling survey detail for ID:', surveyId);
         
@@ -1117,10 +1223,12 @@ class SurveyHistoryApp {
                         </div>
                         <div style="padding: 12px;">
                             <div class="skeleton-item" style="width: 100px; height: 14px; margin-bottom: 12px; border-radius: 3px;"></div>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px;">
-                                <div class="skeleton-item" style="height: 80px; border-radius: 6px;"></div>
-                                <div class="skeleton-item" style="height: 80px; border-radius: 6px;"></div>
-                                <div class="skeleton-item" style="height: 80px; border-radius: 6px;"></div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); gap: 4px;">
+                                <div class="skeleton-item" style="height: 60px; border-radius: 4px;"></div>
+                                <div class="skeleton-item" style="height: 60px; border-radius: 4px;"></div>
+                                <div class="skeleton-item" style="height: 60px; border-radius: 4px;"></div>
+                                <div class="skeleton-item" style="height: 60px; border-radius: 4px;"></div>
+                                <div class="skeleton-item" style="height: 60px; border-radius: 4px;"></div>
                             </div>
                         </div>
                     </div>
@@ -1132,9 +1240,11 @@ class SurveyHistoryApp {
                         </div>
                         <div style="padding: 12px;">
                             <div class="skeleton-item" style="width: 80px; height: 14px; margin-bottom: 12px; border-radius: 3px;"></div>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px;">
-                                <div class="skeleton-item" style="height: 80px; border-radius: 6px;"></div>
-                                <div class="skeleton-item" style="height: 80px; border-radius: 6px;"></div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); gap: 4px;">
+                                <div class="skeleton-item" style="height: 60px; border-radius: 4px;"></div>
+                                <div class="skeleton-item" style="height: 60px; border-radius: 4px;"></div>
+                                <div class="skeleton-item" style="height: 60px; border-radius: 4px;"></div>
+                                <div class="skeleton-item" style="height: 60px; border-radius: 4px;"></div>
                             </div>
                         </div>
                     </div>
@@ -1166,40 +1276,7 @@ class SurveyHistoryApp {
 
         return `
             <div class="survey-detail-content" style="padding: 16px;">
-                <!-- Collapsible Survey Information Section -->
-                <div class="detail-section collapsible-section">
-                    <div class="section-header" onclick="app.toggleDetailSection('info-${surveyId}')" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--neutral-border); margin-bottom: 12px;">
-                        <h4 style="margin: 0; color: var(--primary); font-size: 1rem; display: flex; align-items: center; gap: 8px;">
-                            <span>📋</span>
-                            <span>Survey Information</span>
-                        </h4>
-                        <span class="section-toggle-icon" id="info-${surveyId}-icon" style="color: var(--secondary); transition: transform 0.3s ease;">▼</span>
-                    </div>
-                    <div class="section-content expanded" id="info-${surveyId}" style="max-height: 200px; overflow: hidden; transition: all 0.3s ease;">
-                        <div class="detail-info-card">
-                            ${storeInfo}<br>
-                            <strong>Submitted:</strong> ${this.formatDateTime(submittedAt)}<br>
-                            <strong>Submitted by:</strong> ${this.escapeHtml(submittedBy)} ${survey.submittedByRole ? `(${this.escapeHtml(survey.submittedByRole)})` : ''}<br>
-                            <strong>Status:</strong> <span class="status-badge status-${status.toLowerCase()}">${status}</span><br>
-                            <strong>Total Models:</strong> ${responseCount}<br>
-                            <strong>Total Images:</strong> ${totalImages}
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Collapsible Survey Responses Section -->
-                <div class="detail-section collapsible-section">
-                    <div class="section-header" onclick="app.toggleDetailSection('responses-${surveyId}')" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--neutral-border); margin-bottom: 12px;">
-                        <h4 style="margin: 0; color: var(--primary); font-size: 1rem; display: flex; align-items: center; gap: 8px;">
-                            <span>📝</span>
-                            <span>Survey Responses</span>
-                        </h4>
-                        <span class="section-toggle-icon" id="responses-${surveyId}-icon" style="color: var(--secondary); transition: transform 0.3s ease;">▼</span>
-                    </div>
-                    <div class="section-content expanded" id="responses-${surveyId}" style="max-height: 1000px; overflow: hidden; transition: all 0.3s ease;">
-                        ${this.renderDetailedSurveyResponses(survey)}
-                    </div>
-                </div>
+                ${this.renderSimpleSurveyResponses(survey, surveyId)}
             </div>
         `;
     }
@@ -1226,282 +1303,79 @@ class SurveyHistoryApp {
 
         return `
             <div class="mobile-detail-content" style="padding: 12px;">
-                <!-- Mobile Survey Information Section -->
-                <div class="detail-section collapsible-section">
-                    <div class="section-header" onclick="app.toggleDetailSection('info-${surveyId}')" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 12px 8px; border-bottom: 1px solid var(--neutral-border); margin-bottom: 12px; min-height: 44px;">
-                        <h4 style="margin: 0; color: var(--primary); font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
-                            <span>📋</span>
-                            <span>Survey Information</span>
-                        </h4>
-                        <span class="section-toggle-icon" id="info-${surveyId}-icon" style="color: var(--secondary); transition: transform 0.3s ease;">▼</span>
-                    </div>
-                    <div class="section-content expanded" id="info-${surveyId}" style="max-height: 300px; overflow: hidden; transition: all 0.3s ease;">
-                        <div class="detail-info-card">
-                            ${storeInfo}<br>
-                            <strong>Submitted:</strong> ${this.formatDateTime(submittedAt)}<br>
-                            <strong>Submitted by:</strong> ${this.escapeHtml(submittedBy)} ${survey.submittedByRole ? `(${this.escapeHtml(survey.submittedByRole)})` : ''}<br>
-                            <strong>Status:</strong> <span class="status-badge status-${status.toLowerCase()}">${status}</span><br>
-                            <strong>Total Models:</strong> ${responseCount}<br>
-                            <strong>Total Images:</strong> ${totalImages}
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Mobile Survey Responses Section -->
-                <div class="detail-section collapsible-section">
-                    <div class="section-header" onclick="app.toggleDetailSection('responses-${surveyId}')" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 12px 8px; border-bottom: 1px solid var(--neutral-border); margin-bottom: 12px; min-height: 44px;">
-                        <h4 style="margin: 0; color: var(--primary); font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
-                            <span>📝</span>
-                            <span>Survey Responses</span>
-                        </h4>
-                        <span class="section-toggle-icon" id="responses-${surveyId}-icon" style="color: var(--secondary); transition: transform 0.3s ease;">▼</span>
-                    </div>
-                    <div class="section-content expanded" id="responses-${surveyId}" style="max-height: 1000px; overflow: hidden; transition: all 0.3s ease;">
-                        ${this.renderMobileDetailedSurveyResponses(survey)}
-                    </div>
-                </div>
+                ${this.renderSimpleSurveyResponses(survey, surveyId)}
             </div>
         `;
     }
 
-    renderDetailedSurveyResponses(survey) {
-        // Handle different data structures
+    renderSimpleSurveyResponses(survey, surveyId) {
         const responses = survey.responses || survey.models || survey.answers || [];
         
         if (!responses || responses.length === 0) {
-            return '<div style="padding: 20px; text-align: center; color: var(--secondary); background: white; border-radius: 8px; border: 1px solid var(--neutral-border);">No responses recorded for this survey.</div>';
+            return '<div class="no-responses">No responses recorded for this survey.</div>';
         }
 
-        return responses.map((response, index) => {
-            const modelName = response.model || response.modelName || response.question || `Model ${index + 1}`;
-            const quantity = response.quantity || 1;
-            const allSelected = response.allSelected || false;
-            const images = response.images || response.photos || [];
-            const posmSelections = response.posmSelections || response.selections || [];
-
-            return `
-                <div class="model-response-detail" style="border: 1px solid #ddd; border-radius: 8px; margin-bottom: 16px; overflow: hidden; background: white;">
-                    <div class="model-header" style="background: #f8f9fa; padding: 12px; border-bottom: 1px solid #ddd;">
-                        <h5 style="margin: 0 0 8px; color: var(--neutral-text); font-size: 0.95rem;">
-                            📦 ${this.escapeHtml(modelName)}
-                        </h5>
-                        <div style="font-size: 0.85rem; color: var(--secondary); display: flex; gap: 16px; flex-wrap: wrap;">
-                            <span><strong>Quantity:</strong> ${quantity}</span>
-                            <span><strong>All POSM Selected:</strong> ${allSelected ? 'Yes' : 'No'}</span>
-                            <span><strong>Images:</strong> ${images.length}</span>
-                        </div>
-                    </div>
+        return `
+            <div class="survey-responses-list">
+                ${responses.map((response, index) => {
+                    const modelName = response.model || response.modelName || response.question || `Model ${index + 1}`;
+                    const posmInfo = this.formatPosmInfo(response.posmSelections || response.selections || [], response.allSelected || false);
+                    const images = response.images || response.photos || [];
+                    const imageCount = images.length;
                     
-                    <div style="padding: 12px;">
-                        ${this.renderPosmSelectionsDetail(posmSelections, allSelected)}
-                        ${this.renderImageGallery(images, `${modelName} - Model ${index + 1}`)}
-                        ${response.notes ? `<div style="margin-top: 12px;"><strong>Notes:</strong> ${this.escapeHtml(response.notes)}</div>` : ''}
-                    </div>
-                </div>
-            `;
-        }).join('');
+                    return `
+                        <div class="response-row">
+                            <span class="model-name">${this.escapeHtml(modelName)}</span>
+                            <span class="posm-info">${posmInfo}</span>
+                            ${imageCount > 0 
+                                ? `<a class="images-link" onclick="app.openModelImagesLightbox('${surveyId}', ${index})" href="javascript:void(0)">Images (${imageCount})</a>`
+                                : '<span class="no-images">No images</span>'
+                            }
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
     }
 
-    renderMobileDetailedSurveyResponses(survey) {
-        // Handle different data structures
+    formatPosmInfo(posmSelections, allSelected) {
+        if (allSelected) {
+            return 'POSM: All Selected';
+        }
+        
+        if (!posmSelections || posmSelections.length === 0) {
+            return 'POSM: None';
+        }
+        
+        const selectedPosm = posmSelections.filter(p => p.selected || p.isSelected !== false);
+        if (selectedPosm.length === 0) {
+            return 'POSM: None';
+        }
+        
+        const names = selectedPosm.map(p => p.posmName || p.name || p.posmCode || p.code).slice(0, 3);
+        const display = names.join(', ');
+        const remaining = selectedPosm.length - names.length;
+        
+        return `POSM: ${display}${remaining > 0 ? ` +${remaining} more` : ''}`;
+    }
+
+    openModelImagesLightbox(surveyId, modelIndex) {
+        const survey = this.surveyDetails.get(surveyId);
+        if (!survey) return;
+        
         const responses = survey.responses || survey.models || survey.answers || [];
+        const response = responses[modelIndex];
+        if (!response) return;
         
-        if (!responses || responses.length === 0) {
-            return '<div style="padding: 16px; text-align: center; color: var(--secondary); background: white; border-radius: 8px; border: 1px solid var(--neutral-border);">No responses recorded for this survey.</div>';
-        }
-
-        return responses.map((response, index) => {
-            const modelName = response.model || response.modelName || response.question || `Model ${index + 1}`;
-            const quantity = response.quantity || 1;
-            const allSelected = response.allSelected || false;
-            const images = response.images || response.photos || [];
-            const posmSelections = response.posmSelections || response.selections || [];
-
-            return `
-                <div class="model-response-detail" style="border: 1px solid #ddd; border-radius: 8px; margin-bottom: 12px; overflow: hidden; background: white;">
-                    <div class="model-header" style="background: #f8f9fa; padding: 10px; border-bottom: 1px solid #ddd; min-height: 44px; display: flex; align-items: center;">
-                        <h5 style="margin: 0; color: var(--neutral-text); font-size: 0.9rem;">
-                            📦 ${this.escapeHtml(modelName)}
-                        </h5>
-                    </div>
-                    <div style="padding: 10px; font-size: 0.85rem;">
-                        <div style="margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.8rem; color: var(--secondary);">
-                            <span><strong>Qty:</strong> ${quantity}</span>
-                            <span><strong>All POSM:</strong> ${allSelected ? 'Yes' : 'No'}</span>
-                            <span><strong>Images:</strong> ${images.length}</span>
-                        </div>
-                        ${this.renderMobilePosmSelectionsDetail(posmSelections, allSelected)}
-                        ${this.renderMobileImageGallery(images, `${modelName} - Model ${index + 1}`)}
-                        ${response.notes ? `<div style="margin-top: 10px; font-size: 0.8rem;"><strong>Notes:</strong> ${this.escapeHtml(response.notes)}</div>` : ''}
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    renderMobilePosmSelectionsDetail(posmSelections, allSelected) {
-        if (allSelected) {
-            return `
-                <div style="margin-bottom: 10px;">
-                    <strong style="color: var(--primary); font-size: 0.8rem;">🏷️ POSM:</strong>
-                    <span style="display: inline-block; margin-left: 6px; padding: 3px 6px; background: var(--error-light); color: var(--error); border-radius: 10px; font-size: 0.7rem; font-weight: 600;">
-                        ALL SELECTED
-                    </span>
-                </div>
-            `;
-        }
-
-        if (!posmSelections || posmSelections.length === 0) {
-            return `
-                <div style="margin-bottom: 10px;">
-                    <strong style="color: var(--primary); font-size: 0.8rem;">🏷️ POSM:</strong>
-                    <span style="color: var(--secondary); margin-left: 6px; font-style: italic; font-size: 0.75rem;">None selected</span>
-                </div>
-            `;
-        }
-
-        const selectedPosm = posmSelections.filter(p => p.selected || p.isSelected !== false);
+        const images = response.images || response.photos || [];
+        if (images.length === 0) return;
         
-        if (selectedPosm.length === 0) {
-            return `
-                <div style="margin-bottom: 10px;">
-                    <strong style="color: var(--primary); font-size: 0.8rem;">🏷️ POSM:</strong>
-                    <span style="color: var(--secondary); margin-left: 6px; font-style: italic; font-size: 0.75rem;">None selected</span>
-                </div>
-            `;
-        }
-
-        return `
-            <div style="margin-bottom: 10px;">
-                <strong style="color: var(--primary); font-size: 0.8rem;">🏷️ POSM:</strong>
-                <div class="mobile-posm-container" style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px;">
-                    ${selectedPosm.map(posm => `
-                        <span class="mobile-posm-chip" style="padding: 3px 6px; background: var(--primary-light); color: var(--primary); border-radius: 10px; font-size: 0.7rem; border: 1px solid var(--primary);">
-                            ${this.escapeHtml(posm.posmName || posm.name || posm.posmCode || posm.code)}
-                        </span>
-                    `).join('')}
-                </div>
-            </div>
-        `;
+        // Open first image in existing lightbox (can be enhanced to show all model images)
+        this.openImageLightbox(images[0], `${response.model || `Model ${modelIndex + 1}`} - Image 1`);
     }
 
-    renderMobileImageGallery(images, altPrefix = '') {
-        if (!images || images.length === 0) {
-            return `
-                <div style="margin-bottom: 10px;">
-                    <strong style="color: var(--primary); font-size: 0.8rem;">📸 Images:</strong>
-                    <span style="color: var(--secondary); margin-left: 6px; font-style: italic; font-size: 0.75rem;">No images</span>
-                </div>
-            `;
-        }
 
-        return `
-            <div class="image-gallery-container" style="margin-bottom: 10px;">
-                <strong style="color: var(--primary); font-size: 0.8rem;">📸 Images (${images.length}):</strong>
-                <div class="image-gallery" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 4px; margin-top: 6px; max-width: 100%;">
-                    ${images.map((imageUrl, imgIndex) => `
-                        <div class="image-thumbnail" style="position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; border: 2px solid var(--neutral-border); cursor: pointer; transition: all 0.2s ease; min-height: 70px;"
-                             onclick="app.openImageLightbox('${imageUrl}', '${altPrefix} - Image ${imgIndex + 1}')">
-                            <img src="${imageUrl}" 
-                                 alt="${altPrefix} - Image ${imgIndex + 1}"
-                                 style="width: 100%; height: 100%; object-fit: cover;"
-                                 loading="lazy"
-                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                            <div style="display: none; width: 100%; height: 100%; background: #f5f5f5; align-items: center; justify-content: center; color: var(--secondary); font-size: 0.6rem;">
-                                Error
-                            </div>
-                            <div style="position: absolute; bottom: 1px; right: 1px; background: rgba(0,0,0,0.7); color: white; padding: 1px 3px; border-radius: 2px; font-size: 0.6rem;">
-                                ${imgIndex + 1}
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
 
-    renderPosmSelectionsDetail(posmSelections, allSelected) {
-        if (allSelected) {
-            return `
-                <div style="margin-bottom: 12px;">
-                    <strong style="color: var(--primary);">🏷️ POSM Selections:</strong>
-                    <span style="display: inline-block; margin-left: 8px; padding: 4px 8px; background: var(--error-light); color: var(--error); border-radius: 12px; font-size: 0.8rem; font-weight: 600;">
-                        ALL POSM SELECTED
-                    </span>
-                </div>
-            `;
-        }
-
-        if (!posmSelections || posmSelections.length === 0) {
-            return `
-                <div style="margin-bottom: 12px;">
-                    <strong style="color: var(--primary);">🏷️ POSM Selections:</strong>
-                    <span style="color: var(--secondary); margin-left: 8px; font-style: italic;">None selected</span>
-                </div>
-            `;
-        }
-
-        const selectedPosm = posmSelections.filter(p => p.selected || p.isSelected !== false);
-        
-        if (selectedPosm.length === 0) {
-            return `
-                <div style="margin-bottom: 12px;">
-                    <strong style="color: var(--primary);">🏷️ POSM Selections:</strong>
-                    <span style="color: var(--secondary); margin-left: 8px; font-style: italic;">None selected</span>
-                </div>
-            `;
-        }
-
-        return `
-            <div style="margin-bottom: 12px;">
-                <strong style="color: var(--primary);">🏷️ POSM Selections:</strong>
-                <div class="mobile-posm-container" style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;">
-                    ${selectedPosm.map(posm => `
-                        <span class="mobile-posm-chip" style="padding: 4px 8px; background: var(--primary-light); color: var(--primary); border-radius: 12px; font-size: 0.75rem; border: 1px solid var(--primary);">
-                            ${this.escapeHtml(posm.posmName || posm.name || posm.posmCode || posm.code)}
-                        </span>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
-
-    renderImageGallery(images, altPrefix = '') {
-        if (!images || images.length === 0) {
-            return `
-                <div style="margin-bottom: 12px;">
-                    <strong style="color: var(--primary);">📸 Images:</strong>
-                    <span style="color: var(--secondary); margin-left: 8px; font-style: italic;">No images uploaded</span>
-                </div>
-            `;
-        }
-
-        return `
-            <div class="image-gallery-container" style="margin-bottom: 12px;">
-                <strong style="color: var(--primary);">📸 Images (${images.length}):</strong>
-                <div class="image-gallery" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 6px; margin-top: 8px; max-width: 100%;">
-                    ${images.map((imageUrl, imgIndex) => `
-                        <div class="image-thumbnail" style="position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; border: 2px solid var(--neutral-border); cursor: pointer; transition: all 0.2s ease; max-width: 120px;"
-                             onclick="app.openImageLightbox('${imageUrl}', '${altPrefix} - Image ${imgIndex + 1}')"
-                             onmouseover="this.style.borderColor='var(--primary)'; this.style.transform='scale(1.02)'"
-                             onmouseout="this.style.borderColor='var(--neutral-border)'; this.style.transform='scale(1)'">
-                            <img src="${imageUrl}" 
-                                 alt="${altPrefix} - Image ${imgIndex + 1}"
-                                 style="width: 100%; height: 100%; object-fit: cover;"
-                                 loading="lazy"
-                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                            <div style="display: none; width: 100%; height: 100%; background: #f5f5f5; align-items: center; justify-content: center; color: var(--secondary); font-size: 0.7rem;">
-                                Image not found
-                            </div>
-                            <div style="position: absolute; bottom: 2px; right: 2px; background: rgba(0,0,0,0.7); color: white; padding: 1px 4px; border-radius: 2px; font-size: 0.6rem;">
-                                ${imgIndex + 1}
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
 
     openImageLightbox(imageUrl, altText = '') {
         // Use the existing lightbox modal
@@ -1573,19 +1447,31 @@ function toggleFilters() {
     }
 }
 
-async function applyFilters() {
-    app.showButtonLoading('applyFiltersBtn', true);
-    app.updateFilters();
-    app.currentPage = 1;
-    await app.loadSurveyHistory(true);
-    app.showButtonLoading('applyFiltersBtn', false);
-}
 
 function clearFilters() {
-    document.getElementById('startDate').value = '';
-    document.getElementById('endDate').value = '';
-    document.getElementById('storeName').value = '';
-    app.filters = { startDate: '', endDate: '', storeName: '' };
+    // Clear search input
+    const storeSearchInput = document.getElementById('storeSearch');
+    if (storeSearchInput) {
+        storeSearchInput.value = '';
+    }
+    
+    // Reset date filter to default (Last 7 days)
+    const dateFilterText = document.getElementById('dateFilterText');
+    if (dateFilterText) {
+        dateFilterText.textContent = 'Last 7 days';
+    }
+    
+    // Clear custom date inputs
+    const customStartDate = document.getElementById('customStartDate');
+    const customEndDate = document.getElementById('customEndDate');
+    if (customStartDate) customStartDate.value = '';
+    if (customEndDate) customEndDate.value = '';
+    
+    // Apply default 7-day filter
+    app.applyDateFilter(7);
+    
+    // Clear search filter
+    app.filters.storeName = '';
     app.currentPage = 1;
     app.loadSurveyHistory(true);
 }

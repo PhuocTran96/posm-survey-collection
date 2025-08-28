@@ -158,11 +158,174 @@
             display: none;
         }
 
+        /* New Filter Layout */
+        .new-filters-container {
+            display: flex;
+            gap: clamp(12px, 3vw, 16px);
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .search-container {
+            flex: 1;
+            min-width: 250px;
+            position: relative;
+        }
+
+        .search-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            color: var(--secondary);
+            z-index: 1;
+            font-size: 16px;
+        }
+
+        .search-input-wrapper input {
+            width: 100%;
+            padding: clamp(10px, 2.5vw, 12px) clamp(12px, 3vw, 16px) clamp(10px, 2.5vw, 12px) clamp(40px, 8vw, 44px);
+            border: 2px solid var(--neutral-border);
+            border-radius: 8px;
+            font-size: clamp(0.9rem, 2vw, 1rem);
+            transition: all 0.3s ease;
+            background: white;
+            color: var(--neutral-text);
+        }
+
+        .search-input-wrapper input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+
+        .date-filter-container {
+            position: relative;
+        }
+
+        .date-filter-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: clamp(10px, 2.5vw, 12px) clamp(12px, 3vw, 16px);
+            border: 2px solid var(--neutral-border);
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            white-space: nowrap;
+            font-size: clamp(0.9rem, 2vw, 1rem);
+            color: var(--neutral-text);
+            transition: all 0.3s ease;
+        }
+
+        .date-filter-btn:hover {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+
+        .calendar-icon {
+            font-size: 16px;
+            color: var(--secondary);
+        }
+
+        .dropdown-arrow {
+            font-size: 12px;
+            color: var(--secondary);
+            transition: transform 0.3s ease;
+        }
+
+        .date-filter-btn.active .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .date-filter-dropdown {
+            position: absolute;
+            top: calc(100% + 4px);
+            right: 0;
+            background: white;
+            border: 2px solid var(--primary);
+            border-radius: 8px;
+            box-shadow: var(--card-shadow-lg);
+            min-width: 200px;
+            z-index: 1000;
+            overflow: hidden;
+        }
+
+        .date-filter-option {
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--neutral-border);
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+        }
+
+        .date-filter-option:hover {
+            background: var(--primary-light);
+            color: var(--primary);
+        }
+
+        .date-filter-option:last-of-type {
+            border-bottom: none;
+        }
+
+        .custom-date-inputs {
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            border-top: 1px solid var(--neutral-border);
+        }
+
+        .custom-date-inputs input {
+            padding: 8px 12px;
+            border: 1px solid var(--neutral-border);
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .apply-custom-date {
+            padding: 8px 16px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background 0.2s ease;
+        }
+
+        .apply-custom-date:hover {
+            background: var(--primary-hover);
+        }
+
+        .clear-filters-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: clamp(10px, 2.5vw, 12px) clamp(12px, 3vw, 16px);
+            background: var(--error);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: clamp(0.85rem, 2vw, 0.9rem);
+            font-weight: 500;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .clear-filters-btn:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+            box-shadow: var(--card-shadow);
+        }
+
         .filters-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: clamp(12px, 3vw, 20px);
-            align-items: end;
+            display: none; /* Hide old grid layout */
         }
 
         .filter-group label {
@@ -232,6 +395,23 @@
 
         .survey-table tbody tr:hover {
             background: var(--neutral);
+        }
+
+        /* Toggle button styles */
+        .toggle-details-btn {
+            background: none !important;
+            border: none !important;
+            cursor: pointer !important;
+            color: var(--secondary) !important;
+            font-size: 16px !important;
+            padding: 8px !important;
+            transition: all 0.2s ease !important;
+            border-radius: 4px !important;
+        }
+
+        .toggle-details-btn:hover {
+            background-color: var(--neutral) !important;
+            color: var(--primary) !important;
         }
 
         .status-badge {
@@ -425,6 +605,37 @@
                 gap: 12px;
             }
             
+            /* Mobile filter layout */
+            .new-filters-container {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+            
+            .search-container {
+                min-width: auto;
+            }
+            
+            .date-filter-container {
+                align-self: stretch;
+            }
+            
+            .date-filter-btn {
+                width: 100%;
+                justify-content: space-between;
+            }
+            
+            .date-filter-dropdown {
+                left: 0;
+                right: 0;
+                min-width: auto;
+            }
+            
+            .clear-filters-btn {
+                align-self: center;
+                min-width: 120px;
+            }
+            
             .filters-grid {
                 grid-template-columns: 1fr;
                 gap: 15px;
@@ -488,15 +699,10 @@
                 overflow: hidden;
                 box-shadow: var(--card-shadow);
                 transition: all 0.3s ease;
-                cursor: pointer;
                 position: relative;
                 min-height: 44px;
             }
 
-            .mobile-survey-card:active {
-                transform: scale(0.98);
-                box-shadow: var(--card-shadow);
-            }
 
             .mobile-survey-card.expanded {
                 border-color: var(--primary);
@@ -504,7 +710,7 @@
             }
 
             .mobile-card-header {
-                padding: 12px 40px 12px 12px;
+                padding: 12px 64px 12px 12px;
                 position: relative;
             }
 
@@ -574,20 +780,31 @@
             .mobile-expand-icon {
                 position: absolute;
                 top: 50%;
-                right: 16px;
+                right: 8px;
                 transform: translateY(-50%);
                 color: var(--secondary);
-                font-size: 14px;
+                font-size: 16px;
                 transition: all 0.3s ease;
-                pointer-events: none;
+                padding: 12px;
+                border-radius: 8px;
+                min-width: 44px;
+                min-height: 44px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
             }
 
-            .mobile-survey-card.expanded .mobile-expand-icon {
-                transform: translateY(-50%) rotate(180deg);
+            .mobile-expand-icon:hover {
+                background-color: var(--neutral);
                 color: var(--primary);
             }
 
-            .mobile-survey-card:active .mobile-expand-icon {
+            .mobile-expand-icon:active {
+                background-color: var(--primary-light);
+                transform: translateY(-50%) scale(0.95);
+            }
+
+            .mobile-survey-card.expanded .mobile-expand-icon {
                 color: var(--primary);
             }
 
@@ -739,16 +956,17 @@
             }
 
             .image-gallery {
-                grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)) !important;
-                gap: 6px !important;
+                grid-template-columns: repeat(auto-fit, minmax(50px, 1fr)) !important;
+                gap: 3px !important;
                 max-width: 100% !important;
             }
 
             .image-thumbnail {
-                min-height: 80px;
+                min-height: 50px;
+                height: 50px !important;
                 width: 100%;
                 box-sizing: border-box;
-                border-radius: 6px;
+                border-radius: 4px;
                 overflow: hidden;
                 position: relative;
                 cursor: pointer;
@@ -897,6 +1115,75 @@
             0% { background-color: #e0e0e0; }
             50% { background-color: #f0f0f0; }
             100% { background-color: #e0e0e0; }
+        }
+
+        /* Simplified Survey Responses List */
+        .survey-responses-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 16px 0;
+        }
+
+        .response-row {
+            display: grid;
+            grid-template-columns: 2fr 3fr 1fr;
+            gap: 16px;
+            padding: 12px;
+            background: white;
+            border: 1px solid var(--neutral-border);
+            border-radius: 6px;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+
+        .response-row:hover {
+            box-shadow: var(--card-shadow);
+            border-color: var(--primary-light);
+        }
+
+        .model-name {
+            font-weight: 600;
+            color: var(--neutral-text);
+            font-size: 0.9rem;
+        }
+
+        .posm-info {
+            font-size: 0.85rem;
+            color: var(--secondary);
+            line-height: 1.3;
+        }
+
+        .images-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 0.85rem;
+            cursor: pointer;
+            text-align: right;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .images-link:hover {
+            text-decoration: underline;
+            color: var(--primary-hover);
+        }
+
+        .no-images {
+            color: var(--secondary);
+            font-size: 0.8rem;
+            font-style: italic;
+            text-align: right;
+        }
+
+        .no-responses {
+            padding: 20px;
+            text-align: center;
+            color: var(--secondary);
+            font-style: italic;
+            background: white;
+            border: 1px solid var(--neutral-border);
+            border-radius: 8px;
         }
 
         /* Very small screens */
@@ -1059,6 +1346,26 @@
                 align-items: center;
                 justify-content: center;
             }
+
+            /* Mobile responsive for simplified survey responses */
+            .response-row {
+                grid-template-columns: 1fr;
+                gap: 8px;
+                padding: 10px;
+            }
+            
+            .images-link,
+            .no-images {
+                text-align: left;
+            }
+
+            .posm-info {
+                font-size: 0.8rem;
+            }
+
+            .model-name {
+                font-size: 0.85rem;
+            }
         }
         
         /* Lightbox Styles */
@@ -1205,33 +1512,36 @@
                 <span class="filter-toggle-icon" id="filterToggleIcon">▼</span>
             </div>
             <div class="filters-content" id="filtersContent">
-                <div class="filters-grid">
-                    <div class="filter-group">
-                        <label for="startDate">Start Date</label>
-                        <input type="date" id="startDate" name="startDate">
-                    </div>
-                    <div class="filter-group">
-                        <label for="endDate">End Date</label>
-                        <input type="date" id="endDate" name="endDate">
-                    </div>
-                    <div class="filter-group">
-                        <label for="storeName">Store Name</label>
-                        <div class="autocomplete-container">
-                            <input type="text" id="storeName" name="storeName" placeholder="Search by store name..." autocomplete="off">
-                            <div id="storeNameSuggestions" class="autocomplete-dropdown" style="display: none;"></div>
+                <div class="new-filters-container">
+                    <div class="search-container">
+                        <div class="search-input-wrapper">
+                            <span class="search-icon">🔍</span>
+                            <input type="text" id="storeSearch" name="storeSearch" placeholder="Search by store name..." autocomplete="off">
+                            <div id="storeSearchSuggestions" class="autocomplete-dropdown" style="display: none;"></div>
                         </div>
                     </div>
-                    <div class="filter-group">
-                        <label>&nbsp;</label>
-                        <div style="display: flex; gap: 10px;">
-                            <button type="button" id="applyFiltersBtn" onclick="applyFilters()" class="action-btn">
-                                <span class="btn-text">Apply Filters</span>
-                            </button>
-                            <button type="button" onclick="clearFilters()" class="action-btn secondary">
-                                <span class="btn-text">Clear</span>
-                            </button>
+                    <div class="date-filter-container">
+                        <button class="date-filter-btn" id="dateFilterBtn" onclick="app.toggleDateFilter()">
+                            <span class="calendar-icon">📅</span>
+                            <span class="date-filter-text" id="dateFilterText">Last 7 days</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </button>
+                        <div class="date-filter-dropdown" id="dateFilterDropdown" style="display: none;">
+                            <div class="date-filter-option" data-days="7" onclick="app.applyDateFilter(7)">Last 7 days</div>
+                            <div class="date-filter-option" data-days="30" onclick="app.applyDateFilter(30)">Last 30 days</div>
+                            <div class="date-filter-option" data-days="90" onclick="app.applyDateFilter(90)">Last 90 days</div>
+                            <div class="date-filter-option" onclick="app.showCustomDateInputs()">Custom range</div>
+                            <div class="custom-date-inputs" id="customDateInputs" style="display: none;">
+                                <input type="date" id="customStartDate" placeholder="Start date">
+                                <input type="date" id="customEndDate" placeholder="End date">
+                                <button class="apply-custom-date" onclick="app.applyCustomDateRange()">Apply</button>
+                            </div>
                         </div>
                     </div>
+                    <button class="clear-filters-btn" onclick="clearFilters()">
+                        <span>🗑️</span>
+                        Clear
+                    </button>
                 </div>
             </div>
         </div>
@@ -1259,6 +1569,7 @@
                         <th>Status</th>
                         <th>Models</th>
                         <th>Images</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody id="surveyTableBody">

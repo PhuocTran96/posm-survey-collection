@@ -124,6 +124,23 @@
                 </div>
             </div>
         </div>
+
+        <!-- Edit Survey Dialog -->
+        <div id="editSurveyDialog" class="modal-overlay" style="display: none;">
+            <div class="modal-content edit-modal">
+                <div class="modal-header">
+                    <h3>✏️ Chỉnh sửa khảo sát</h3>
+                    <button class="modal-close" onclick="surveyResultsApp.closeEditDialog()">&times;</button>
+                </div>
+                <div class="modal-body" id="editModalBody">
+                    <!-- Edit form will be dynamically loaded here -->
+                </div>
+                <div class="modal-footer">
+                    <button id="btnSaveEdit" class="btn btn-primary">💾 Lưu thay đổi</button>
+                    <button id="btnCancelEdit" class="btn btn-secondary" onclick="surveyResultsApp.closeEditDialog()">❌ Hủy</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>

@@ -17,26 +17,26 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
     cb(null, 'users-' + uniqueSuffix + path.extname(file.originalname));
-  }
+  },
 });
 
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
+    fileSize: 5 * 1024 * 1024, // 5MB limit
   },
   fileFilter: function (req, file, cb) {
     const allowedTypes = ['.csv', '.xlsx', '.xls'];
     const ext = path.extname(file.originalname).toLowerCase();
-    
+
     if (allowedTypes.includes(ext)) {
       cb(null, true);
     } else {
       cb(new Error('Only CSV and Excel files are allowed'));
     }
-  }
+  },
 });
 
 // All user management routes require admin authentication
@@ -56,14 +56,9 @@ router.delete('/bulk/delete', userController.bulkDeleteUsers);
 router.post('/:id/reset-password', userController.resetUserPassword);
 
 // CSV import/export
-router.post('/import/csv', 
-  upload.single('csvFile'), 
-  userController.importUsersFromCSV
-);
+router.post('/import/csv', upload.single('csvFile'), userController.importUsersFromCSV);
 
-router.get('/export/csv', 
-  userController.exportUsersToCSV
-);
+router.get('/export/csv', userController.exportUsersToCSV);
 
 // Error handling middleware for multer
 router.use((error, req, res, next) => {
@@ -71,18 +66,18 @@ router.use((error, req, res, next) => {
     if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
         success: false,
-        message: 'File size too large. Maximum size is 5MB.'
+        message: 'File size too large. Maximum size is 5MB.',
       });
     }
   }
-  
+
   if (error.message === 'Only CSV and Excel files are allowed') {
     return res.status(400).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
-  
+
   next(error);
 });
 

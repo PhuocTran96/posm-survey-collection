@@ -15,31 +15,27 @@ const getUsers = async (req, res) => {
 
     // Build filter object
     const filters = {};
-    
+
     if (req.query.role) {
       filters.role = req.query.role;
     }
-    
+
     if (req.query.isActive !== undefined) {
       filters.isActive = req.query.isActive === 'true';
     }
-    
+
     if (req.query.leader) {
       filters.leader = req.query.leader;
     }
-    
+
     if (req.query.search) {
       const searchRegex = new RegExp(req.query.search, 'i');
-      filters.$or = [
-        { userid: searchRegex },
-        { username: searchRegex },
-        { loginid: searchRegex }
-      ];
+      filters.$or = [{ userid: searchRegex }, { username: searchRegex }, { loginid: searchRegex }];
     }
 
     // Get total count for pagination
     const totalCount = await User.countDocuments(filters);
-    
+
     // Get users with pagination
     const users = await User.find(filters)
       .select('-password -refreshToken')
@@ -59,15 +55,14 @@ const getUsers = async (req, res) => {
         totalCount: totalCount,
         limit: limit,
         hasNextPage: page < totalPages,
-        hasPrevPage: page > 1
-      }
+        hasPrevPage: page > 1,
+      },
     });
-
   } catch (error) {
     console.error('Get users error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to retrieve users'
+      message: 'Failed to retrieve users',
     });
   }
 };
@@ -78,28 +73,27 @@ const getUsers = async (req, res) => {
 const getUserById = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const user = await User.findById(id)
       .select('-password -refreshToken')
       .populate('assignedStores', 'store_id store_name channel region province');
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: 'User not found',
       });
     }
 
     res.json({
       success: true,
-      data: user
+      data: user,
     });
-
   } catch (error) {
     console.error('Get user by ID error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to retrieve user'
+      message: 'Failed to retrieve user',
     });
   }
 };
@@ -109,21 +103,22 @@ const getUserById = async (req, res) => {
  */
 const createUser = async (req, res) => {
   try {
-    const { userid, username, loginid, password, role, leader, isActive, assignedStores } = req.body;
+    const { userid, username, loginid, password, role, leader, isActive, assignedStores } =
+      req.body;
     const currentUser = req.user;
 
     // Validation
     if (!userid || !username || !loginid || !password || !role) {
       return res.status(400).json({
         success: false,
-        message: 'All required fields must be provided'
+        message: 'All required fields must be provided',
       });
     }
 
     if (password.length < 6) {
       return res.status(400).json({
         success: false,
-        message: 'Password must be at least 6 characters long'
+        message: 'Password must be at least 6 characters long',
       });
     }
 
@@ -132,19 +127,23 @@ const createUser = async (req, res) => {
       $or: [
         { userid: userid.trim() },
         { username: username.trim() },
-        { loginid: { $regex: new RegExp(`^${loginid.trim()}$`, 'i') } }
-      ]
+        { loginid: { $regex: new RegExp(`^${loginid.trim()}$`, 'i') } },
+      ],
     });
 
     if (existingUser) {
-      const duplicateField = 
-        existingUser.userid === userid.trim() ? 'userid' :
-        existingUser.username === username.trim() ? 'username' :
-        existingUser.loginid.toLowerCase() === loginid.trim().toLowerCase() ? 'loginid' : 'loginid';
-        
+      const duplicateField =
+        existingUser.userid === userid.trim()
+          ? 'userid'
+          : existingUser.username === username.trim()
+            ? 'username'
+            : existingUser.loginid.toLowerCase() === loginid.trim().toLowerCase()
+              ? 'loginid'
+              : 'loginid';
+
       return res.status(400).json({
         success: false,
-        message: `User with this ${duplicateField} already exists`
+        message: `User with this ${duplicateField} already exists`,
       });
     }
 
@@ -152,7 +151,7 @@ const createUser = async (req, res) => {
     if (leader && !User.validateHierarchy(role, leader)) {
       return res.status(400).json({
         success: false,
-        message: `Invalid hierarchy: ${role} cannot report to ${leader}`
+        message: `Invalid hierarchy: ${role} cannot report to ${leader}`,
       });
     }
 
@@ -162,7 +161,7 @@ const createUser = async (req, res) => {
       if (!leaderUser) {
         return res.status(400).json({
           success: false,
-          message: 'Specified leader does not exist or is inactive'
+          message: 'Specified leader does not exist or is inactive',
         });
       }
     }
@@ -178,7 +177,7 @@ const createUser = async (req, res) => {
       isActive: isActive !== undefined ? isActive : true,
       assignedStores: assignedStores || [],
       createdBy: currentUser.username,
-      updatedBy: currentUser.username
+      updatedBy: currentUser.username,
     };
 
     const newUser = new User(userData);
@@ -196,15 +195,14 @@ const createUser = async (req, res) => {
         loginid: newUser.loginid,
         role: newUser.role,
         leader: newUser.leader,
-        isActive: newUser.isActive
-      }
+        isActive: newUser.isActive,
+      },
     });
-
   } catch (error) {
     console.error('Create user error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to create user'
+      message: 'Failed to create user',
     });
   }
 };
@@ -215,15 +213,16 @@ const createUser = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { userid, username, loginid, role, leader, isActive, assignedStores, password } = req.body;
+    const { userid, username, loginid, role, leader, isActive, assignedStores, password } =
+      req.body;
     const currentUser = req.user;
 
     const user = await User.findById(id);
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: 'User not found',
       });
     }
 
@@ -231,7 +230,7 @@ const updateUser = async (req, res) => {
     if (user.isSuperAdmin && !currentUser.isSuperAdmin) {
       return res.status(403).json({
         success: false,
-        message: 'Cannot modify super admin account'
+        message: 'Cannot modify super admin account',
       });
     }
 
@@ -241,7 +240,7 @@ const updateUser = async (req, res) => {
       if (existingUser) {
         return res.status(400).json({
           success: false,
-          message: 'User with this userid already exists'
+          message: 'User with this userid already exists',
         });
       }
       user.userid = userid.trim();
@@ -252,21 +251,21 @@ const updateUser = async (req, res) => {
       if (existingUser) {
         return res.status(400).json({
           success: false,
-          message: 'User with this username already exists'
+          message: 'User with this username already exists',
         });
       }
       user.username = username.trim();
     }
 
     if (loginid && loginid !== user.loginid) {
-      const existingUser = await User.findOne({ 
-        loginid: { $regex: new RegExp(`^${loginid.trim()}$`, 'i') }, 
-        _id: { $ne: id } 
+      const existingUser = await User.findOne({
+        loginid: { $regex: new RegExp(`^${loginid.trim()}$`, 'i') },
+        _id: { $ne: id },
       });
       if (existingUser) {
         return res.status(400).json({
           success: false,
-          message: 'User with this loginid already exists'
+          message: 'User with this loginid already exists',
         });
       }
       user.loginid = loginid.trim();
@@ -278,7 +277,7 @@ const updateUser = async (req, res) => {
       if (leader && !User.validateHierarchy(role, leader)) {
         return res.status(400).json({
           success: false,
-          message: `Invalid hierarchy: ${role} cannot report to ${leader}`
+          message: `Invalid hierarchy: ${role} cannot report to ${leader}`,
         });
       }
       user.role = role.trim();
@@ -290,16 +289,16 @@ const updateUser = async (req, res) => {
         if (!User.validateHierarchy(user.role, leader)) {
           return res.status(400).json({
             success: false,
-            message: `Invalid hierarchy: ${user.role} cannot report to ${leader}`
+            message: `Invalid hierarchy: ${user.role} cannot report to ${leader}`,
           });
         }
-        
+
         // Verify leader exists
         const leaderUser = await User.findOne({ username: leader.trim(), isActive: true });
         if (!leaderUser) {
           return res.status(400).json({
             success: false,
-            message: 'Specified leader does not exist or is inactive'
+            message: 'Specified leader does not exist or is inactive',
           });
         }
         user.leader = leader.trim();
@@ -313,7 +312,7 @@ const updateUser = async (req, res) => {
       if (user.isSuperAdmin && isActive === false) {
         return res.status(403).json({
           success: false,
-          message: 'Cannot deactivate super admin account'
+          message: 'Cannot deactivate super admin account',
         });
       }
       user.isActive = isActive;
@@ -327,7 +326,7 @@ const updateUser = async (req, res) => {
       if (password.length < 6) {
         return res.status(400).json({
           success: false,
-          message: 'Password must be at least 6 characters long'
+          message: 'Password must be at least 6 characters long',
         });
       }
       user.password = password.trim();
@@ -348,15 +347,14 @@ const updateUser = async (req, res) => {
         loginid: user.loginid,
         role: user.role,
         leader: user.leader,
-        isActive: user.isActive
-      }
+        isActive: user.isActive,
+      },
     });
-
   } catch (error) {
     console.error('Update user error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to update user'
+      message: 'Failed to update user',
     });
   }
 };
@@ -370,11 +368,11 @@ const deleteUser = async (req, res) => {
     const currentUser = req.user;
 
     const user = await User.findById(id);
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: 'User not found',
       });
     }
 
@@ -382,7 +380,7 @@ const deleteUser = async (req, res) => {
     if (user.isSuperAdmin) {
       return res.status(403).json({
         success: false,
-        message: 'Cannot delete super admin account'
+        message: 'Cannot delete super admin account',
       });
     }
 
@@ -390,7 +388,7 @@ const deleteUser = async (req, res) => {
     if (user._id.toString() === currentUser._id.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Cannot delete your own account'
+        message: 'Cannot delete your own account',
       });
     }
 
@@ -401,12 +399,12 @@ const deleteUser = async (req, res) => {
         success: false,
         message: `Cannot delete user with ${subordinates.length} active subordinate(s). Please reassign or deactivate subordinates first.`,
         data: {
-          subordinates: subordinates.map(sub => ({
+          subordinates: subordinates.map((sub) => ({
             userid: sub.userid,
             username: sub.username,
-            role: sub.role
-          }))
-        }
+            role: sub.role,
+          })),
+        },
       });
     }
 
@@ -416,14 +414,13 @@ const deleteUser = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'User deleted successfully'
+      message: 'User deleted successfully',
     });
-
   } catch (error) {
     console.error('Delete user error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to delete user'
+      message: 'Failed to delete user',
     });
   }
 };
@@ -439,25 +436,25 @@ const bulkDeleteUsers = async (req, res) => {
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Array of user IDs is required'
+        message: 'Array of user IDs is required',
       });
     }
 
     // Get users to delete
     const users = await User.find({ _id: { $in: ids } });
-    
+
     // Check for super admin or current user
-    const protectedUsers = users.filter(user => 
-      user.isSuperAdmin || user._id.toString() === currentUser._id.toString()
+    const protectedUsers = users.filter(
+      (user) => user.isSuperAdmin || user._id.toString() === currentUser._id.toString()
     );
-    
+
     if (protectedUsers.length > 0) {
       return res.status(403).json({
         success: false,
         message: 'Cannot delete super admin or your own account',
         data: {
-          protectedUsers: protectedUsers.map(u => u.username)
-        }
+          protectedUsers: protectedUsers.map((u) => u.username),
+        },
       });
     }
 
@@ -468,7 +465,7 @@ const bulkDeleteUsers = async (req, res) => {
       if (subordinates.length > 0) {
         usersWithSubordinates.push({
           username: user.username,
-          subordinateCount: subordinates.length
+          subordinateCount: subordinates.length,
         });
       }
     }
@@ -478,8 +475,8 @@ const bulkDeleteUsers = async (req, res) => {
         success: false,
         message: 'Some users have active subordinates',
         data: {
-          usersWithSubordinates
-        }
+          usersWithSubordinates,
+        },
       });
     }
 
@@ -492,15 +489,14 @@ const bulkDeleteUsers = async (req, res) => {
       success: true,
       message: `Successfully deleted ${deleteResult.deletedCount} user(s)`,
       data: {
-        deletedCount: deleteResult.deletedCount
-      }
+        deletedCount: deleteResult.deletedCount,
+      },
     });
-
   } catch (error) {
     console.error('Bulk delete users error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to delete users'
+      message: 'Failed to delete users',
     });
   }
 };
@@ -517,41 +513,40 @@ const resetUserPassword = async (req, res) => {
     if (!newPassword || newPassword.length < 6) {
       return res.status(400).json({
         success: false,
-        message: 'New password must be at least 6 characters long'
+        message: 'New password must be at least 6 characters long',
       });
     }
 
     const user = await User.findById(id);
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: 'User not found',
       });
     }
 
     // Update password
     user.password = newPassword;
     user.updatedBy = currentUser.username;
-    
+
     // Clear refresh tokens to force re-login
     user.refreshToken = null;
     user.refreshTokenExpiry = null;
-    
+
     await user.save();
 
     // Log password reset
 
     res.json({
       success: true,
-      message: 'Password reset successfully'
+      message: 'Password reset successfully',
     });
-
   } catch (error) {
     console.error('Reset password error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to reset password'
+      message: 'Failed to reset password',
     });
   }
 };
@@ -563,19 +558,19 @@ const importUsersFromCSV = async (req, res) => {
   try {
     const currentUser = req.user;
     console.log('🔄 User import request from:', currentUser?.username);
-    
+
     if (!req.file) {
       console.log('❌ No file uploaded');
       return res.status(400).json({
         success: false,
-        message: 'CSV file is required'
+        message: 'CSV file is required',
       });
     }
-    
+
     console.log('📁 Uploaded file:', {
       originalname: req.file.originalname,
       path: req.file.path,
-      size: req.file.size
+      size: req.file.size,
     });
 
     const results = [];
@@ -589,15 +584,15 @@ const importUsersFromCSV = async (req, res) => {
         .pipe(csv())
         .on('data', (data) => {
           lineNumber++;
-          
+
           // Clean BOM and other invisible characters from keys
           const cleanedData = {};
-          Object.keys(data).forEach(key => {
+          Object.keys(data).forEach((key) => {
             // Remove BOM (UTF-8 BOM: \uFEFF) and other whitespace from key
             const cleanKey = key.replace(/^\uFEFF/, '').trim();
             cleanedData[cleanKey] = data[key];
           });
-          
+
           results.push({ ...cleanedData, lineNumber });
         })
         .on('end', () => {
@@ -615,7 +610,7 @@ const importUsersFromCSV = async (req, res) => {
       created: 0,
       updated: 0,
       skipped: 0,
-      errors: 0
+      errors: 0,
     };
 
     // Process each user
@@ -626,7 +621,7 @@ const importUsersFromCSV = async (req, res) => {
           errors.push({
             line: userData.lineNumber,
             error: 'Missing required fields (userid, username, loginid, role)',
-            data: userData
+            data: userData,
           });
           stats.errors++;
           continue;
@@ -637,38 +632,53 @@ const importUsersFromCSV = async (req, res) => {
           $or: [
             { userid: userData.userid.trim() },
             { username: userData.username.trim() },
-            { loginid: { $regex: new RegExp(`^${userData.loginid.trim()}$`, 'i') } }
-          ]
+            { loginid: { $regex: new RegExp(`^${userData.loginid.trim()}$`, 'i') } },
+          ],
         });
 
         // Process assigned stores - convert store_id to ObjectIds
         let assignedStoreIds = [];
         // Handle different possible column names for assigned stores
-        const assignedStoresData = userData.assignedStores || userData['assignedStore:assignedStores'] || userData.assignedStore;
-        
+        const assignedStoresData =
+          userData.assignedStores ||
+          userData['assignedStore:assignedStores'] ||
+          userData.assignedStore;
+
         if (assignedStoresData) {
-          console.log('🏪 Processing assigned stores for user:', userData.userid, 'Raw data:', assignedStoresData);
-          
-          const storeIds = typeof assignedStoresData === 'string' ? 
-            assignedStoresData.split(';').map(s => s.trim()).filter(s => s) : 
-            assignedStoresData;
-          
+          console.log(
+            '🏪 Processing assigned stores for user:',
+            userData.userid,
+            'Raw data:',
+            assignedStoresData
+          );
+
+          const storeIds =
+            typeof assignedStoresData === 'string'
+              ? assignedStoresData
+                  .split(';')
+                  .map((s) => s.trim())
+                  .filter((s) => s)
+              : assignedStoresData;
+
           console.log('🏪 Parsed store IDs:', storeIds);
-          
+
           if (storeIds.length > 0) {
             // Find stores by store_id and get their ObjectIds
-            const foundStores = await Store.find({ 
-              store_id: { $in: storeIds } 
+            const foundStores = await Store.find({
+              store_id: { $in: storeIds },
             }).select('_id store_id');
-            
-            console.log('🔍 Found stores in database:', foundStores.map(s => s.store_id));
-            
-            assignedStoreIds = foundStores.map(store => store._id);
+
+            console.log(
+              '🔍 Found stores in database:',
+              foundStores.map((s) => s.store_id)
+            );
+
+            assignedStoreIds = foundStores.map((store) => store._id);
             console.log('✅ Assigned store ObjectIds:', assignedStoreIds);
-            
+
             // Log stores that were not found
-            const foundStoreIds = foundStores.map(s => s.store_id);
-            const notFoundStores = storeIds.filter(id => !foundStoreIds.includes(id));
+            const foundStoreIds = foundStores.map((s) => s.store_id);
+            const notFoundStores = storeIds.filter((id) => !foundStoreIds.includes(id));
             if (notFoundStores.length > 0) {
               console.log('⚠️ Store IDs not found in database:', notFoundStores);
             }
@@ -686,22 +696,23 @@ const importUsersFromCSV = async (req, res) => {
           existingUser.leader = userData.leader?.trim() || null;
           existingUser.assignedStores = assignedStoreIds;
           existingUser.updatedBy = currentUser.username;
-          
+
           // Only update password if provided and not empty
           if (userData.password && userData.password.trim()) {
             existingUser.password = userData.password.trim();
           }
-          
+
           // Handle isActive field
           if (userData.isActive !== undefined && userData.isActive !== '') {
             const isActiveValue = userData.isActive;
             if (typeof isActiveValue === 'string') {
-              existingUser.isActive = isActiveValue.toLowerCase() === 'true' || isActiveValue === '1';
+              existingUser.isActive =
+                isActiveValue.toLowerCase() === 'true' || isActiveValue === '1';
             } else {
               existingUser.isActive = Boolean(isActiveValue);
             }
           }
-          
+
           await existingUser.save();
           stats.updated++;
         } else {
@@ -710,12 +721,12 @@ const importUsersFromCSV = async (req, res) => {
             errors.push({
               line: userData.lineNumber,
               error: 'Password is required for new users',
-              data: userData
+              data: userData,
             });
             stats.errors++;
             continue;
           }
-          
+
           const cleanUserData = {
             userid: userData.userid.trim(),
             username: userData.username.trim(),
@@ -725,31 +736,31 @@ const importUsersFromCSV = async (req, res) => {
             leader: userData.leader?.trim() || null,
             assignedStores: assignedStoreIds,
             createdBy: currentUser.username,
-            updatedBy: currentUser.username
+            updatedBy: currentUser.username,
           };
-          
+
           // Handle isActive field for new users
           if (userData.isActive !== undefined && userData.isActive !== '') {
             const isActiveValue = userData.isActive;
             if (typeof isActiveValue === 'string') {
-              cleanUserData.isActive = isActiveValue.toLowerCase() === 'true' || isActiveValue === '1';
+              cleanUserData.isActive =
+                isActiveValue.toLowerCase() === 'true' || isActiveValue === '1';
             } else {
               cleanUserData.isActive = Boolean(isActiveValue);
             }
           } else {
             cleanUserData.isActive = true; // Default to active for new users
           }
-          
+
           const newUser = new User(cleanUserData);
           await newUser.save();
           stats.created++;
         }
-
       } catch (error) {
         errors.push({
           line: userData.lineNumber,
           error: error.message,
-          data: userData
+          data: userData,
         });
         stats.errors++;
       }
@@ -765,21 +776,20 @@ const importUsersFromCSV = async (req, res) => {
       message: 'CSV import completed',
       data: {
         stats,
-        errors: errors.slice(0, 10) // Limit errors in response
-      }
+        errors: errors.slice(0, 10), // Limit errors in response
+      },
     });
-
   } catch (error) {
     console.error('CSV import error:', error);
-    
+
     // Clean up uploaded file
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
-    
+
     res.status(500).json({
       success: false,
-      message: 'Failed to import CSV'
+      message: 'Failed to import CSV',
     });
   }
 };
@@ -790,7 +800,7 @@ const importUsersFromCSV = async (req, res) => {
 const exportUsersToCSV = async (req, res) => {
   try {
     const currentUser = req.user;
-    
+
     // Get all users (excluding passwords) with populated store details
     const users = await User.find({})
       .select('-password -refreshToken -refreshTokenExpiry')
@@ -799,21 +809,22 @@ const exportUsersToCSV = async (req, res) => {
 
     // Create workbook
     const workbook = XLSX.utils.book_new();
-    
+
     // Prepare data for export
-    const exportData = users.map(user => ({
+    const exportData = users.map((user) => ({
       userid: user.userid,
       username: user.username,
       loginid: user.loginid,
       role: user.role,
       leader: user.leader || '',
-      assignedStores: Array.isArray(user.assignedStores) ? 
-        user.assignedStores.map(store => store.store_id || store).join(';') : '',
+      assignedStores: Array.isArray(user.assignedStores)
+        ? user.assignedStores.map((store) => store.store_id || store).join(';')
+        : '',
       isActive: user.isActive,
       lastLogin: user.lastLogin ? user.lastLogin.toISOString() : '',
       createdAt: user.createdAt ? user.createdAt.toISOString() : '',
       createdBy: user.createdBy || '',
-      updatedBy: user.updatedBy || ''
+      updatedBy: user.updatedBy || '',
     }));
 
     // Create worksheet
@@ -827,18 +838,20 @@ const exportUsersToCSV = async (req, res) => {
     // Log export activity
 
     // Set response headers
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
     // Send file
     const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
     res.send(buffer);
-
   } catch (error) {
     console.error('Export users error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to export users'
+      message: 'Failed to export users',
     });
   }
 };
@@ -854,33 +867,32 @@ const getUserStats = async (req, res) => {
           _id: null,
           totalUsers: { $sum: 1 },
           activeUsers: { $sum: { $cond: ['$isActive', 1, 0] } },
-          inactiveUsers: { $sum: { $cond: ['$isActive', 0, 1] } }
-        }
-      }
+          inactiveUsers: { $sum: { $cond: ['$isActive', 0, 1] } },
+        },
+      },
     ]);
 
     const roleStats = await User.aggregate([
       {
         $group: {
           _id: '$role',
-          count: { $sum: 1 }
-        }
-      }
+          count: { $sum: 1 },
+        },
+      },
     ]);
 
     res.json({
       success: true,
       data: {
         overview: stats[0] || { totalUsers: 0, activeUsers: 0, inactiveUsers: 0 },
-        roleDistribution: roleStats
-      }
+        roleDistribution: roleStats,
+      },
     });
-
   } catch (error) {
     console.error('Get user stats error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get user statistics'
+      message: 'Failed to get user statistics',
     });
   }
 };
@@ -895,5 +907,5 @@ module.exports = {
   resetUserPassword,
   importUsersFromCSV,
   exportUsersToCSV,
-  getUserStats
+  getUserStats,
 };

@@ -4,24 +4,26 @@ const { config } = require('../config');
 const uploadFile = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'No file uploaded' 
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded',
       });
     }
-    
+
     const file = req.file;
     const s3Key = `uploads/${Date.now()}_${file.originalname}`;
     let fileBuffer = file.buffer;
-    
-    console.log(`Processing upload: ${file.originalname}, type: ${file.mimetype}, size: ${file.size}`);
-    
+
+    console.log(
+      `Processing upload: ${file.originalname}, type: ${file.mimetype}, size: ${file.size}`
+    );
+
     if (['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
       console.log('Resizing image...');
       try {
         fileBuffer = await reduceImageSize(
-          file.buffer, 
-          config.upload.maxImageWidth, 
+          file.buffer,
+          config.upload.maxImageWidth,
           config.upload.imageQuality
         );
         console.log(`Image resized from ${file.size} to ${fileBuffer.length} bytes`);
@@ -30,28 +32,30 @@ const uploadFile = async (req, res) => {
         throw new Error(`Image processing failed: ${resizeError.message}`);
       }
     }
-    
+
     const params = {
       Bucket: config.aws.s3Bucket,
       Key: s3Key,
       Body: fileBuffer,
-      ContentType: file.mimetype
+      ContentType: file.mimetype,
     };
-    
-    console.log(`Uploading to S3: bucket=${params.Bucket}, key=${params.Key}, size=${fileBuffer.length}`);
-    
+
+    console.log(
+      `Uploading to S3: bucket=${params.Bucket}, key=${params.Key}, size=${fileBuffer.length}`
+    );
+
     const uploadResult = await s3.upload(params).promise();
     console.log('S3 upload successful:', uploadResult.Location);
-    
+
     const s3Url = `https://${config.aws.s3Bucket}.s3-${config.aws.region}.amazonaws.com/${s3Key}`;
-    
-    res.json({ 
-      success: true, 
-      url: s3Url 
+
+    res.json({
+      success: true,
+      url: s3Url,
     });
   } catch (error) {
     console.error('Error uploading file to S3:', error);
-    
+
     // Provide more specific error messages
     let errorMessage = 'Error uploading file to S3';
     if (error.code === 'AccessDenied') {
@@ -65,15 +69,15 @@ const uploadFile = async (req, res) => {
     } else if (error.message) {
       errorMessage = error.message;
     }
-    
-    res.status(500).json({ 
-      success: false, 
+
+    res.status(500).json({
+      success: false,
       message: errorMessage,
-      error_code: error.code || 'UNKNOWN_ERROR'
+      error_code: error.code || 'UNKNOWN_ERROR',
     });
   }
 };
 
 module.exports = {
-  uploadFile
+  uploadFile,
 };

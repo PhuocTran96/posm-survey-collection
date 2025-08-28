@@ -8,20 +8,20 @@ const { config, validateConfig } = require('./src/config');
 const { connectDB, setupDatabaseEvents } = require('./src/config/database');
 const routes = require('./src/routes');
 const { errorHandler, notFoundHandler } = require('./src/middleware/errorHandler');
-const { protectSurveyPage, protectAdminPage, redirectIfAuthenticated } = require('./src/middleware/routeAuth');
+const {
+  protectSurveyPage,
+  protectAdminPage,
+  redirectIfAuthenticated,
+} = require('./src/middleware/routeAuth');
 const dataInitializer = require('./src/services/dataInitializer');
 
 validateConfig();
 
 // Ensure upload directories exist
 function ensureUploadDirectories() {
-  const uploadDirs = [
-    'uploads/',
-    'uploads/csv/',
-    'uploads/temp/'
-  ];
-  
-  uploadDirs.forEach(dir => {
+  const uploadDirs = ['uploads/', 'uploads/csv/', 'uploads/temp/'];
+
+  uploadDirs.forEach((dir) => {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
       console.log(`📁 Created upload directory: ${dir}`);
@@ -42,15 +42,13 @@ app.use(express.urlencoded({ extended: true, limit: config.upload.maxFileSize })
 app.get('/debug/users/count', async (req, res) => {
   try {
     const User = require('./src/models/User');
-    
+
     const totalUsers = await User.countDocuments();
     const activeUsers = await User.countDocuments({ isActive: true });
-    const usersByRole = await User.aggregate([
-      { $group: { _id: '$role', count: { $sum: 1 } } }
-    ]);
+    const usersByRole = await User.aggregate([{ $group: { _id: '$role', count: { $sum: 1 } } }]);
     const adminUsers = await User.countDocuments({ role: 'admin' });
     const superAdmins = await User.countDocuments({ isSuperAdmin: true });
-    
+
     res.json({
       total: totalUsers,
       active: activeUsers,
@@ -58,12 +56,12 @@ app.get('/debug/users/count', async (req, res) => {
       byRole: usersByRole,
       admins: adminUsers,
       superAdmins: superAdmins,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to count users',
-      message: error.message 
+      message: error.message,
     });
   }
 });
@@ -72,14 +70,14 @@ app.get('/debug/users/count', async (req, res) => {
 app.get('/debug/stores/ids', async (req, res) => {
   try {
     const Store = require('./src/models/Store');
-    
+
     const stores = await Store.find({}).select('store_id store_name').limit(10);
     const totalStores = await Store.countDocuments();
-    
+
     res.json({
       total: totalStores,
       sampleStores: stores,
-      storeIds: stores.map(s => s.store_id)
+      storeIds: stores.map((s) => s.store_id),
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -90,21 +88,21 @@ app.get('/debug/stores/ids', async (req, res) => {
 app.get('/debug/users/list', async (req, res) => {
   try {
     const User = require('./src/models/User');
-    
+
     const sampleUsers = await User.find({})
       .select('userid username loginid role isActive leader')
       .limit(10)
       .sort({ createdAt: -1 });
-    
+
     res.json({
       sampleUsers,
       count: sampleUsers.length,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to list users',
-      message: error.message 
+      message: error.message,
     });
   }
 });
@@ -113,20 +111,20 @@ app.get('/debug/users/list', async (req, res) => {
 app.get('/debug/users/admins', async (req, res) => {
   try {
     const User = require('./src/models/User');
-    
+
     const admins = await User.find({ $or: [{ role: 'admin' }, { role: 'Admin' }] })
       .select('userid username loginid role isActive isSuperAdmin')
       .sort({ createdAt: -1 });
-    
+
     res.json({
       admins,
       count: admins.length,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to list admins',
-      message: error.message 
+      message: error.message,
     });
   }
 });
@@ -143,7 +141,7 @@ app.get('/admin-login.html', redirectIfAuthenticated('/admin'), (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin-login.html'));
 });
 
-// Protected HTML routes  
+// Protected HTML routes
 app.get('/', protectSurveyPage, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -181,9 +179,11 @@ app.get('/store-management.html', protectAdminPage, (req, res) => {
 });
 
 // Static files (CSS, JS, images) - these should be served last
-app.use(express.static('public', {
-  index: false // Prevent serving index.html automatically
-}));
+app.use(
+  express.static('public', {
+    index: false, // Prevent serving index.html automatically
+  })
+);
 
 app.use(errorHandler);
 app.use('*', notFoundHandler);
@@ -201,20 +201,19 @@ const startServer = async () => {
   try {
     const db = await connectDB();
     setupDatabaseEvents(db.connection);
-    
+
     await dataInitializer.initializeData();
-    
+
     const server = app.listen(config.server.port, () => {
       console.log(`🚀 POSM Survey Server running on port ${config.server.port}`);
       console.log(`📊 Environment: ${config.server.nodeEnv}`);
       console.log(`🌐 Survey URL: http://localhost:${config.server.port}`);
       console.log(`⚙️  Admin URL: http://localhost:${config.server.port}/admin`);
     });
-    
+
     server.on('error', (error) => {
       console.error('Server error:', error);
     });
-    
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);

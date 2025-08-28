@@ -15,51 +15,45 @@ const getDisplays = async (req, res) => {
 
     // Build filter object
     const filters = {};
-    
+
     if (req.query.store_id) {
       const searchRegex = new RegExp(req.query.store_id, 'i');
       filters.store_id = searchRegex;
     }
-    
+
     if (req.query.model) {
       const searchRegex = new RegExp(req.query.model, 'i');
       filters.model = searchRegex;
     }
-    
+
     if (req.query.is_displayed !== undefined) {
       filters.is_displayed = req.query.is_displayed === 'true';
     }
-    
+
     if (req.query.search) {
       const searchRegex = new RegExp(req.query.search, 'i');
-      filters.$or = [
-        { store_id: searchRegex },
-        { model: searchRegex }
-      ];
+      filters.$or = [{ store_id: searchRegex }, { model: searchRegex }];
     }
 
     // Get total count for pagination
     const totalCount = await Display.countDocuments(filters);
-    
+
     // Get displays with pagination
-    const displays = await Display.find(filters)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    const displays = await Display.find(filters).sort({ createdAt: -1 }).skip(skip).limit(limit);
 
     // Join with stores collection to get store names
     // Both collections store store_id as strings, so no conversion needed
-    const displayIds = displays.map(d => d.store_id);
+    const displayIds = displays.map((d) => d.store_id);
     const stores = await Store.find({ store_id: { $in: displayIds } });
-    
+
     // Create a map for quick lookup: store_id -> store_name
     const storeMap = {};
-    stores.forEach(store => {
+    stores.forEach((store) => {
       storeMap[store.store_id] = store.store_name;
     });
-    
+
     // Add store_name to each display
-    const displaysWithStoreName = displays.map(display => {
+    const displaysWithStoreName = displays.map((display) => {
       const displayObj = display.toObject();
       displayObj.store_name = storeMap[display.store_id] || null;
       return displayObj;
@@ -76,15 +70,14 @@ const getDisplays = async (req, res) => {
         totalCount: totalCount,
         limit: limit,
         hasNextPage: page < totalPages,
-        hasPrevPage: page > 1
-      }
+        hasPrevPage: page > 1,
+      },
     });
-
   } catch (error) {
     console.error('Get displays error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to retrieve display records'
+      message: 'Failed to retrieve display records',
     });
   }
 };
@@ -95,26 +88,25 @@ const getDisplays = async (req, res) => {
 const getDisplayById = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const display = await Display.findById(id);
-    
+
     if (!display) {
       return res.status(404).json({
         success: false,
-        message: 'Display record not found'
+        message: 'Display record not found',
       });
     }
 
     res.json({
       success: true,
-      data: display
+      data: display,
     });
-
   } catch (error) {
     console.error('Get display by ID error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to retrieve display record'
+      message: 'Failed to retrieve display record',
     });
   }
 };
@@ -131,20 +123,20 @@ const createDisplay = async (req, res) => {
     if (!store_id || !model || is_displayed === undefined) {
       return res.status(400).json({
         success: false,
-        message: 'Store ID, model, and display status are required'
+        message: 'Store ID, model, and display status are required',
       });
     }
 
     // Check for duplicate store_id + model combination
     const existingDisplay = await Display.findOne({
       store_id: store_id.trim(),
-      model: model.trim()
+      model: model.trim(),
     });
 
     if (existingDisplay) {
       return res.status(400).json({
         success: false,
-        message: `Display record for store ${store_id} and model ${model} already exists`
+        message: `Display record for store ${store_id} and model ${model} already exists`,
       });
     }
 
@@ -154,7 +146,7 @@ const createDisplay = async (req, res) => {
       model: model.trim(),
       is_displayed: Boolean(is_displayed),
       createdBy: currentUser?.username || 'system',
-      updatedBy: currentUser?.username || 'system'
+      updatedBy: currentUser?.username || 'system',
     };
 
     const newDisplay = new Display(displayData);
@@ -163,14 +155,13 @@ const createDisplay = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Display record created successfully',
-      data: newDisplay
+      data: newDisplay,
     });
-
   } catch (error) {
     console.error('Create display error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to create display record'
+      message: 'Failed to create display record',
     });
   }
 };
@@ -185,11 +176,11 @@ const updateDisplay = async (req, res) => {
     const currentUser = req.user;
 
     const display = await Display.findById(id);
-    
+
     if (!display) {
       return res.status(404).json({
         success: false,
-        message: 'Display record not found'
+        message: 'Display record not found',
       });
     }
 
@@ -197,17 +188,17 @@ const updateDisplay = async (req, res) => {
     if ((store_id && store_id !== display.store_id) || (model && model !== display.model)) {
       const checkStoreId = store_id || display.store_id;
       const checkModel = model || display.model;
-      
+
       const existingDisplay = await Display.findOne({
         store_id: checkStoreId.trim(),
         model: checkModel.trim(),
-        _id: { $ne: id }
+        _id: { $ne: id },
       });
-      
+
       if (existingDisplay) {
         return res.status(400).json({
           success: false,
-          message: `Display record for store ${checkStoreId} and model ${checkModel} already exists`
+          message: `Display record for store ${checkStoreId} and model ${checkModel} already exists`,
         });
       }
     }
@@ -216,11 +207,11 @@ const updateDisplay = async (req, res) => {
     if (store_id !== undefined) {
       display.store_id = store_id.trim();
     }
-    
+
     if (model !== undefined) {
       display.model = model.trim();
     }
-    
+
     if (is_displayed !== undefined) {
       display.is_displayed = Boolean(is_displayed);
     }
@@ -231,14 +222,13 @@ const updateDisplay = async (req, res) => {
     res.json({
       success: true,
       message: 'Display record updated successfully',
-      data: display
+      data: display,
     });
-
   } catch (error) {
     console.error('Update display error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to update display record'
+      message: 'Failed to update display record',
     });
   }
 };
@@ -251,11 +241,11 @@ const deleteDisplay = async (req, res) => {
     const { id } = req.params;
 
     const display = await Display.findById(id);
-    
+
     if (!display) {
       return res.status(404).json({
         success: false,
-        message: 'Display record not found'
+        message: 'Display record not found',
       });
     }
 
@@ -263,14 +253,13 @@ const deleteDisplay = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Display record deleted successfully'
+      message: 'Display record deleted successfully',
     });
-
   } catch (error) {
     console.error('Delete display error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to delete display record'
+      message: 'Failed to delete display record',
     });
   }
 };
@@ -285,7 +274,7 @@ const bulkDeleteDisplays = async (req, res) => {
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Array of display record IDs is required'
+        message: 'Array of display record IDs is required',
       });
     }
 
@@ -296,15 +285,14 @@ const bulkDeleteDisplays = async (req, res) => {
       success: true,
       message: `Successfully deleted ${deleteResult.deletedCount} display record(s)`,
       data: {
-        deletedCount: deleteResult.deletedCount
-      }
+        deletedCount: deleteResult.deletedCount,
+      },
     });
-
   } catch (error) {
     console.error('Bulk delete displays error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to delete display records'
+      message: 'Failed to delete display records',
     });
   }
 };
@@ -315,11 +303,11 @@ const bulkDeleteDisplays = async (req, res) => {
 const importDisplaysFromCSV = async (req, res) => {
   try {
     const currentUser = req.user;
-    
+
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: 'CSV file is required'
+        message: 'CSV file is required',
       });
     }
 
@@ -344,7 +332,7 @@ const importDisplaysFromCSV = async (req, res) => {
       created: 0,
       updated: 0,
       skipped: 0,
-      errors: 0
+      errors: 0,
     };
 
     // Process each display record
@@ -355,7 +343,7 @@ const importDisplaysFromCSV = async (req, res) => {
           errors.push({
             line: displayData.lineNumber,
             error: 'Missing required fields (store_id, model, is_displayed)',
-            data: displayData
+            data: displayData,
           });
           stats.errors++;
           continue;
@@ -364,15 +352,18 @@ const importDisplaysFromCSV = async (req, res) => {
         // Check if display record exists
         const existingDisplay = await Display.findOne({
           store_id: displayData.store_id.trim(),
-          model: displayData.model.trim()
+          model: displayData.model.trim(),
         });
 
         const cleanDisplayData = {
           store_id: displayData.store_id.trim(),
           model: displayData.model.trim(),
-          is_displayed: displayData.is_displayed === '1' || displayData.is_displayed === 'true' || displayData.is_displayed === true,
+          is_displayed:
+            displayData.is_displayed === '1' ||
+            displayData.is_displayed === 'true' ||
+            displayData.is_displayed === true,
           createdBy: currentUser?.username || 'system',
-          updatedBy: currentUser?.username || 'system'
+          updatedBy: currentUser?.username || 'system',
         };
 
         if (existingDisplay) {
@@ -386,12 +377,11 @@ const importDisplaysFromCSV = async (req, res) => {
           await newDisplay.save();
           stats.created++;
         }
-
       } catch (error) {
         errors.push({
           line: displayData.lineNumber,
           error: error.message,
-          data: displayData
+          data: displayData,
         });
         stats.errors++;
       }
@@ -405,21 +395,20 @@ const importDisplaysFromCSV = async (req, res) => {
       message: 'CSV import completed',
       data: {
         stats,
-        errors: errors.slice(0, 10) // Limit errors in response
-      }
+        errors: errors.slice(0, 10), // Limit errors in response
+      },
     });
-
   } catch (error) {
     console.error('CSV import error:', error);
-    
+
     // Clean up uploaded file
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
-    
+
     res.status(500).json({
       success: false,
-      message: 'Failed to import CSV'
+      message: 'Failed to import CSV',
     });
   }
 };
@@ -430,21 +419,20 @@ const importDisplaysFromCSV = async (req, res) => {
 const exportDisplaysToCSV = async (req, res) => {
   try {
     // Get all display records
-    const displays = await Display.find({})
-      .sort({ store_id: 1, model: 1 });
+    const displays = await Display.find({}).sort({ store_id: 1, model: 1 });
 
     // Create workbook
     const workbook = XLSX.utils.book_new();
-    
+
     // Prepare data for export
-    const exportData = displays.map(display => ({
+    const exportData = displays.map((display) => ({
       store_id: display.store_id,
       model: display.model,
       is_displayed: display.is_displayed ? 1 : 0,
       createdAt: display.createdAt.toISOString(),
       updatedAt: display.updatedAt.toISOString(),
       createdBy: display.createdBy,
-      updatedBy: display.updatedBy
+      updatedBy: display.updatedBy,
     }));
 
     // Create worksheet
@@ -456,18 +444,20 @@ const exportDisplaysToCSV = async (req, res) => {
     const filename = `displays-export-${timestamp}.xlsx`;
 
     // Set response headers
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
     // Send file
     const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
     res.send(buffer);
-
   } catch (error) {
     console.error('Export displays error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to export display records'
+      message: 'Failed to export display records',
     });
   }
 };
@@ -483,9 +473,9 @@ const getDisplayStats = async (req, res) => {
           _id: null,
           totalRecords: { $sum: 1 },
           displayedCount: { $sum: { $cond: ['$is_displayed', 1, 0] } },
-          notDisplayedCount: { $sum: { $cond: ['$is_displayed', 0, 1] } }
-        }
-      }
+          notDisplayedCount: { $sum: { $cond: ['$is_displayed', 0, 1] } },
+        },
+      },
     ]);
 
     const modelStats = await Display.aggregate([
@@ -493,12 +483,12 @@ const getDisplayStats = async (req, res) => {
         $group: {
           _id: '$model',
           count: { $sum: 1 },
-          displayed: { $sum: { $cond: ['$is_displayed', 1, 0] } }
-        }
+          displayed: { $sum: { $cond: ['$is_displayed', 1, 0] } },
+        },
       },
       {
-        $sort: { count: -1 }
-      }
+        $sort: { count: -1 },
+      },
     ]);
 
     const storeStats = await Display.aggregate([
@@ -506,16 +496,16 @@ const getDisplayStats = async (req, res) => {
         $group: {
           _id: '$store_id',
           modelCount: { $sum: 1 },
-          displayedCount: { $sum: { $cond: ['$is_displayed', 1, 0] } }
-        }
+          displayedCount: { $sum: { $cond: ['$is_displayed', 1, 0] } },
+        },
       },
       {
         $group: {
           _id: null,
           totalStores: { $sum: 1 },
-          avgModelsPerStore: { $avg: '$modelCount' }
-        }
-      }
+          avgModelsPerStore: { $avg: '$modelCount' },
+        },
+      },
     ]);
 
     res.json({
@@ -523,15 +513,14 @@ const getDisplayStats = async (req, res) => {
       data: {
         overview: stats[0] || { totalRecords: 0, displayedCount: 0, notDisplayedCount: 0 },
         modelDistribution: modelStats,
-        storeStats: storeStats[0] || { totalStores: 0, avgModelsPerStore: 0 }
-      }
+        storeStats: storeStats[0] || { totalStores: 0, avgModelsPerStore: 0 },
+      },
     });
-
   } catch (error) {
     console.error('Get display stats error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get display statistics'
+      message: 'Failed to get display statistics',
     });
   }
 };
@@ -545,5 +534,5 @@ module.exports = {
   bulkDeleteDisplays,
   importDisplaysFromCSV,
   exportDisplaysToCSV,
-  getDisplayStats
+  getDisplayStats,
 };

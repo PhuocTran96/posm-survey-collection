@@ -4,7 +4,7 @@ const { verifyToken } = require('../middleware/auth');
 const {
   getSurveyHistory,
   getSurveyDetail,
-  getSurveyStats
+  getSurveyStats,
 } = require('../controllers/surveyHistoryController');
 
 // All routes require authentication

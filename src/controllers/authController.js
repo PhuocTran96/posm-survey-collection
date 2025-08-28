@@ -7,51 +7,49 @@ const { generateTokens, getClientInfo } = require('../middleware/auth');
 const login = async (req, res) => {
   try {
     const { loginid, password } = req.body;
-    
+
     if (!loginid || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Login ID and password are required'
+        message: 'Login ID and password are required',
       });
     }
 
     // Find user by loginid (case-insensitive)
-    const user = await User.findOne({ 
-      loginid: { $regex: new RegExp(`^${loginid.trim()}$`, 'i') } 
+    const user = await User.findOne({
+      loginid: { $regex: new RegExp(`^${loginid.trim()}$`, 'i') },
     });
-    
+
     if (!user) {
       // Log failed login attempt
-      
+
       return res.status(401).json({
         success: false,
-        message: 'Invalid login credentials'
+        message: 'Invalid login credentials',
       });
     }
 
     // Check if account is active
     if (!user.isActive) {
-      
       return res.status(401).json({
         success: false,
-        message: 'Account is deactivated'
+        message: 'Account is deactivated',
       });
     }
 
     // Verify password
     const isPasswordValid = await user.comparePassword(password);
-    
+
     if (!isPasswordValid) {
-      
       return res.status(401).json({
         success: false,
-        message: 'Invalid login credentials'
+        message: 'Invalid login credentials',
       });
     }
 
     // Generate tokens
     const tokens = generateTokens(user);
-    
+
     // Update user's last login and refresh token
     user.lastLogin = new Date();
     user.refreshToken = tokens.refreshToken;
@@ -81,16 +79,15 @@ const login = async (req, res) => {
           role: user.role,
           leader: user.leader,
           lastLogin: user.lastLogin,
-          assignedStores: assignedStores
-        }
-      }
+          assignedStores: assignedStores,
+        },
+      },
     });
-
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({
       success: false,
-      message: 'Login failed due to server error'
+      message: 'Login failed due to server error',
     });
   }
 };
@@ -101,50 +98,47 @@ const login = async (req, res) => {
 const adminLogin = async (req, res) => {
   try {
     const { loginid, password } = req.body;
-    
+
     if (!loginid || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Login ID and password are required'
+        message: 'Login ID and password are required',
       });
     }
 
     // Find user by loginid (case-insensitive)
-    const user = await User.findOne({ 
-      loginid: { $regex: new RegExp(`^${loginid.trim()}$`, 'i') } 
+    const user = await User.findOne({
+      loginid: { $regex: new RegExp(`^${loginid.trim()}$`, 'i') },
     });
-    
+
     if (!user || user.role !== 'admin') {
-      
       return res.status(401).json({
         success: false,
-        message: 'Invalid admin credentials'
+        message: 'Invalid admin credentials',
       });
     }
 
     // Check if account is active
     if (!user.isActive) {
-      
       return res.status(401).json({
         success: false,
-        message: 'Account is deactivated'
+        message: 'Account is deactivated',
       });
     }
 
     // Verify password
     const isPasswordValid = await user.comparePassword(password);
-    
+
     if (!isPasswordValid) {
-      
       return res.status(401).json({
         success: false,
-        message: 'Invalid admin credentials'
+        message: 'Invalid admin credentials',
       });
     }
 
     // Generate tokens
     const tokens = generateTokens(user);
-    
+
     // Update user's last login and refresh token
     user.lastLogin = new Date();
     user.refreshToken = tokens.refreshToken;
@@ -166,16 +160,15 @@ const adminLogin = async (req, res) => {
           loginid: user.loginid,
           role: user.role,
           isSuperAdmin: user.isSuperAdmin,
-          lastLogin: user.lastLogin
-        }
-      }
+          lastLogin: user.lastLogin,
+        },
+      },
     });
-
   } catch (error) {
     console.error('Admin login error:', error);
     res.status(500).json({
       success: false,
-      message: 'Admin login failed due to server error'
+      message: 'Admin login failed due to server error',
     });
   }
 };
@@ -186,12 +179,12 @@ const adminLogin = async (req, res) => {
 const logout = async (req, res) => {
   try {
     const user = req.user;
-    
+
     // Clear refresh token
     if (user) {
       await User.findByIdAndUpdate(user._id, {
         refreshToken: null,
-        refreshTokenExpiry: null
+        refreshTokenExpiry: null,
       });
 
       // Log logout
@@ -199,14 +192,13 @@ const logout = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Logout successful'
+      message: 'Logout successful',
     });
-
   } catch (error) {
     console.error('Logout error:', error);
     res.status(500).json({
       success: false,
-      message: 'Logout failed'
+      message: 'Logout failed',
     });
   }
 };
@@ -217,7 +209,7 @@ const logout = async (req, res) => {
 const getProfile = async (req, res) => {
   try {
     const user = req.user;
-    
+
     res.json({
       success: true,
       data: {
@@ -230,16 +222,15 @@ const getProfile = async (req, res) => {
           leader: user.leader,
           isActive: user.isActive,
           lastLogin: user.lastLogin,
-          createdAt: user.createdAt
-        }
-      }
+          createdAt: user.createdAt,
+        },
+      },
     });
-
   } catch (error) {
     console.error('Get profile error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get user profile'
+      message: 'Failed to get user profile',
     });
   }
 };
@@ -251,32 +242,31 @@ const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     const user = req.user;
-    
+
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
         success: false,
-        message: 'Current password and new password are required'
+        message: 'Current password and new password are required',
       });
     }
 
     if (newPassword.length < 6) {
       return res.status(400).json({
         success: false,
-        message: 'New password must be at least 6 characters long'
+        message: 'New password must be at least 6 characters long',
       });
     }
 
     // Get full user data including password
     const fullUser = await User.findById(user._id);
-    
+
     // Verify current password
     const isCurrentPasswordValid = await fullUser.comparePassword(currentPassword);
-    
+
     if (!isCurrentPasswordValid) {
-      
       return res.status(401).json({
         success: false,
-        message: 'Current password is incorrect'
+        message: 'Current password is incorrect',
       });
     }
 
@@ -288,21 +278,20 @@ const changePassword = async (req, res) => {
     // Clear all refresh tokens to force re-login
     await User.findByIdAndUpdate(user._id, {
       refreshToken: null,
-      refreshTokenExpiry: null
+      refreshTokenExpiry: null,
     });
 
     // Log password change
 
     res.json({
       success: true,
-      message: 'Password changed successfully. Please login again with your new password.'
+      message: 'Password changed successfully. Please login again with your new password.',
     });
-
   } catch (error) {
     console.error('Change password error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to change password'
+      message: 'Failed to change password',
     });
   }
 };
@@ -313,7 +302,7 @@ const changePassword = async (req, res) => {
 const verifyToken = async (req, res) => {
   try {
     const user = req.user;
-    
+
     res.json({
       success: true,
       message: 'Token is valid',
@@ -325,16 +314,15 @@ const verifyToken = async (req, res) => {
           loginid: user.loginid,
           role: user.role,
           leader: user.leader,
-          isActive: user.isActive
-        }
-      }
+          isActive: user.isActive,
+        },
+      },
     });
-
   } catch (error) {
     console.error('Verify token error:', error);
     res.status(500).json({
       success: false,
-      message: 'Token verification failed'
+      message: 'Token verification failed',
     });
   }
 };
@@ -345,28 +333,27 @@ const verifyToken = async (req, res) => {
 const getSubordinates = async (req, res) => {
   try {
     const user = req.user;
-    
+
     const subordinates = await user.getSubordinates();
-    
+
     res.json({
       success: true,
       data: {
-        subordinates: subordinates.map(sub => ({
+        subordinates: subordinates.map((sub) => ({
           id: sub._id,
           userid: sub.userid,
           username: sub.username,
           role: sub.role,
           isActive: sub.isActive,
-          lastLogin: sub.lastLogin
-        }))
-      }
+          lastLogin: sub.lastLogin,
+        })),
+      },
     });
-
   } catch (error) {
     console.error('Get subordinates error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get subordinates'
+      message: 'Failed to get subordinates',
     });
   }
 };
@@ -378,5 +365,5 @@ module.exports = {
   getProfile,
   changePassword,
   verifyToken,
-  getSubordinates
+  getSubordinates,
 };

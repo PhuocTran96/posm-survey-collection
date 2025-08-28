@@ -1536,6 +1536,245 @@
 .delete-btn:hover {
     background: #c82333;
 }
+
+/* Edit button styles */
+.edit-btn {
+    background: #fbbf24;
+    color: white;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    margin-left: 8px;
+    transition: all 0.2s ease;
+}
+
+.edit-btn:hover {
+    background: #f59e0b;
+    transform: scale(1.05);
+}
+
+/* Edit modal styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.edit-modal {
+    background: white;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid #e5e5e5;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #333;
+    font-size: 1.25rem;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #666;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.modal-close:hover {
+    background: #f0f0f0;
+    color: #333;
+}
+
+.modal-body {
+    padding: 24px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid #e5e5e5;
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+/* Edit form styles */
+.edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.form-section {
+    border: 1px solid #e5e5e5;
+    border-radius: 6px;
+    padding: 16px;
+}
+
+.form-section h4 {
+    margin: 0 0 16px 0;
+    color: #333;
+    font-size: 1.1rem;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: #555;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    box-sizing: border-box;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.editable-response {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 16px;
+    background: #f9f9f9;
+}
+
+.editable-response h5 {
+    margin: 0 0 12px 0;
+    color: #333;
+    font-size: 1rem;
+}
+
+.posm-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 8px 0;
+}
+
+.posm-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.posm-checkbox input[type="checkbox"] {
+    width: auto;
+}
+
+.btn-add-response {
+    background: #28a745;
+    color: white;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.btn-add-response:hover {
+    background: #218838;
+}
+
+.btn-remove {
+    background: #dc3545;
+    color: white;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    float: right;
+}
+
+.btn-remove:hover {
+    background: #c82333;
+}
+
+/* Mobile responsive for edit modal */
+@media (max-width: 768px) {
+    .edit-modal {
+        width: 95%;
+        max-height: 95vh;
+        margin: 20px auto;
+    }
+    
+    .modal-header {
+        padding: 16px 20px;
+    }
+    
+    .modal-body {
+        padding: 20px;
+    }
+    
+    .modal-footer {
+        padding: 12px 20px;
+        flex-direction: column;
+    }
+    
+    .editable-response {
+        padding: 12px;
+    }
+    
+    .posm-checkboxes {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .btn-remove {
+        float: none;
+        margin-top: 12px;
+        width: 100%;
+    }
+}
+
 .confirm-dialog {
     position: fixed;
     top: 0;
@@ -3825,5 +4064,196 @@ body {
     
     .display-management-container .table-row > .table-cell:nth-child(n+3) {
         display: none;
+    }
+}
+
+/* Enhanced Admin Edit Survey Styles */
+
+/* Read-only field styling */
+.readonly-field {
+    background-color: #f8f9fa !important;
+    border: 1px solid #e9ecef !important;
+    color: #6c757d !important;
+    cursor: not-allowed !important;
+}
+
+/* Enhanced form section headers */
+.form-section h4 {
+    color: #495057;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 8px;
+    margin-bottom: 15px;
+}
+
+/* Model response styling */
+.model-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border-left: 4px solid #007bff;
+}
+
+.model-header h5 {
+    margin: 0;
+    color: #495057;
+}
+
+.btn-remove-inline {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.2s;
+}
+
+.btn-remove-inline:hover {
+    background: #c82333;
+}
+
+/* POSM container styling */
+.posm-container {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    margin-top: 5px;
+    max-height: 200px;
+    overflow-y: auto;
+    background-color: #fefefe;
+}
+
+.posm-checkboxes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+}
+
+.posm-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.posm-checkbox:hover {
+    background-color: #f0f0f0;
+}
+
+.posm-checkbox input[type="checkbox"] {
+    margin: 0;
+}
+
+.posm-checkbox span {
+    font-size: 14px;
+    color: #495057;
+}
+
+/* Loading and message states */
+.loading {
+    text-align: center;
+    color: #6c757d;
+    font-style: italic;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+.no-posm-message {
+    text-align: center;
+    color: #6c757d;
+    font-style: italic;
+    padding: 20px;
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+}
+
+/* Enhanced editable response styling */
+.editable-response {
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    background-color: #ffffff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: box-shadow 0.2s;
+}
+
+.editable-response:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+/* Form group enhancements */
+.editable-response .form-group {
+    margin-bottom: 15px;
+}
+
+.editable-response .form-group label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 5px;
+    display: block;
+}
+
+.editable-response input[type="text"],
+.editable-response input[type="number"],
+.editable-response textarea {
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.editable-response input[type="text"]:focus,
+.editable-response input[type="number"]:focus,
+.editable-response textarea:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
+    outline: none;
+}
+
+/* Button styling enhancements */
+.btn-add-response {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-add-response:hover {
+    background: #218838;
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .model-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    
+    .posm-checkboxes {
+        grid-template-columns: 1fr;
+    }
+    
+    .editable-response {
+        padding: 15px;
     }
 } 

@@ -12,7 +12,7 @@ const getSurveyHistory = async (req, res) => {
 
     // Build filter object
     const filters = { submittedById: user.userid };
-    
+
     // Date range filter
     if (req.query.startDate || req.query.endDate) {
       filters.submittedAt = {};
@@ -25,19 +25,19 @@ const getSurveyHistory = async (req, res) => {
         filters.submittedAt.$lte = endDate;
       }
     }
-    
+
     // Store name filter
     if (req.query.storeName) {
       const searchRegex = new RegExp(req.query.storeName, 'i');
       filters.shopName = searchRegex;
     }
-    
+
     // Status filter (for now, all surveys are considered "Completed" since we don't have pending status)
     // This can be extended later if needed
 
     // Get total count for pagination
     const totalCount = await SurveyResponse.countDocuments(filters);
-    
+
     // Get survey responses with pagination
     const surveys = await SurveyResponse.find(filters)
       .select('leader shopName submittedAt submittedBy submittedByRole responses')
@@ -46,7 +46,7 @@ const getSurveyHistory = async (req, res) => {
       .limit(limit);
 
     // Transform data for frontend
-    const surveyHistory = surveys.map(survey => ({
+    const surveyHistory = surveys.map((survey) => ({
       id: survey._id,
       date: survey.submittedAt,
       storeName: survey.shopName,
@@ -55,7 +55,7 @@ const getSurveyHistory = async (req, res) => {
       submittedBy: survey.submittedBy,
       submittedByRole: survey.submittedByRole,
       responseCount: survey.responses.length,
-      hasImages: survey.responses.some(r => r.images && r.images.length > 0)
+      hasImages: survey.responses.some((r) => r.images && r.images.length > 0),
     }));
 
     const totalPages = Math.ceil(totalCount / limit);
@@ -69,15 +69,14 @@ const getSurveyHistory = async (req, res) => {
         totalCount: totalCount,
         limit: limit,
         hasNextPage: page < totalPages,
-        hasPrevPage: page > 1
-      }
+        hasPrevPage: page > 1,
+      },
     });
-
   } catch (error) {
     console.error('Get survey history error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to retrieve survey history'
+      message: 'Failed to retrieve survey history',
     });
   }
 };
@@ -92,24 +91,21 @@ const getSurveyDetail = async (req, res) => {
 
     const survey = await SurveyResponse.findOne({
       _id: id,
-      submittedById: user.userid // Ensure user can only access their own surveys
+      submittedById: user.userid, // Ensure user can only access their own surveys
     });
 
     if (!survey) {
       return res.status(404).json({
         success: false,
-        message: 'Survey not found or access denied'
+        message: 'Survey not found or access denied',
       });
     }
 
     // Try to get store details if available
     let storeDetails = null;
     try {
-      storeDetails = await Store.findOne({ 
-        $or: [
-          { store_id: survey.leader },
-          { store_name: survey.shopName }
-        ]
+      storeDetails = await Store.findOne({
+        $or: [{ store_id: survey.leader }, { store_name: survey.shopName }],
       }).select('store_id store_name channel region province');
     } catch (storeError) {
       console.warn('Could not fetch store details:', storeError.message);
@@ -125,28 +121,30 @@ const getSurveyDetail = async (req, res) => {
       submittedBy: survey.submittedBy,
       submittedByRole: survey.submittedByRole,
       status: 'Completed',
-      responses: survey.responses.map(response => ({
+      responses: survey.responses.map((response) => ({
         model: response.model,
         quantity: response.quantity,
         allSelected: response.allSelected,
         posmSelections: response.posmSelections,
         images: response.images,
-        imageCount: response.images ? response.images.length : 0
+        imageCount: response.images ? response.images.length : 0,
       })),
       totalModels: survey.responses.length,
-      totalImages: survey.responses.reduce((total, r) => total + (r.images ? r.images.length : 0), 0)
+      totalImages: survey.responses.reduce(
+        (total, r) => total + (r.images ? r.images.length : 0),
+        0
+      ),
     };
 
     res.json({
       success: true,
-      data: surveyDetail
+      data: surveyDetail,
     });
-
   } catch (error) {
     console.error('Get survey detail error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to retrieve survey details'
+      message: 'Failed to retrieve survey details',
     });
   }
 };
@@ -157,7 +155,7 @@ const getSurveyDetail = async (req, res) => {
 const getSurveyStats = async (req, res) => {
   try {
     const user = req.user;
-    
+
     const stats = await SurveyResponse.aggregate([
       { $match: { submittedById: user.userid } },
       {
@@ -171,13 +169,13 @@ const getSurveyStats = async (req, res) => {
               $reduce: {
                 input: '$responses',
                 initialValue: 0,
-                in: { $add: ['$$value', { $size: { $ifNull: ['$$this.images', []] } }] }
-              }
-            }
+                in: { $add: ['$$value', { $size: { $ifNull: ['$$this.images', []] } }] },
+              },
+            },
           },
           earliestSurvey: { $min: '$submittedAt' },
-          latestSurvey: { $max: '$submittedAt' }
-        }
+          latestSurvey: { $max: '$submittedAt' },
+        },
       },
       {
         $project: {
@@ -187,9 +185,9 @@ const getSurveyStats = async (req, res) => {
           totalModels: 1,
           totalImages: 1,
           earliestSurvey: 1,
-          latestSurvey: 1
-        }
-      }
+          latestSurvey: 1,
+        },
+      },
     ]);
 
     const result = stats[0] || {
@@ -198,19 +196,18 @@ const getSurveyStats = async (req, res) => {
       totalModels: 0,
       totalImages: 0,
       earliestSurvey: null,
-      latestSurvey: null
+      latestSurvey: null,
     };
 
     res.json({
       success: true,
-      data: result
+      data: result,
     });
-
   } catch (error) {
     console.error('Get survey stats error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to retrieve survey statistics'
+      message: 'Failed to retrieve survey statistics',
     });
   }
 };
@@ -218,5 +215,5 @@ const getSurveyStats = async (req, res) => {
 module.exports = {
   getSurveyHistory,
   getSurveyDetail,
-  getSurveyStats
+  getSurveyStats,
 };

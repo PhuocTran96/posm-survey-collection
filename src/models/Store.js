@@ -1,75 +1,78 @@
 const mongoose = require('mongoose');
 
-const storeSchema = new mongoose.Schema({
-  store_id: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-    index: true
+const storeSchema = new mongoose.Schema(
+  {
+    store_id: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      index: true,
+    },
+    store_code: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+    store_name: {
+      type: String,
+      required: true,
+      trim: true,
+      index: true,
+    },
+    channel: {
+      type: String,
+      required: true,
+      trim: true,
+      index: true,
+    },
+    hc: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    region: {
+      type: String,
+      required: true,
+      trim: true,
+      index: true,
+    },
+    province: {
+      type: String,
+      required: true,
+      trim: true,
+      index: true,
+    },
+    mcp: {
+      type: String,
+      required: true,
+      trim: true,
+      enum: ['Y', 'N'],
+      default: 'N',
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    createdBy: {
+      type: String,
+      default: 'system',
+    },
+    updatedBy: {
+      type: String,
+      default: 'system',
+    },
   },
-  store_code: {
-    type: String,
-    trim: true,
-    index: true
-  },
-  store_name: {
-    type: String,
-    required: true,
-    trim: true,
-    index: true
-  },
-  channel: {
-    type: String,
-    required: true,
-    trim: true,
-    index: true
-  },
-  hc: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  region: {
-    type: String,
-    required: true,
-    trim: true,
-    index: true
-  },
-  province: {
-    type: String,
-    required: true,
-    trim: true,
-    index: true
-  },
-  mcp: {
-    type: String,
-    required: true,
-    trim: true,
-    enum: ['Y', 'N'],
-    default: 'N'
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  createdBy: {
-    type: String,
-    default: 'system'
-  },
-  updatedBy: {
-    type: String,
-    default: 'system'
+  {
+    timestamps: true,
+    toJSON: {
+      transform: function (doc, ret) {
+        delete ret.__v;
+        return ret;
+      },
+    },
   }
-}, {
-  timestamps: true,
-  toJSON: {
-    transform: function(doc, ret) {
-      delete ret.__v;
-      return ret;
-    }
-  }
-});
+);
 
 // Indexes for performance
 storeSchema.index({ store_id: 1 });

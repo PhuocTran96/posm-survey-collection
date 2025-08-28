@@ -11,9 +11,9 @@ const storage = multer.diskStorage({
     cb(null, 'uploads/');
   },
   filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
     cb(null, 'stores-' + uniqueSuffix + path.extname(file.originalname));
-  }
+  },
 });
 
 const upload = multer({
@@ -21,7 +21,7 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['.csv', '.xlsx', '.xls'];
     const fileExtension = path.extname(file.originalname).toLowerCase();
-    
+
     if (allowedTypes.includes(fileExtension)) {
       cb(null, true);
     } else {
@@ -29,8 +29,8 @@ const upload = multer({
     }
   },
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
-  }
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
 });
 
 // All routes require authentication
@@ -45,7 +45,12 @@ router.get('/:id', storeController.getStoreById);
 
 // POST routes
 router.post('/', requireRole(['admin']), storeController.createStore);
-router.post('/import', requireRole(['admin']), upload.single('csvFile'), storeController.importStoresFromCSV);
+router.post(
+  '/import',
+  requireRole(['admin']),
+  upload.single('csvFile'),
+  storeController.importStoresFromCSV
+);
 router.post('/bulk-delete', requireRole(['admin']), storeController.bulkDeleteStores);
 
 // PUT routes

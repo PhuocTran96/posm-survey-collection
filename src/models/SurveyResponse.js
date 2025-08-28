@@ -1,55 +1,64 @@
 const mongoose = require('mongoose');
 
-const surveyResponseSchema = new mongoose.Schema({
-  leader: {
-    type: String,
-    required: true
-  },
-  shopName: {
-    type: String,
-    required: true
-  },
-  responses: [{
-    model: {
+const surveyResponseSchema = new mongoose.Schema(
+  {
+    leader: {
       type: String,
-      required: true
+      required: true,
     },
-    quantity: {
-      type: Number,
-      default: 1,
-      min: 1
+    shopName: {
+      type: String,
+      required: true,
     },
-    posmSelections: [{
-      posmCode: String,
-      posmName: String,
-      selected: Boolean
-    }],
-    allSelected: {
-      type: Boolean,
-      default: false
+    responses: [
+      {
+        model: {
+          type: String,
+          required: true,
+        },
+        quantity: {
+          type: Number,
+          default: 1,
+          min: 1,
+        },
+        posmSelections: [
+          {
+            posmCode: String,
+            posmName: String,
+            selected: Boolean,
+          },
+        ],
+        allSelected: {
+          type: Boolean,
+          default: false,
+        },
+        images: [
+          {
+            type: String,
+          },
+        ],
+      },
+    ],
+    submittedAt: {
+      type: Date,
+      default: Date.now,
     },
-    images: [{
-      type: String
-    }]
-  }],
-  submittedAt: {
-    type: Date,
-    default: Date.now
+    submittedBy: {
+      type: String,
+      default: 'anonymous',
+    },
+    submittedById: {
+      type: String,
+      default: null,
+    },
+    submittedByRole: {
+      type: String,
+      default: 'unknown',
+    },
   },
-  submittedBy: {
-    type: String,
-    default: 'anonymous'
-  },
-  submittedById: {
-    type: String,
-    default: null
-  },
-  submittedByRole: {
-    type: String,
-    default: 'unknown'
+  {
+    timestamps: true,
   }
-}, {
-  timestamps: true
-});
+);
 
 module.exports = mongoose.model('SurveyResponse', surveyResponseSchema);

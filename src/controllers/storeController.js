@@ -14,44 +14,41 @@ const getStores = async (req, res) => {
 
     // Build filter object
     const filters = {};
-    
+
     if (req.query.channel) {
       filters.channel = req.query.channel;
     }
-    
+
     if (req.query.region) {
       filters.region = req.query.region;
     }
-    
+
     if (req.query.province) {
       filters.province = req.query.province;
     }
-    
+
     if (req.query.mcp) {
       filters.mcp = req.query.mcp;
     }
-    
+
     if (req.query.isActive !== undefined) {
       filters.isActive = req.query.isActive === 'true';
     }
-    
+
     if (req.query.search) {
       const searchRegex = new RegExp(req.query.search, 'i');
       filters.$or = [
         { store_id: searchRegex },
         { store_code: searchRegex },
-        { store_name: searchRegex }
+        { store_name: searchRegex },
       ];
     }
 
     // Get total count for pagination
     const totalCount = await Store.countDocuments(filters);
-    
+
     // Get stores with pagination
-    const stores = await Store.find(filters)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    const stores = await Store.find(filters).sort({ createdAt: -1 }).skip(skip).limit(limit);
 
     const totalPages = Math.ceil(totalCount / limit);
 
@@ -64,15 +61,14 @@ const getStores = async (req, res) => {
         totalCount: totalCount,
         limit: limit,
         hasNextPage: page < totalPages,
-        hasPrevPage: page > 1
-      }
+        hasPrevPage: page > 1,
+      },
     });
-
   } catch (error) {
     console.error('Get stores error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to retrieve stores'
+      message: 'Failed to retrieve stores',
     });
   }
 };
@@ -83,26 +79,25 @@ const getStores = async (req, res) => {
 const getStoreById = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const store = await Store.findById(id);
-    
+
     if (!store) {
       return res.status(404).json({
         success: false,
-        message: 'Store not found'
+        message: 'Store not found',
       });
     }
 
     res.json({
       success: true,
-      data: store
+      data: store,
     });
-
   } catch (error) {
     console.error('Get store by ID error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to retrieve store'
+      message: 'Failed to retrieve store',
     });
   }
 };
@@ -119,14 +114,14 @@ const createStore = async (req, res) => {
     if (!store_id || !store_name || !channel || hc === undefined || !region || !province || !mcp) {
       return res.status(400).json({
         success: false,
-        message: 'All required fields must be provided'
+        message: 'All required fields must be provided',
       });
     }
 
     if (isNaN(hc) || hc < 0) {
       return res.status(400).json({
         success: false,
-        message: 'HC must be a valid positive number'
+        message: 'HC must be a valid positive number',
       });
     }
 
@@ -136,7 +131,7 @@ const createStore = async (req, res) => {
     if (existingStore) {
       return res.status(400).json({
         success: false,
-        message: 'Store with this ID already exists'
+        message: 'Store with this ID already exists',
       });
     }
 
@@ -151,7 +146,7 @@ const createStore = async (req, res) => {
       province: province.trim(),
       mcp: mcp.trim().toUpperCase(),
       createdBy: currentUser?.username || 'system',
-      updatedBy: currentUser?.username || 'system'
+      updatedBy: currentUser?.username || 'system',
     };
 
     const newStore = new Store(storeData);
@@ -160,14 +155,13 @@ const createStore = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Store created successfully',
-      data: newStore
+      data: newStore,
     });
-
   } catch (error) {
     console.error('Create store error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to create store'
+      message: 'Failed to create store',
     });
   }
 };
@@ -178,15 +172,16 @@ const createStore = async (req, res) => {
 const updateStore = async (req, res) => {
   try {
     const { id } = req.params;
-    const { store_id, store_code, store_name, channel, hc, region, province, mcp, isActive } = req.body;
+    const { store_id, store_code, store_name, channel, hc, region, province, mcp, isActive } =
+      req.body;
     const currentUser = req.user;
 
     const store = await Store.findById(id);
-    
+
     if (!store) {
       return res.status(404).json({
         success: false,
-        message: 'Store not found'
+        message: 'Store not found',
       });
     }
 
@@ -196,7 +191,7 @@ const updateStore = async (req, res) => {
       if (existingStore) {
         return res.status(400).json({
           success: false,
-          message: 'Store with this ID already exists'
+          message: 'Store with this ID already exists',
         });
       }
       store.store_id = store_id.trim();
@@ -206,33 +201,33 @@ const updateStore = async (req, res) => {
     if (store_code !== undefined) {
       store.store_code = store_code?.trim() || null;
     }
-    
+
     if (store_name) {
       store.store_name = store_name.trim();
     }
-    
+
     if (channel) {
       store.channel = channel.trim();
     }
-    
+
     if (hc !== undefined) {
       if (isNaN(hc) || hc < 0) {
         return res.status(400).json({
           success: false,
-          message: 'HC must be a valid positive number'
+          message: 'HC must be a valid positive number',
         });
       }
       store.hc = parseInt(hc);
     }
-    
+
     if (region) {
       store.region = region.trim();
     }
-    
+
     if (province) {
       store.province = province.trim();
     }
-    
+
     if (mcp) {
       store.mcp = mcp.trim().toUpperCase();
     }
@@ -247,14 +242,13 @@ const updateStore = async (req, res) => {
     res.json({
       success: true,
       message: 'Store updated successfully',
-      data: store
+      data: store,
     });
-
   } catch (error) {
     console.error('Update store error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to update store'
+      message: 'Failed to update store',
     });
   }
 };
@@ -267,11 +261,11 @@ const deleteStore = async (req, res) => {
     const { id } = req.params;
 
     const store = await Store.findById(id);
-    
+
     if (!store) {
       return res.status(404).json({
         success: false,
-        message: 'Store not found'
+        message: 'Store not found',
       });
     }
 
@@ -279,14 +273,13 @@ const deleteStore = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Store deleted successfully'
+      message: 'Store deleted successfully',
     });
-
   } catch (error) {
     console.error('Delete store error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to delete store'
+      message: 'Failed to delete store',
     });
   }
 };
@@ -301,7 +294,7 @@ const bulkDeleteStores = async (req, res) => {
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Array of store IDs is required'
+        message: 'Array of store IDs is required',
       });
     }
 
@@ -312,15 +305,14 @@ const bulkDeleteStores = async (req, res) => {
       success: true,
       message: `Successfully deleted ${deleteResult.deletedCount} store(s)`,
       data: {
-        deletedCount: deleteResult.deletedCount
-      }
+        deletedCount: deleteResult.deletedCount,
+      },
     });
-
   } catch (error) {
     console.error('Bulk delete stores error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to delete stores'
+      message: 'Failed to delete stores',
     });
   }
 };
@@ -331,11 +323,11 @@ const bulkDeleteStores = async (req, res) => {
 const importStoresFromCSV = async (req, res) => {
   try {
     const currentUser = req.user;
-    
+
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: 'CSV file is required'
+        message: 'CSV file is required',
       });
     }
 
@@ -360,19 +352,26 @@ const importStoresFromCSV = async (req, res) => {
       created: 0,
       updated: 0,
       skipped: 0,
-      errors: 0
+      errors: 0,
     };
 
     // Process each store
     for (const storeData of results) {
       try {
         // Validate required fields
-        if (!storeData.store_id || !storeData.store_name || !storeData.channel || 
-            storeData.hc === undefined || !storeData.region || !storeData.province || !storeData.mcp) {
+        if (
+          !storeData.store_id ||
+          !storeData.store_name ||
+          !storeData.channel ||
+          storeData.hc === undefined ||
+          !storeData.region ||
+          !storeData.province ||
+          !storeData.mcp
+        ) {
           errors.push({
             line: storeData.lineNumber,
             error: 'Missing required fields',
-            data: storeData
+            data: storeData,
           });
           stats.errors++;
           continue;
@@ -391,7 +390,7 @@ const importStoresFromCSV = async (req, res) => {
           province: storeData.province.trim(),
           mcp: storeData.mcp.trim().toUpperCase(),
           createdBy: currentUser?.username || 'system',
-          updatedBy: currentUser?.username || 'system'
+          updatedBy: currentUser?.username || 'system',
         };
 
         if (existingStore) {
@@ -405,12 +404,11 @@ const importStoresFromCSV = async (req, res) => {
           await newStore.save();
           stats.created++;
         }
-
       } catch (error) {
         errors.push({
           line: storeData.lineNumber,
           error: error.message,
-          data: storeData
+          data: storeData,
         });
         stats.errors++;
       }
@@ -424,21 +422,20 @@ const importStoresFromCSV = async (req, res) => {
       message: 'CSV import completed',
       data: {
         stats,
-        errors: errors.slice(0, 10) // Limit errors in response
-      }
+        errors: errors.slice(0, 10), // Limit errors in response
+      },
     });
-
   } catch (error) {
     console.error('CSV import error:', error);
-    
+
     // Clean up uploaded file
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
-    
+
     res.status(500).json({
       success: false,
-      message: 'Failed to import CSV'
+      message: 'Failed to import CSV',
     });
   }
 };
@@ -449,14 +446,13 @@ const importStoresFromCSV = async (req, res) => {
 const exportStoresToCSV = async (req, res) => {
   try {
     // Get all stores
-    const stores = await Store.find({})
-      .sort({ createdAt: -1 });
+    const stores = await Store.find({}).sort({ createdAt: -1 });
 
     // Create workbook
     const workbook = XLSX.utils.book_new();
-    
+
     // Prepare data for export
-    const exportData = stores.map(store => ({
+    const exportData = stores.map((store) => ({
       store_id: store.store_id,
       store_code: store.store_code || '',
       store_name: store.store_name,
@@ -468,7 +464,7 @@ const exportStoresToCSV = async (req, res) => {
       isActive: store.isActive,
       createdAt: store.createdAt.toISOString(),
       createdBy: store.createdBy,
-      updatedBy: store.updatedBy
+      updatedBy: store.updatedBy,
     }));
 
     // Create worksheet
@@ -480,18 +476,20 @@ const exportStoresToCSV = async (req, res) => {
     const filename = `stores-export-${timestamp}.xlsx`;
 
     // Set response headers
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
     // Send file
     const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
     res.send(buffer);
-
   } catch (error) {
     console.error('Export stores error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to export stores'
+      message: 'Failed to export stores',
     });
   }
 };
@@ -503,48 +501,44 @@ const searchStores = async (req, res) => {
   try {
     const { q } = req.query;
     const user = req.user;
-    
+
     if (!q || q.length < 2) {
       return res.json({
         success: true,
-        data: []
+        data: [],
       });
     }
 
     // Get user's assigned store IDs
     const assignedStoreIds = user.assignedStores || [];
-    
+
     if (assignedStoreIds.length === 0) {
       return res.json({
         success: true,
-        data: []
+        data: [],
       });
     }
 
     // Create search regex
     const searchRegex = new RegExp(q, 'i');
-    
+
     // Query actual Store documents that match user's assigned stores AND search criteria
     const matchingStores = await Store.find({
       _id: { $in: assignedStoreIds },
-      $or: [
-        { store_name: searchRegex },
-        { store_id: searchRegex }
-      ]
+      $or: [{ store_name: searchRegex }, { store_id: searchRegex }],
     })
-    .select('store_id store_name channel region province')
-    .limit(20);
+      .select('store_id store_name channel region province')
+      .limit(20);
 
     res.json({
       success: true,
-      data: matchingStores
+      data: matchingStores,
     });
-
   } catch (error) {
     console.error('Store search error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to search stores'
+      message: 'Failed to search stores',
     });
   }
 };
@@ -560,27 +554,27 @@ const getStoreStats = async (req, res) => {
           _id: null,
           totalStores: { $sum: 1 },
           activeStores: { $sum: { $cond: ['$isActive', 1, 0] } },
-          inactiveStores: { $sum: { $cond: ['$isActive', 0, 1] } }
-        }
-      }
+          inactiveStores: { $sum: { $cond: ['$isActive', 0, 1] } },
+        },
+      },
     ]);
 
     const channelStats = await Store.aggregate([
       {
         $group: {
           _id: '$channel',
-          count: { $sum: 1 }
-        }
-      }
+          count: { $sum: 1 },
+        },
+      },
     ]);
 
     const regionStats = await Store.aggregate([
       {
         $group: {
           _id: '$region',
-          count: { $sum: 1 }
-        }
-      }
+          count: { $sum: 1 },
+        },
+      },
     ]);
 
     res.json({
@@ -588,15 +582,14 @@ const getStoreStats = async (req, res) => {
       data: {
         overview: stats[0] || { totalStores: 0, activeStores: 0, inactiveStores: 0 },
         channelDistribution: channelStats,
-        regionDistribution: regionStats
-      }
+        regionDistribution: regionStats,
+      },
     });
-
   } catch (error) {
     console.error('Get store stats error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to get store statistics'
+      message: 'Failed to get store statistics',
     });
   }
 };
@@ -611,5 +604,5 @@ module.exports = {
   importStoresFromCSV,
   exportStoresToCSV,
   searchStores,
-  getStoreStats
+  getStoreStats,
 };

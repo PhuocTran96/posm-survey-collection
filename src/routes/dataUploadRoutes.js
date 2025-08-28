@@ -1,6 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { upload, uploadStores, uploadPOSM, getUploadStats } = require('../controllers/dataUploadController');
+const {
+  upload,
+  uploadStores,
+  uploadPOSM,
+  getUploadStats,
+} = require('../controllers/dataUploadController');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
 
 // All data upload routes require admin authentication

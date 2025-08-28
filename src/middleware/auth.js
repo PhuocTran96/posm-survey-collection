@@ -2,12 +2,14 @@ const jwt = require('jsonwebtoken');
 const { User } = require('../models');
 
 // JWT Secret keys (should be in environment variables)
-const ACCESS_TOKEN_SECRET = process.env.JWT_ACCESS_SECRET || 'your-super-secret-access-key-change-in-production';
-const REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET || 'your-super-secret-refresh-key-change-in-production';
+const ACCESS_TOKEN_SECRET =
+  process.env.JWT_ACCESS_SECRET || 'your-super-secret-access-key-change-in-production';
+const REFRESH_TOKEN_SECRET =
+  process.env.JWT_REFRESH_SECRET || 'your-super-secret-refresh-key-change-in-production';
 
 // Token expiry times
 const ACCESS_TOKEN_EXPIRY = '15m'; // 15 minutes
-const REFRESH_TOKEN_EXPIRY = '7d';  // 7 days
+const REFRESH_TOKEN_EXPIRY = '7d'; // 7 days
 
 /**
  * Generate access and refresh tokens for a user
@@ -19,24 +21,20 @@ const generateTokens = (user) => {
     username: user.username,
     loginid: user.loginid,
     role: user.role,
-    leader: user.leader
+    leader: user.leader,
   };
 
   const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, {
     expiresIn: ACCESS_TOKEN_EXPIRY,
     issuer: 'posm-survey-app',
-    audience: 'posm-survey-users'
+    audience: 'posm-survey-users',
   });
 
-  const refreshToken = jwt.sign(
-    { id: user._id, username: user.username },
-    REFRESH_TOKEN_SECRET,
-    {
-      expiresIn: REFRESH_TOKEN_EXPIRY,
-      issuer: 'posm-survey-app',
-      audience: 'posm-survey-users'
-    }
-  );
+  const refreshToken = jwt.sign({ id: user._id, username: user.username }, REFRESH_TOKEN_SECRET, {
+    expiresIn: REFRESH_TOKEN_EXPIRY,
+    issuer: 'posm-survey-app',
+    audience: 'posm-survey-users',
+  });
 
   return { accessToken, refreshToken };
 };
@@ -47,12 +45,12 @@ const generateTokens = (user) => {
 const verifyToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
         message: 'Access token is required',
-        code: 'NO_TOKEN'
+        code: 'NO_TOKEN',
       });
     }
 
@@ -60,17 +58,17 @@ const verifyToken = async (req, res, next) => {
 
     const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET, {
       issuer: 'posm-survey-app',
-      audience: 'posm-survey-users'
+      audience: 'posm-survey-users',
     });
 
     // Get fresh user data from database
     const user = await User.findById(decoded.id).select('-password -refreshToken');
-    
+
     if (!user) {
       return res.status(401).json({
         success: false,
         message: 'User not found',
-        code: 'USER_NOT_FOUND'
+        code: 'USER_NOT_FOUND',
       });
     }
 
@@ -78,38 +76,38 @@ const verifyToken = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         message: 'Account is deactivated',
-        code: 'ACCOUNT_DEACTIVATED'
+        code: 'ACCOUNT_DEACTIVATED',
       });
     }
 
     // Attach user info to request
     req.user = user;
     req.tokenData = decoded;
-    
+
     next();
   } catch (error) {
     console.error('Token verification error:', error);
-    
+
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
         message: 'Access token expired',
-        code: 'TOKEN_EXPIRED'
+        code: 'TOKEN_EXPIRED',
       });
     }
-    
+
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         success: false,
         message: 'Invalid access token',
-        code: 'INVALID_TOKEN'
+        code: 'INVALID_TOKEN',
       });
     }
 
     return res.status(500).json({
       success: false,
       message: 'Token verification failed',
-      code: 'VERIFICATION_ERROR'
+      code: 'VERIFICATION_ERROR',
     });
   }
 };
@@ -122,7 +120,7 @@ const requireRole = (allowedRoles) => {
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        message: 'Authentication required'
+        message: 'Authentication required',
       });
     }
 
@@ -131,7 +129,7 @@ const requireRole = (allowedRoles) => {
         success: false,
         message: 'Insufficient permissions',
         required: allowedRoles,
-        current: req.user.role
+        current: req.user.role,
       });
     }
 
@@ -160,32 +158,32 @@ const requireManager = requireRole(['admin', 'TDS', 'TDL']);
 const refreshAccessToken = async (req, res) => {
   try {
     const { refreshToken } = req.body;
-    
+
     if (!refreshToken) {
       return res.status(401).json({
         success: false,
-        message: 'Refresh token is required'
+        message: 'Refresh token is required',
       });
     }
 
     const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET, {
       issuer: 'posm-survey-app',
-      audience: 'posm-survey-users'
+      audience: 'posm-survey-users',
     });
 
     const user = await User.findById(decoded.id);
-    
+
     if (!user || user.refreshToken !== refreshToken) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid refresh token'
+        message: 'Invalid refresh token',
       });
     }
 
     if (!user.isActive) {
       return res.status(401).json({
         success: false,
-        message: 'Account is deactivated'
+        message: 'Account is deactivated',
       });
     }
 
@@ -195,16 +193,16 @@ const refreshAccessToken = async (req, res) => {
       user.refreshToken = null;
       user.refreshTokenExpiry = null;
       await user.save();
-      
+
       return res.status(401).json({
         success: false,
-        message: 'Refresh token expired'
+        message: 'Refresh token expired',
       });
     }
 
     // Generate new tokens
     const tokens = generateTokens(user);
-    
+
     // Update refresh token in database
     user.refreshToken = tokens.refreshToken;
     user.refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
@@ -222,24 +220,23 @@ const refreshAccessToken = async (req, res) => {
           username: user.username,
           loginid: user.loginid,
           role: user.role,
-          leader: user.leader
-        }
-      }
+          leader: user.leader,
+        },
+      },
     });
-
   } catch (error) {
     console.error('Refresh token error:', error);
-    
+
     if (error.name === 'TokenExpiredError' || error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         success: false,
-        message: 'Invalid or expired refresh token'
+        message: 'Invalid or expired refresh token',
       });
     }
 
     return res.status(500).json({
       success: false,
-      message: 'Token refresh failed'
+      message: 'Token refresh failed',
     });
   }
 };
@@ -250,10 +247,9 @@ const refreshAccessToken = async (req, res) => {
 const getClientInfo = (req) => {
   return {
     ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'],
-    userAgent: req.headers['user-agent'] || 'unknown'
+    userAgent: req.headers['user-agent'] || 'unknown',
   };
 };
-
 
 /**
  * Optional authentication middleware (doesn't fail if no token)
@@ -261,7 +257,7 @@ const getClientInfo = (req) => {
 const optionalAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return next();
     }
@@ -269,7 +265,7 @@ const optionalAuth = async (req, res, next) => {
     const token = authHeader.substring(7);
     const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET);
     const user = await User.findById(decoded.id).select('-password -refreshToken');
-    
+
     if (user && user.isActive) {
       req.user = user;
       req.tokenData = decoded;
@@ -278,7 +274,7 @@ const optionalAuth = async (req, res, next) => {
     // Ignore token errors in optional auth
     console.log('Optional auth failed:', error.message);
   }
-  
+
   next();
 };
 
@@ -292,8 +288,8 @@ module.exports = {
   refreshAccessToken,
   getClientInfo,
   optionalAuth,
-  
+
   // Constants
   ACCESS_TOKEN_EXPIRY,
-  REFRESH_TOKEN_EXPIRY
+  REFRESH_TOKEN_EXPIRY,
 };

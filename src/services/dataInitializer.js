@@ -11,7 +11,7 @@ const loadStoresData = async () => {
     }
 
     const stores = [];
-    
+
     return new Promise((resolve, reject) => {
       fs.createReadStream('stores.csv')
         .pipe(csv())
@@ -20,16 +20,16 @@ const loadStoresData = async () => {
             console.log('Store CSV columns:', Object.keys(row));
             console.log('Store CSV row sample:', row);
           }
-          
+
           const name = row['Name'] || row['﻿Name'] || '';
           const province = row['Province'] || '';
           const leader = row['Leader'] || '';
-          
+
           if (name.trim() && province.trim() && leader.trim()) {
             stores.push({
               name: name.trim(),
               province: province.trim(),
-              leader: leader.trim()
+              leader: leader.trim(),
             });
           }
         })
@@ -62,7 +62,7 @@ const loadModelPosmData = async () => {
     }
 
     const modelPosmData = [];
-    
+
     return new Promise((resolve, reject) => {
       fs.createReadStream('posm.csv')
         .pipe(csv())
@@ -71,16 +71,16 @@ const loadModelPosmData = async () => {
             console.log('POSM CSV columns:', Object.keys(row));
             console.log('POSM CSV row sample:', row);
           }
-          
+
           const model = row['model'] || row['﻿model'] || '';
           const posm = row['posm'] || '';
           const posmName = row['posm_name'] || '';
-          
+
           if (model.trim() && posm.trim() && posmName.trim()) {
             modelPosmData.push({
               model: model.trim(),
               posm: posm.trim(),
-              posmName: posmName.trim()
+              posmName: posmName.trim(),
             });
           }
         })
@@ -117,5 +117,5 @@ const initializeData = async () => {
 module.exports = {
   loadStoresData,
   loadModelPosmData,
-  initializeData
+  initializeData,
 };

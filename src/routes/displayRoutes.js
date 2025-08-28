@@ -12,7 +12,7 @@ const {
   bulkDeleteDisplays,
   importDisplaysFromCSV,
   exportDisplaysToCSV,
-  getDisplayStats
+  getDisplayStats,
 } = require('../controllers/displayController');
 
 // Configure multer for file uploads
@@ -21,29 +21,30 @@ const storage = multer.diskStorage({
     cb(null, 'uploads/');
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
     cb(null, 'displays-' + uniqueSuffix + path.extname(file.originalname));
-  }
+  },
 });
 
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
+    fileSize: 10 * 1024 * 1024, // 10MB limit
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = /csv|xlsx|xls/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype) || 
-                    file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-                    file.mimetype === 'application/vnd.ms-excel';
+    const mimetype =
+      allowedTypes.test(file.mimetype) ||
+      file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      file.mimetype === 'application/vnd.ms-excel';
 
     if (mimetype && extname) {
       return cb(null, true);
     } else {
       cb(new Error('Only CSV and Excel files are allowed'));
     }
-  }
+  },
 });
 
 // Apply authentication to all routes

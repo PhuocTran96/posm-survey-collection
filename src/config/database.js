@@ -8,9 +8,9 @@ const connectDB = async () => {
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
-      bufferCommands: false
+      bufferCommands: false,
     });
-    
+
     console.log(`MongoDB Connected: ${conn.connection.host}`);
     console.log(`Database: ${conn.connection.name}`);
     return conn;
@@ -28,11 +28,11 @@ const setupDatabaseEvents = (db) => {
   db.on('error', (error) => {
     console.error('MongoDB connection error:', error.message);
   });
-  
+
   db.on('disconnected', () => {
     console.log('MongoDB disconnected');
   });
-  
+
   db.on('reconnected', () => {
     console.log('MongoDB reconnected');
   });

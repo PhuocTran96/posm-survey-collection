@@ -9,5 +9,5 @@ module.exports = {
   Store,
   ModelPosm,
   User,
-  Display
+  Display,
 };

@@ -12,7 +12,11 @@
     "upload-posm-update": "node upload-posm-data.js --update-only",
     "upload-posm-upsert": "node upload-posm-data.js --upsert",
     "import-users": "node import-users.js",
-    "create-super-admin": "node import-users.js --create-super-admin"
+    "create-super-admin": "node import-users.js --create-super-admin",
+    "lint": "eslint src --ext .js --max-warnings=0",
+    "lint:fix": "eslint src --ext .js --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "aws-sdk": "^2.1531.0",
@@ -29,7 +33,10 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@eslint/js": "^9.34.0",
     "axios": "^1.11.0",
+    "eslint-plugin-prettier": "^5.5.4",
+    "globals": "^16.3.0",
     "nodemon": "^3.0.1"
   },
   "keywords": [

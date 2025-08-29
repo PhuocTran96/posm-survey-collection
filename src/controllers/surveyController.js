@@ -618,10 +618,8 @@ const getPosmByModel = async (req, res) => {
       posmName: item.posmName,
     }));
 
-    res.json({
-      success: true,
-      data: posmList
-    });
+    // Return just the array to match frontend expectations
+    res.json(posmList);
   } catch (error) {
     console.error('Error fetching POSM for model:', error);
     res.status(500).json({

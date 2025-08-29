@@ -105,6 +105,9 @@ class SurveyApp {
     if (logoutBtn) {
       logoutBtn.addEventListener('click', () => this.logout());
     }
+
+    // Load and display all assigned stores immediately
+    this.loadAndDisplayAllStores();
   }
 
   async logout() {
@@ -132,6 +135,161 @@ class SurveyApp {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
+  }
+
+  // Load and display all assigned stores immediately
+  async loadAndDisplayAllStores() {
+    try {
+      console.log('🏪 Loading all assigned stores for user');
+      
+      // Show loading state
+      const storeListContainer = document.getElementById('storeList');
+      if (storeListContainer) {
+        storeListContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">Loading stores...</div>';
+      }
+      
+      // First try to get stores from user data
+      if (this.assignedStores && this.assignedStores.length > 0) {
+        console.log('✅ Using stores from user data:', this.assignedStores.length);
+        this.displayStoreList(this.assignedStores);
+        return;
+      }
+
+      // Fallback: fetch assigned stores from API
+      let response = await this.authenticatedFetch('/api/stores/assigned');
+      if (response && response.ok) {
+        const result = await response.json();
+        if (result.success && result.data && result.data.length > 0) {
+          this.assignedStores = result.data;
+          console.log('✅ Loaded assigned stores from API:', this.assignedStores.length);
+          this.displayStoreList(this.assignedStores);
+          return;
+        }
+      }
+
+      // Second fallback: fetch all stores with pagination
+      response = await this.authenticatedFetch('/api/stores?limit=1000');
+      if (response && response.ok) {
+        const result = await response.json();
+        this.assignedStores = result.data || [];
+        console.log('✅ Loaded all stores from API:', this.assignedStores.length);
+        this.displayStoreList(this.assignedStores);
+      } else {
+        throw new Error('Failed to load stores from any API endpoint');
+      }
+    } catch (error) {
+      console.error('❌ Error loading stores:', error);
+      const storeListContainer = document.getElementById('storeList');
+      if (storeListContainer) {
+        storeListContainer.innerHTML = `
+          <div style="padding: 20px; text-align: center; color: #e74c3c;">
+            <p>Failed to load stores</p>
+            <button onclick="app.loadAndDisplayAllStores()" style="margin-top: 10px; padding: 8px 16px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer;">
+              Retry
+            </button>
+          </div>
+        `;
+      }
+    }
+  }
+
+  // Display the store list with radio buttons
+  displayStoreList(stores) {
+    const storeListContainer = document.getElementById('storeList');
+    
+    if (!storeListContainer) {
+      console.error('❌ storeList element not found');
+      return;
+    }
+
+    if (!stores || stores.length === 0) {
+      storeListContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">No stores assigned</div>';
+      return;
+    }
+
+    const html = stores.map(store => `
+      <div class="store-item" data-store-id="${store._id || store.id}">
+        <input type="radio" 
+               name="storeSelection" 
+               value="${store._id || store.id}" 
+               class="store-radio"
+>
+        <div class="store-info">
+          <div class="store-name">${this.escapeHtml(store.store_name)}</div>
+          <div class="store-id">${this.escapeHtml(store.store_id)}</div>
+        </div>
+      </div>
+    `).join('');
+    
+    storeListContainer.innerHTML = html;
+    console.log('✅ Displayed', stores.length, 'stores in list');
+  }
+
+  // Handle store selection via radio button
+  selectStore(storeId) {
+    const selectedStore = this.assignedStores.find(store => 
+      (store._id || store.id) === storeId
+    );
+    
+    if (selectedStore) {
+      console.log('🏪 Selected store:', selectedStore.store_name);
+      this.selectedShop = selectedStore;
+      this.shopSearchSelected = JSON.stringify(selectedStore);
+      
+      // Update search input to show selected store
+      const shopInput = document.getElementById('shopSearchInput');
+      if (shopInput) {
+        shopInput.value = `${selectedStore.store_name} (${selectedStore.store_id})`;
+      }
+      
+      // Show selected shop info
+      this.showSelectedShopInfo(selectedStore);
+      
+      // Enable continue button
+      const nextBtn = document.getElementById('nextToStep2');
+      if (nextBtn) {
+        nextBtn.disabled = false;
+      }
+    }
+  }
+
+  // Filter store list based on search input
+  filterStoreList(query) {
+    const storeItems = document.querySelectorAll('.store-item');
+    
+    storeItems.forEach(item => {
+      const storeName = item.querySelector('.store-name').textContent.toLowerCase();
+      const storeId = item.querySelector('.store-id').textContent.toLowerCase();
+      
+      const matches = storeName.includes(query) || storeId.includes(query);
+      item.style.display = matches ? 'flex' : 'none';
+    });
+  }
+
+  // Handle clicking on store items to select them
+  onStoreItemClick(e) {
+    const storeItem = e.target.closest('.store-item');
+    if (!storeItem) return;
+
+    const storeId = storeItem.dataset.storeId;
+    if (!storeId) return;
+
+    // Find and check the radio button
+    const radioButton = storeItem.querySelector('.store-radio');
+    if (radioButton) {
+      radioButton.checked = true;
+    }
+
+    // Call the existing selectStore method
+    this.selectStore(storeId);
+  }
+
+  // Helper method to escape HTML
+  escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   // Helper method for authenticated API calls with token refresh
@@ -225,18 +383,23 @@ class SurveyApp {
   }
 
   bindEvents() {
-    // Step navigation
-    document.getElementById('nextToStep2').addEventListener('click', () => this.goToStep2());
-    document.getElementById('backToStep1').addEventListener('click', () => this.goToStep1());
-    document.getElementById('submitSurvey').addEventListener('click', () => this.submitSurvey());
-    document.getElementById('startNewSurvey').addEventListener('click', () => this.resetSurvey());
+    // Step navigation - add null checks
+    const nextBtn = document.getElementById('nextToStep2');
+    const backBtn = document.getElementById('backToStep1');
+    const submitBtn = document.getElementById('submitSurvey');
+    const newSurveyBtn = document.getElementById('startNewSurvey');
 
-    // Shop autocomplete events
+    if (nextBtn) nextBtn.addEventListener('click', () => this.goToStep2());
+    if (backBtn) backBtn.addEventListener('click', () => this.goToStep1());
+    if (submitBtn) submitBtn.addEventListener('click', () => this.submitSurvey());
+    if (newSurveyBtn) newSurveyBtn.addEventListener('click', () => this.resetSurvey());
+
+    // Shop input - add null checks (removed old autocomplete references)
     const shopInput = document.getElementById('shopSearchInput');
-    const shopSuggestionsBox = document.getElementById('shopSuggestions');
-    shopInput.addEventListener('input', (e) => this.onShopInput(e));
-    shopInput.addEventListener('keydown', (e) => this.onShopInputKeydown(e));
-    shopSuggestionsBox.addEventListener('mousedown', (e) => this.onShopSuggestionClick(e));
+    if (shopInput) {
+      shopInput.addEventListener('input', (e) => this.onShopInput(e));
+      // Removed keydown event since we don't need autocomplete navigation anymore
+    }
 
     // Reposition dropdown on window events
     window.addEventListener('resize', () => this.repositionVisibleDropdowns());
@@ -245,103 +408,67 @@ class SurveyApp {
     // Hide dropdowns when clicking outside
     document.addEventListener('click', (e) => this.handleOutsideClick(e));
 
-    // Model autocomplete events
+    // Store item click handling (event delegation)
+    const storeListContainer = document.getElementById('storeList');
+    if (storeListContainer) {
+      storeListContainer.addEventListener('click', (e) => this.onStoreItemClick(e));
+    }
+
+    // Model autocomplete events - add null checks
     const modelInput = document.getElementById('modelSearchInput');
     const suggestionsBox = document.getElementById('modelSuggestions');
     const addModelBtn = document.getElementById('addModelBtn');
-    modelInput.addEventListener('input', (e) => this.onModelInput(e));
-    modelInput.addEventListener('keydown', (e) => this.onModelInputKeydown(e));
-    suggestionsBox.addEventListener('mousedown', (e) => this.onModelSuggestionClick(e));
-    addModelBtn.addEventListener('click', () => this.onAddModel());
+    
+    if (modelInput) modelInput.addEventListener('input', (e) => this.onModelInput(e));
+    if (modelInput) modelInput.addEventListener('keydown', (e) => this.onModelInputKeydown(e));
+    if (suggestionsBox) suggestionsBox.addEventListener('mousedown', (e) => this.onModelSuggestionClick(e));
+    if (addModelBtn) addModelBtn.addEventListener('click', () => this.onAddModel());
   }
 
   showLoading() {
-    document.getElementById('loadingOverlay').classList.add('show');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    if (loadingOverlay) {
+      loadingOverlay.classList.add('show');
+    }
   }
 
   hideLoading() {
-    document.getElementById('loadingOverlay').classList.remove('show');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    if (loadingOverlay) {
+      loadingOverlay.classList.remove('show');
+    }
   }
 
-  // Shop autocomplete methods
+  // Shop search and filter methods
   async onShopInput(e) {
-    const value = e.target.value.trim();
+    const value = e.target.value.trim().toLowerCase();
     this.shopSearchValue = value;
-    this.shopSearchSelected = '';
-
-    const nextBtn = document.getElementById('nextToStep2');
-    nextBtn.disabled = true;
-    this.hideSelectedShopInfo();
-
-    // Clear existing timer
-    if (this.shopSearchDebounceTimer) {
-      clearTimeout(this.shopSearchDebounceTimer);
-    }
-
-    if (!value || value.length < 2) {
-      this.hideShopSuggestions();
+    
+    // If user clears the input, reset selection
+    if (!value) {
+      this.shopSearchSelected = '';
+      const nextBtn = document.getElementById('nextToStep2');
+      if (nextBtn) {
+        nextBtn.disabled = true;
+      }
+      this.hideSelectedShopInfo();
+      
+      // Clear any radio button selections
+      const radioButtons = document.querySelectorAll('input[name="storeSelection"]');
+      radioButtons.forEach(radio => radio.checked = false);
+      
+      // Show all stores
+      this.filterStoreList('');
       return;
     }
 
-    // Debounce search with 300ms delay
-    this.shopSearchDebounceTimer = setTimeout(async () => {
-      try {
-        console.log('🔍 Frontend: Searching for stores with query:', value);
-        const res = await this.authenticatedFetch(
-          `/api/stores/search?q=${encodeURIComponent(value)}`
-        );
-        if (res && res.ok) {
-          const result = await res.json();
-          console.log('📥 Frontend: Search API response:', result);
-          if (result.success) {
-            console.log('✅ Frontend: Showing suggestions for', result.data.length, 'stores');
-            this.showShopSuggestions(result.data);
-          } else {
-            console.error('❌ Frontend: API returned error:', result.message);
-          }
-        } else {
-          console.error('❌ Frontend: HTTP error:', res.status, res.statusText);
-        }
-      } catch (error) {
-        console.error('❌ Frontend: Store search error:', error);
-      }
-    }, 300);
+    // Filter the store list in real-time
+    this.filterStoreList(value);
   }
 
+  // This method is no longer used - keeping for compatibility
   showShopSuggestions(stores) {
-    const suggestionsBox = document.getElementById('shopSuggestions');
-
-    if (!suggestionsBox) {
-      console.error('❌ Frontend: shopSuggestions element not found!');
-      return;
-    }
-
-    suggestionsBox.innerHTML = '';
-
-    if (!stores.length) {
-      suggestionsBox.style.display = 'none';
-      return;
-    }
-
-    stores.forEach((store, idx) => {
-      const div = document.createElement('div');
-      div.className = 'autocomplete-suggestion';
-      div.textContent = `${store.store_name} (${store.store_id})`;
-      div.dataset.value = JSON.stringify(store);
-      if (idx === 0) {
-        div.classList.add('active');
-      }
-      suggestionsBox.appendChild(div);
-    });
-
-    // Position the dropdown relative to the input field
-    this.positionDropdown('shopSearchInput', 'shopSuggestions');
-
-    suggestionsBox.style.display = 'block';
-    suggestionsBox.style.visibility = 'visible';
-
-    // Reset scroll position to top when showing new suggestions
-    suggestionsBox.scrollTop = 0;
+    console.log('showShopSuggestions called but no longer used with new store list UI');
   }
 
   // Helper method to position fixed dropdown relative to input
@@ -385,12 +512,7 @@ class SurveyApp {
 
   // Reposition any visible dropdowns when window changes
   repositionVisibleDropdowns() {
-    const shopDropdown = document.getElementById('shopSuggestions');
     const modelDropdown = document.getElementById('modelSuggestions');
-
-    if (shopDropdown && shopDropdown.style.display === 'block') {
-      this.positionDropdown('shopSearchInput', 'shopSuggestions');
-    }
 
     if (modelDropdown && modelDropdown.style.display === 'block') {
       this.positionDropdown('modelSearchInput', 'modelSuggestions');
@@ -399,20 +521,8 @@ class SurveyApp {
 
   // Handle clicks outside dropdowns to close them
   handleOutsideClick(e) {
-    const shopInput = document.getElementById('shopSearchInput');
-    const shopDropdown = document.getElementById('shopSuggestions');
     const modelInput = document.getElementById('modelSearchInput');
     const modelDropdown = document.getElementById('modelSuggestions');
-
-    // Check if click is outside shop autocomplete
-    if (
-      shopInput &&
-      shopDropdown &&
-      !shopInput.contains(e.target) &&
-      !shopDropdown.contains(e.target)
-    ) {
-      this.hideShopSuggestions();
-    }
 
     // Check if click is outside model autocomplete
     if (
@@ -426,9 +536,8 @@ class SurveyApp {
   }
 
   hideShopSuggestions() {
-    const suggestionsBox = document.getElementById('shopSuggestions');
-    suggestionsBox.innerHTML = '';
-    suggestionsBox.style.display = 'none';
+    // No longer used with new store list UI
+    console.log('hideShopSuggestions called but no longer used');
   }
 
   onShopSuggestionClick(e) {
@@ -438,41 +547,10 @@ class SurveyApp {
   }
 
   onShopInputKeydown(e) {
-    const suggestionsBox = document.getElementById('shopSuggestions');
-    const items = Array.from(suggestionsBox.querySelectorAll('.autocomplete-suggestion'));
-    if (!items.length) {
-      return;
-    }
-
-    const idx = items.findIndex((item) => item.classList.contains('active'));
-
-    if (e.key === 'ArrowDown') {
-      if (idx < items.length - 1) {
-        if (idx >= 0) {
-          items[idx].classList.remove('active');
-        }
-        const newIdx = idx + 1;
-        items[newIdx].classList.add('active');
-        // Scroll into view if needed
-        this.scrollSuggestionIntoView(suggestionsBox, items[newIdx]);
-      }
-      e.preventDefault();
-    } else if (e.key === 'ArrowUp') {
-      if (idx > 0) {
-        items[idx].classList.remove('active');
-        const newIdx = idx - 1;
-        items[newIdx].classList.add('active');
-        // Scroll into view if needed
-        this.scrollSuggestionIntoView(suggestionsBox, items[newIdx]);
-      }
-      e.preventDefault();
-    } else if (e.key === 'Enter') {
-      if (idx >= 0) {
-        this.selectShopSuggestion(items[idx].dataset.value);
-        e.preventDefault();
-      }
-    } else if (e.key === 'Escape') {
-      this.hideShopSuggestions();
+    // Simplified keydown handler for new store list UI
+    if (e.key === 'Escape') {
+      e.target.value = '';
+      this.onShopInput({ target: { value: '' } });
       e.preventDefault();
     }
   }
@@ -495,7 +573,9 @@ class SurveyApp {
     const store = JSON.parse(storeData);
     const shopInput = document.getElementById('shopSearchInput');
 
-    shopInput.value = `${store.store_name} (${store.store_id})`;
+    if (shopInput) {
+      shopInput.value = `${store.store_name} (${store.store_id})`;
+    }
     this.shopSearchSelected = store;
     this.selectedShop = store;
 
@@ -503,19 +583,27 @@ class SurveyApp {
     this.hideShopSuggestions();
 
     const nextBtn = document.getElementById('nextToStep2');
-    nextBtn.disabled = false;
+    if (nextBtn) {
+      nextBtn.disabled = false;
+    }
   }
 
   showSelectedShopInfo(store) {
     const infoDiv = document.getElementById('selectedShopInfo');
     const textSpan = document.getElementById('selectedShopText');
-    textSpan.textContent = `${store.store_name} (${store.store_id})`;
-    infoDiv.style.display = 'block';
+    if (textSpan) {
+      textSpan.textContent = `${store.store_name} (${store.store_id})`;
+    }
+    if (infoDiv) {
+      infoDiv.style.display = 'block';
+    }
   }
 
   hideSelectedShopInfo() {
     const infoDiv = document.getElementById('selectedShopInfo');
-    infoDiv.style.display = 'none';
+    if (infoDiv) {
+      infoDiv.style.display = 'none';
+    }
   }
 
   async loadModelsAndPOSM() {
@@ -1221,13 +1309,15 @@ class SurveyApp {
           const modelResponse = await this.authenticatedFetch(
             `/api/model-posm/${encodeURIComponent(model)}`
           );
-          if (modelResponse.ok) {
+          if (modelResponse && modelResponse.ok) {
             const modelData = await modelResponse.json();
-            if (modelData && modelData.length > 0) {
+            // Add validation to ensure we have an array
+            if (modelData && Array.isArray(modelData) && modelData.length > 0) {
               this.surveyData[model] = modelData;
               console.log('✅ POSM data loaded from general list for model:', model);
             } else {
-              alert('Không tìm thấy POSM cho model này.');
+              console.error('❌ No POSM data found for model:', model, 'Response:', modelData);
+              alert(`Không tìm thấy POSM cho model "${model}". Model sẽ bị loại bỏ khỏi danh sách.`);
               // Remove the model from selected list
               this.selectedModels = this.selectedModels.filter((m) => m !== model);
               console.log('❌ Model removed due to no POSM data');
@@ -1283,7 +1373,7 @@ class SurveyApp {
       listDiv.innerHTML = this.selectedModels
         .map(
           (model) => `
-                <span class="selected-model-item" style="display:inline-block;position:relative;margin-right:10px;margin-bottom:5px;padding:5px 10px;background:#f1f3f4;border-radius:5px;">
+                <span class="selected-model-item" style="display:inline-block;position:relative;margin-right:10px;margin-bottom:5px;padding:5px 10px;background:#f1f3f4;border-radius:5px;font-size:0.85rem;">
                     <strong>${model}</strong>
                     <button class="btn-icon-delete" data-model="${model}" title="Xóa model này">×</button>
                 </span>
@@ -1372,6 +1462,7 @@ class SurveyApp {
 }
 
 // Initialize the app when DOM is loaded
+let app;
 document.addEventListener('DOMContentLoaded', () => {
-  new SurveyApp();
+  app = new SurveyApp();
 });

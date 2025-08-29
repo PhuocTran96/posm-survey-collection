@@ -101,7 +101,7 @@
             padding: 0;
             margin-bottom: clamp(15px, 3vw, 25px);
             box-shadow: var(--card-shadow);
-            overflow: hidden;
+            overflow: visible;
         }
 
         .filter-toggle-header {
@@ -141,7 +141,8 @@
         .filters-content {
             padding: 0;
             max-height: 0;
-            overflow: hidden;
+            overflow-x: hidden;
+            overflow-y: visible;
             transition: all 0.3s ease;
             opacity: 0;
             visibility: hidden;
@@ -253,6 +254,8 @@
             min-width: 200px;
             z-index: 1000;
             overflow: hidden;
+            transform: translateZ(0);
+            will-change: opacity, transform;
         }
 
         .date-filter-option {

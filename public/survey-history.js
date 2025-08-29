@@ -1087,11 +1087,20 @@ class SurveyHistoryApp {
   toggleDateFilter() {
     const dropdown = document.getElementById('dateFilterDropdown');
     const button = document.getElementById('dateFilterBtn');
+    const filtersContent = document.getElementById('filtersContent');
 
     if (dropdown.style.display === 'none' || !dropdown.style.display) {
+      // Temporarily remove overflow constraints when opening dropdown
+      if (filtersContent) {
+        filtersContent.style.overflowY = 'visible';
+      }
       dropdown.style.display = 'block';
       button.classList.add('active');
     } else {
+      // Restore overflow constraints when closing dropdown
+      if (filtersContent && filtersContent.classList.contains('expanded')) {
+        filtersContent.style.overflowY = 'visible';
+      }
       dropdown.style.display = 'none';
       button.classList.remove('active');
       this.hideCustomDateInputs();
@@ -1101,11 +1110,17 @@ class SurveyHistoryApp {
   hideDateFilter() {
     const dropdown = document.getElementById('dateFilterDropdown');
     const button = document.getElementById('dateFilterBtn');
+    const filtersContent = document.getElementById('filtersContent');
 
     if (dropdown && button) {
       dropdown.style.display = 'none';
       button.classList.remove('active');
       this.hideCustomDateInputs();
+      
+      // Restore overflow constraints when hiding dropdown
+      if (filtersContent && filtersContent.classList.contains('expanded')) {
+        filtersContent.style.overflowY = 'visible';
+      }
     }
   }
 

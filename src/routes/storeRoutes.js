@@ -3,7 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const router = express.Router();
 const storeController = require('../controllers/storeController');
-const { verifyToken, requireRole } = require('../middleware/auth');
+const { verifyToken, updateActivity, requireRole } = require('../middleware/auth');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -35,6 +35,7 @@ const upload = multer({
 
 // All routes require authentication
 router.use(verifyToken);
+router.use(updateActivity); // Update user activity on each request
 
 // GET routes
 router.get('/', storeController.getStores);

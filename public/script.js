@@ -317,25 +317,42 @@ class SurveyApp {
     try {
       const response = await fetch(url, authOptions);
 
-      // If unauthorized, try to refresh token once
-      if (response.status === 401 && retryCount === 0) {
-        console.log('Token expired, attempting refresh...');
+      // Check for new access token in response headers (for activity updates)
+      const newToken = response.headers.get('X-New-Access-Token');
+      if (newToken) {
+        console.log('🔄 Updating access token due to activity');
+        localStorage.setItem('accessToken', newToken);
+      }
 
-        const refreshSuccess = await this.refreshToken();
-        if (refreshSuccess) {
-          // Retry the original request with new token
-          return await this.authenticatedFetch(url, options, 1);
-        } else {
-          // Refresh failed, redirect to login
+      // Handle different types of authentication failures
+      if (response.status === 401) {
+        const errorData = await response.clone().json().catch(() => ({}));
+        
+        if (errorData.code === 'SESSION_TIMEOUT') {
+          // Session timeout - redirect to login immediately
           this.clearAuthData();
-          this.redirectToLogin('Session expired, please login again');
+          this.redirectToLogin('Session expired due to inactivity. Please login again.');
+          return null;
+        } else if (retryCount === 0) {
+          // Token expired, try to refresh token once
+          console.log('Token expired, attempting refresh...');
+          
+          const refreshSuccess = await this.refreshToken();
+          if (refreshSuccess) {
+            // Retry the original request with new token
+            return await this.authenticatedFetch(url, options, 1);
+          } else {
+            // Refresh failed, redirect to login
+            this.clearAuthData();
+            this.redirectToLogin('Session expired, please login again');
+            return null;
+          }
+        } else {
+          // Already retried once, redirect to login
+          this.clearAuthData();
+          this.redirectToLogin('Authentication failed');
           return null;
         }
-      } else if (response.status === 401) {
-        // Already retried once, redirect to login
-        this.clearAuthData();
-        this.redirectToLogin('Authentication failed');
-        return null;
       }
 
       return response;

@@ -8,13 +8,17 @@ const REFRESH_TOKEN_SECRET =
   process.env.JWT_REFRESH_SECRET || 'your-super-secret-refresh-key-change-in-production';
 
 // Token expiry times
-const ACCESS_TOKEN_EXPIRY = '15m'; // 15 minutes
+const ACCESS_TOKEN_EXPIRY = '7d'; // 7 days
 const REFRESH_TOKEN_EXPIRY = '7d'; // 7 days
+
+// Session timeout (60 minutes of inactivity)
+const SESSION_TIMEOUT = 60 * 60 * 1000; // 60 minutes in milliseconds
 
 /**
  * Generate access and refresh tokens for a user
  */
 const generateTokens = (user) => {
+  const now = new Date();
   const payload = {
     id: user._id,
     userid: user.userid,
@@ -22,6 +26,7 @@ const generateTokens = (user) => {
     loginid: user.loginid,
     role: user.role,
     leader: user.leader,
+    lastActivity: now.getTime(), // Track last activity for session timeout
   };
 
   const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, {
@@ -77,6 +82,18 @@ const verifyToken = async (req, res, next) => {
         success: false,
         message: 'Account is deactivated',
         code: 'ACCOUNT_DEACTIVATED',
+      });
+    }
+
+    // Check for session timeout (60 minutes of inactivity)
+    const now = Date.now();
+    const lastActivity = decoded.lastActivity || decoded.iat * 1000; // Fallback to token issued time
+    
+    if (now - lastActivity > SESSION_TIMEOUT) {
+      return res.status(401).json({
+        success: false,
+        message: 'Session expired due to inactivity',
+        code: 'SESSION_TIMEOUT',
       });
     }
 
@@ -252,6 +269,33 @@ const getClientInfo = (req) => {
 };
 
 /**
+ * Update user activity timestamp (for session management)
+ * Should be used after verifyToken middleware
+ */
+const updateActivity = async (req, res, next) => {
+  try {
+    if (req.user && req.tokenData) {
+      const now = Date.now();
+      const lastActivity = req.tokenData.lastActivity || req.tokenData.iat * 1000;
+      
+      // Update activity if more than 5 minutes have passed to avoid excessive token generation
+      if (now - lastActivity > 5 * 60 * 1000) {
+        // Generate new token with updated activity
+        const newTokens = generateTokens(req.user);
+        
+        // Set new token in response header for client to update
+        res.setHeader('X-New-Access-Token', newTokens.accessToken);
+      }
+    }
+  } catch (error) {
+    console.error('Activity update error:', error);
+    // Don't fail the request if activity update fails
+  }
+  
+  next();
+};
+
+/**
  * Optional authentication middleware (doesn't fail if no token)
  */
 const optionalAuth = async (req, res, next) => {
@@ -281,6 +325,7 @@ const optionalAuth = async (req, res, next) => {
 module.exports = {
   generateTokens,
   verifyToken,
+  updateActivity,
   requireRole,
   requireAdmin,
   requireSurveyUser,
@@ -292,4 +337,5 @@ module.exports = {
   // Constants
   ACCESS_TOKEN_EXPIRY,
   REFRESH_TOKEN_EXPIRY,
+  SESSION_TIMEOUT,
 };

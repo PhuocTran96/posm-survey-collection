@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
-const { verifyToken, refreshAccessToken, requireSurveyUser } = require('../middleware/auth');
+const { verifyToken, updateActivity, refreshAccessToken, requireSurveyUser } = require('../middleware/auth');
 
 // Public routes
 router.post('/login', authController.login);
@@ -10,6 +10,7 @@ router.post('/refresh', refreshAccessToken);
 
 // Protected routes
 router.use(verifyToken); // All routes below require authentication
+router.use(updateActivity); // Update user activity on each request
 
 router.post('/logout', authController.logout);
 router.get('/profile', authController.getProfile);

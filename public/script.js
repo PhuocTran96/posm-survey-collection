@@ -1461,8 +1461,208 @@ class SurveyApp {
   }
 }
 
+// Sticky behavior implementation
+class StickyElements {
+  constructor() {
+    this.stickyElements = [];
+    this.isEnabled = false;
+  }
+
+  init() {
+    // Initialize sticky behavior when step 2 is active
+    this.setupStickyElements();
+    this.bindScrollListener();
+  }
+
+  setupStickyElements() {
+    // Clear existing elements to prevent duplicates
+    this.stickyElements = [];
+    
+    // Try new combined header first, fallback to legacy elements
+    const combinedHeader = document.querySelector('.combined-sticky-header');
+    if (combinedHeader) {
+      this.stickyElements.push({
+        element: combinedHeader,
+        originalTop: null,
+        isSticky: false,
+        className: 'combined-sticky-header'
+      });
+      console.log('📋 Using combined sticky header');
+    } else {
+      // Fallback to legacy separate elements
+      const selectedInfo = document.querySelector('.selected-info');
+      const stickySearch = document.querySelector('.sticky-search-section');
+      
+      if (selectedInfo) {
+        this.stickyElements.push({
+          element: selectedInfo,
+          originalTop: null,
+          isSticky: false,
+          className: 'selected-info'
+        });
+      }
+      
+      if (stickySearch) {
+        this.stickyElements.push({
+          element: stickySearch,
+          originalTop: null,
+          isSticky: false,
+          className: 'sticky-search-section'
+        });
+      }
+      console.log('📋 Using legacy separate sticky elements');
+    }
+    
+    console.log('📋 Setup sticky elements:', this.stickyElements.length);
+  }
+
+  enable() {
+    if (this.isEnabled) return;
+    this.isEnabled = true;
+    console.log('🔧 Enabling sticky behavior for', this.stickyElements.length, 'elements');
+    
+    // Reset elements
+    this.stickyElements.forEach(item => {
+      item.originalTop = item.element.offsetTop;
+      item.isSticky = false;
+      console.log(`  📍 Element ${item.className} originalTop:`, item.originalTop);
+    });
+    
+    this.handleScroll();
+  }
+
+  disable() {
+    if (!this.isEnabled) return;
+    this.isEnabled = false;
+    
+    // Reset all elements to normal positioning
+    this.stickyElements.forEach(item => {
+      if (item.isSticky) {
+        item.element.style.position = '';
+        item.element.style.top = '';
+        item.element.style.left = '';
+        item.element.style.right = '';
+        item.element.style.width = '';
+        item.element.style.marginLeft = '';
+        item.element.style.marginRight = '';
+        item.element.style.boxShadow = '';
+        item.isSticky = false;
+      }
+    });
+  }
+
+  bindScrollListener() {
+    let ticking = false;
+    
+    const scrollHandler = () => {
+      if (!ticking && this.isEnabled) {
+        requestAnimationFrame(() => {
+          this.handleScroll();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+    
+    window.addEventListener('scroll', scrollHandler, { passive: true });
+  }
+
+  handleScroll() {
+    if (!this.isEnabled) return;
+    
+    const scrollY = window.pageYOffset;
+    
+    this.stickyElements.forEach(item => {
+      if (item.originalTop === null) {
+        item.originalTop = item.element.offsetTop;
+      }
+      
+      const shouldStick = scrollY >= item.originalTop;
+      
+      if (shouldStick && !item.isSticky) {
+        // Make sticky
+        console.log(`🔗 Making ${item.className} sticky`);
+        const rect = item.element.getBoundingClientRect();
+        item.element.style.position = 'fixed';
+        item.element.style.top = '0px';
+        item.element.style.left = rect.left + 'px';
+        item.element.style.right = (window.innerWidth - rect.right) + 'px';
+        item.element.style.width = rect.width + 'px';
+        
+        // Fix: Remove negative margins that cause alignment shift
+        item.element.style.marginLeft = '0';
+        item.element.style.marginRight = '0';
+        
+        // Set z-index based on element type
+        if (item.className === 'combined-sticky-header') {
+          item.element.style.zIndex = '200';
+        } else if (item.className === 'selected-info') {
+          item.element.style.zIndex = '200';
+        } else {
+          item.element.style.zIndex = '150';
+        }
+        item.element.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+        item.isSticky = true;
+      } else if (!shouldStick && item.isSticky) {
+        // Remove sticky and restore original state
+        console.log(`🔓 Removing sticky from ${item.className}`);
+        item.element.style.position = '';
+        item.element.style.top = '';
+        item.element.style.left = '';
+        item.element.style.right = '';
+        item.element.style.width = '';
+        item.element.style.marginLeft = '';
+        item.element.style.marginRight = '';
+        item.element.style.boxShadow = '';
+        item.isSticky = false;
+      }
+    });
+  }
+
+  refresh() {
+    // Recalculate positions
+    this.stickyElements.forEach(item => {
+      if (!item.isSticky) {
+        item.originalTop = item.element.offsetTop;
+      }
+    });
+    this.handleScroll();
+  }
+}
+
 // Initialize the app when DOM is loaded
 let app;
+let stickyManager;
+
 document.addEventListener('DOMContentLoaded', () => {
   app = new SurveyApp();
+  stickyManager = new StickyElements();
+  window.stickyManager = stickyManager; // Make it globally accessible
+  stickyManager.init();
+  
+  // Enable sticky behavior when step 2 becomes active
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+        const step2 = document.getElementById('step2');
+        if (step2 && step2.classList.contains('active')) {
+          console.log('🔄 Step 2 activated, enabling sticky elements');
+          // Wait for content to render then enable sticky
+          setTimeout(() => {
+            stickyManager.setupStickyElements();
+            stickyManager.enable();
+            console.log('✅ Sticky elements enabled:', stickyManager.stickyElements.length);
+          }, 100);
+        } else {
+          stickyManager.disable();
+        }
+      }
+    });
+  });
+  
+  // Observe step changes
+  const steps = document.querySelectorAll('.step');
+  steps.forEach(step => {
+    observer.observe(step, { attributes: true });
+  });
 });

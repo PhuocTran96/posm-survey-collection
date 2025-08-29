@@ -56,23 +56,24 @@
             <!-- Step 2: POSM Selection -->
             <div id="step2" class="step">
                 <h2>Bước 2: Chọn POSM đã triển khai</h2>
-                <div class="selected-info">
-                    <p><strong>Shop:</strong> <span id="selectedShop"></span></p>
-                </div>
-                <!-- Model search and add -->
-                <div class="sticky-search-section">
-                    <div class="form-group" style="position:relative;">
-                        <div class="search-input-container">
-                            <input type="text" id="modelSearchInput" class="form-control search-with-icon" placeholder="Nhập tên model..." autocomplete="off">
-                        </div>
-                        <div id="modelSuggestions" class="autocomplete-suggestions"></div>
-                        <button id="addModelBtn" class="btn btn-primary" disabled>Thêm Model</button>
+                <!-- Combined sticky header with shop info and search -->
+                <div class="combined-sticky-header">
+                    <div class="selected-info-compact">
+                        <p><strong>Shop:</strong> <span id="selectedShop"></span></p>
                     </div>
-                    <div id="selectedModelsList" class="compact-models-list"></div>
+                    <div class="search-section-compact">
+                        <div class="form-group" style="position:relative;">
+                            <div class="search-input-container">
+                                <input type="text" id="modelSearchInput" class="form-control search-with-icon" placeholder="Nhập tên model..." autocomplete="off">
+                            </div>
+                            <div id="modelSuggestions" class="autocomplete-suggestions"></div>
+                            <button id="addModelBtn" class="btn btn-primary" disabled>Thêm Model</button>
+                        </div>
+                        <div id="selectedModelsList" class="compact-models-list"></div>
+                    </div>
                 </div>
                 <div class="models-section-separator"></div>
                 <div class="models-section">
-                    <h3 class="models-section-title">Các model đã chọn:</h3>
                     <div id="modelsContainer" class="models-container">
                         <!-- Models and POSM will be loaded here -->
                     </div>

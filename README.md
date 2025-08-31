@@ -1,132 +1,124 @@
-# POSM Survey Collection - Refactoring Summary
+# POSM Survey Collection System
 
-## Overview
-This project has been refactored from a monolithic server architecture to a modular, maintainable structure following Node.js best practices.
+A Node.js web application for collecting and managing survey data with POSM (Point of Sale Management) integration.
 
-## Refactoring Changes
+## Features
 
-### 1. **Modular Architecture**
-- **Before**: Single `server.js` file with 734 lines containing all functionality
-- **After**: Clean separation of concerns across multiple modules
+- **Survey Management**: Create, view, and manage surveys with image uploads
+- **Admin Dashboard**: Administrative interface for data management
+- **File Upload**: Support for image uploads with AWS S3 integration
+- **Data Import/Export**: CSV data import and management tools
+- **Store Management**: Track and manage store information
+- **Responsive UI**: Mobile-friendly interface for field data collection
 
-### 2. **New Project Structure**
+## Tech Stack
+
+- **Backend**: Node.js, Express.js
+- **Database**: MongoDB with Mongoose ODM
+- **File Storage**: AWS S3
+- **Frontend**: HTML, CSS, JavaScript
+- **Development**: Nodemon for hot reloading
+
+## Project Structure
+
 ```
 src/
-├── config/
-│   ├── index.js          # Centralized configuration management
-│   └── database.js       # Database connection logic
-├── controllers/
-│   ├── adminController.js    # Admin operations handlers
-│   ├── surveyController.js   # Survey-related endpoints
-│   └── uploadController.js   # File upload handling
-├── middleware/
-│   └── errorHandler.js   # Global error handling middleware
-├── models/
-│   ├── SurveyResponse.js # Survey response schema
-│   ├── Store.js         # Store schema
-│   ├── ModelPosm.js     # Model-POSM schema
-│   └── index.js         # Models export
-├── routes/
-│   ├── adminRoutes.js   # Admin API routes
-│   ├── surveyRoutes.js  # Survey API routes
-│   ├── uploadRoutes.js  # Upload API routes
-│   └── index.js         # Routes aggregator
-├── services/
-│   └── dataInitializer.js   # CSV data loading service
-└── utils/
-    └── s3Helper.js      # AWS S3 utility functions
+├── config/           # Configuration management
+├── controllers/      # Request handlers
+├── middleware/       # Express middleware
+├── models/          # Database schemas
+├── routes/          # API routes
+├── services/        # Business logic
+└── utils/           # Helper functions
+
+public/              # Static files (HTML, CSS, JS)
+uploads/            # Temporary file uploads
 ```
 
-### 3. **Key Improvements**
+## Installation
 
-#### Configuration Management
-- Extracted all environment variables to `src/config/index.js`
-- Added configuration validation
-- Centralized app settings
-
-#### Database Layer
-- Separated database schemas into individual model files
-- Extracted connection logic to `src/config/database.js`
-- Added proper error handling for database operations
-
-#### Route Organization
-- Split routes by domain (survey, admin, upload)
-- Separated route definitions from business logic
-- Clear API structure with proper middleware
-
-#### Error Handling
-- Centralized error handling middleware
-- Consistent error response format
-- Development vs production error messages
-
-#### Business Logic Separation
-- Controllers handle HTTP requests/responses only
-- Services contain business logic
-- Utilities handle shared functionality
-
-### 4. **Files Created/Modified**
-
-#### New Refactored Files:
-- `server-refactored.js` - Clean main server file (47 lines vs 734)
-- `upload-posm-data-refactored.js` - Modularized upload script
-- All files in `src/` directory
-
-#### Updated Files:
-- `package.json` - Added new script commands for refactored version
-
-### 5. **Usage**
-
-#### Running the Server:
+1. Clone the repository:
 ```bash
-# Development
-npm run dev
+git clone <repository-url>
+cd posm-survey-collection
+```
 
-# Production
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Set up environment variables:
+Create a `.env` file with the following variables:
+```env
+PORT=3000
+MONGODB_URI=mongodb://localhost:27017/posm-surveys
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+AWS_S3_BUCKET=your_s3_bucket_name
+AWS_REGION=your_aws_region
+```
+
+## Usage
+
+### Development
+```bash
+npm run dev
+```
+
+### Production
+```bash
 npm start
 ```
 
-#### Using the Upload Script:
+### Data Management
 ```bash
-# Basic upload
+# Upload POSM data from CSV
 npm run upload-posm
 
-# Clear and upload
+# Clear existing data and upload
 npm run upload-posm-clear
 
-# Upsert mode (default)
+# Upsert mode (update existing, insert new)
 npm run upload-posm-upsert
 ```
 
-### 6. **Benefits of Refactoring**
+## API Endpoints
 
-1. **Maintainability**: Code is easier to understand, modify, and debug
-2. **Testability**: Individual components can be unit tested
-3. **Scalability**: Easy to add new features without affecting existing code
-4. **Reusability**: Shared utilities and services can be reused
-5. **Error Handling**: Centralized and consistent error management
-6. **Code Organization**: Clear separation of concerns
-7. **Configuration**: Environment-based configuration management
+### Survey Routes
+- `GET /api/surveys` - Get all surveys
+- `POST /api/surveys` - Create new survey
+- `GET /api/surveys/:id` - Get specific survey
+- `PUT /api/surveys/:id` - Update survey
+- `DELETE /api/surveys/:id` - Delete survey
 
-### 7. **Migration Completed** ✅
-- Original monolithic files have been replaced with refactored versions
-- `server.js` is now the clean, modular version (47 lines vs original 734 lines)
-- `upload-posm-data.js` uses the new modular architecture  
-- Outdated files (`s3.js`, old server/upload scripts) have been removed
-- Package.json updated with clean script commands
-- Same API endpoints and functionality maintained
+### Admin Routes
+- `GET /api/admin/dashboard` - Admin dashboard data
+- `GET /api/admin/stores` - Get all stores
+- `POST /api/admin/stores` - Create store
 
-### 8. **Next Steps**
-1. Test the refactored version thoroughly
-2. Migrate environment variables to use new config structure
-3. Add unit tests for individual modules
-4. Consider adding API documentation (Swagger/OpenAPI)
-5. Add logging middleware for better monitoring
+### Upload Routes
+- `POST /api/upload/image` - Upload image files
+- `POST /api/upload/csv` - Upload CSV data
 
-## Usage Guide
-The migration is complete. Use the standard commands:
+## Development
 
-1. Start the server: `npm start` or `npm run dev`
-2. Upload POSM data: `npm run upload-posm`
-3. All endpoints remain the same and fully functional
+The application follows a modular architecture with:
 
-The refactored code maintains 100% functional compatibility while providing a much cleaner, more maintainable architecture with 94% fewer lines of code in the main server file.
+- **Controllers**: Handle HTTP requests/responses
+- **Services**: Contain business logic
+- **Models**: Define data schemas
+- **Routes**: Define API endpoints
+- **Middleware**: Handle cross-cutting concerns
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License.

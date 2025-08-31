@@ -80,3 +80,6 @@ check_*
 # Uploaded data files
 uploads/*.csv
 *.csv
+
+# Docs
+docs/

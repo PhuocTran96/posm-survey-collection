@@ -62,8 +62,8 @@ main {
 
 /* Specifically for step2 which has sticky elements */
 #step2 {
-    min-height: 150vh; /* Extra height to ensure scrolling */
-    padding-bottom: 100px; /* Extra padding at bottom */
+    min-height: auto; /* Remove excessive height */
+    padding-bottom: 20px; /* Reduced padding */
 }
 header {
     background: var(--primary);
@@ -336,10 +336,14 @@ main {
 }
 /* Combined sticky header for mobile optimization */
 .combined-sticky-header {
+    position: sticky;
+    top: 0;
     background: white;
     padding: 12px 16px;
     margin: 0 -24px 8px -24px;
     border-bottom: 1px solid #e9ecef;
+    z-index: 100;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .selected-info-compact {
@@ -408,15 +412,15 @@ main {
 .models-section-separator {
     height: 2px;
     background: linear-gradient(90deg, #e9ecef 0%, #dee2e6 50%, #e9ecef 100%);
-    margin: 20px -20px 0 -20px;
+    margin: 8px -20px 0 -20px;
 }
 
 /* Models section styling */
 .models-section {
     background: #f8f9fa;
-    margin: 0 -20px;
+    margin: 120px -20px 0 -20px; /* Top margin for sticky header space */
     padding: 20px;
-    min-height: 80vh; /* Ensure this section is tall enough to trigger scrolling */
+    min-height: auto; /* Remove excessive height */
 }
 
 .models-container, .model-group, .posm-list {
@@ -585,7 +589,7 @@ main {
     
     /* Ensure enough space below sticky header on mobile */
     #step2 .models-section {
-        margin-top: 8px;
+        margin-top: 240px;
     }
     
     /* Sticky continue button for step 1 */

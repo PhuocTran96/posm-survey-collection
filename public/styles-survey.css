@@ -360,10 +360,6 @@ main {
     font-weight: 500;
 }
 
-.search-section-compact {
-    /* Search section styling within combined header */
-}
-
 /* Legacy selectors for compatibility */
 .selected-info {
     background: #f8f9fa;

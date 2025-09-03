@@ -161,15 +161,17 @@ userSchema.statics.validateHierarchy = async function (role, leaderUsername) {
   }
 
   // Find the leader user to check their role
-  const leaderUser = await this.findOne({ username: leaderUsername });
+  const leaderUser = await this.findOne({ username: leaderUsername, isActive: true });
   if (!leaderUser) {
     return false; // Leader doesn't exist
   }
 
   const validHierarchy = {
-    PRT: ['TDS'], // PRT reports to TDS
-    TDS: ['TDL'], // TDS reports to TDL
-    user: ['TDS', 'TDL'], // users can report to TDS or TDL
+    admin: [], // admin doesn't report to anyone
+    PRT: ['TDS', 'TDL', 'admin'], // PRT can report to TDS, TDL, or admin
+    TDS: ['TDL', 'admin'], // TDS can report to TDL or admin
+    TDL: ['admin'], // TDL can report to admin
+    user: ['TDS', 'TDL', 'admin'], // users can report to TDS, TDL, or admin
   };
 
   const allowedLeaderRoles = validHierarchy[role];

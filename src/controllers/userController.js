@@ -148,7 +148,7 @@ const createUser = async (req, res) => {
     }
 
     // Validate hierarchy if leader is provided
-    if (leader && !User.validateHierarchy(role, leader)) {
+    if (leader && !(await User.validateHierarchy(role, leader))) {
       return res.status(400).json({
         success: false,
         message: `Invalid hierarchy: ${role} cannot report to ${leader}`,
@@ -273,12 +273,25 @@ const updateUser = async (req, res) => {
 
     // Update other fields
     if (role && role !== user.role) {
-      // Validate hierarchy with new role
-      if (leader && !User.validateHierarchy(role, leader)) {
-        return res.status(400).json({
-          success: false,
-          message: `Invalid hierarchy: ${role} cannot report to ${leader}`,
-        });
+      // Check if new role is compatible with existing leader
+      if (user.leader && !(await User.validateHierarchy(role, user.leader))) {
+        // Get leader user to show their role in error message
+        const leaderUser = await User.findOne({ username: user.leader, isActive: true });
+        const leaderRole = leaderUser ? leaderUser.role : 'unknown';
+        
+        // Auto-clear leader for roles that can exist without one
+        if (['admin', 'TDL'].includes(role)) {
+          console.log(`Auto-clearing leader for ${role} role change`);
+          user.leader = null;
+        } else {
+          // For roles that need a leader, check if we should auto-clear
+          // This happens when the current leader cannot manage the new role
+          console.log(`Role ${role} is incompatible with leader ${user.leader} (${leaderRole}). Clearing leader.`);
+          user.leader = null;
+          
+          // Log this action for transparency
+          console.log(`Auto-cleared leader for user ${user.username} when changing role from ${user.role} to ${role}`);
+        }
       }
       user.role = role.trim();
     }
@@ -286,7 +299,7 @@ const updateUser = async (req, res) => {
     if (leader !== undefined) {
       if (leader) {
         // Validate hierarchy
-        if (!User.validateHierarchy(user.role, leader)) {
+        if (!(await User.validateHierarchy(user.role, leader))) {
           return res.status(400).json({
             success: false,
             message: `Invalid hierarchy: ${user.role} cannot report to ${leader}`,
@@ -857,6 +870,68 @@ const exportUsersToCSV = async (req, res) => {
 };
 
 /**
+ * Get potential leaders for a given role
+ */
+const getPotentialLeaders = async (req, res) => {
+  try {
+    const { role } = req.params;
+
+    // Validate role parameter
+    const validRoles = ['admin', 'user', 'PRT', 'TDS', 'TDL'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid role specified',
+      });
+    }
+
+    // Define role hierarchy - who can lead whom
+    const roleHierarchy = {
+      PRT: ['TDS', 'TDL', 'admin'],
+      TDS: ['TDL', 'admin'], 
+      user: ['TDS', 'TDL', 'admin'],
+      admin: [],  // Admins don't need leaders
+      TDL: []     // TDLs don't need leaders
+    };
+
+    const allowedLeaderRoles = roleHierarchy[role];
+    
+    // If role doesn't need leaders, return empty array
+    if (!allowedLeaderRoles || allowedLeaderRoles.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+        message: `Role ${role} does not require a leader`
+      });
+    }
+
+    // Fetch active users with the allowed leader roles
+    const potentialLeaders = await User.find({
+      role: { $in: allowedLeaderRoles },
+      isActive: true
+    })
+    .select('_id userid username loginid role')
+    .sort({ username: 1 });
+
+    res.json({
+      success: true,
+      data: potentialLeaders,
+      meta: {
+        requestedRole: role,
+        allowedLeaderRoles: allowedLeaderRoles,
+        count: potentialLeaders.length
+      }
+    });
+  } catch (error) {
+    console.error('Get potential leaders error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve potential leaders',
+    });
+  }
+};
+
+/**
  * Get user statistics
  */
 const getUserStats = async (req, res) => {
@@ -907,5 +982,6 @@ module.exports = {
   resetUserPassword,
   importUsersFromCSV,
   exportUsersToCSV,
+  getPotentialLeaders,
   getUserStats,
 };

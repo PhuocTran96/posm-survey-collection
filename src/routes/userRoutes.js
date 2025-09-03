@@ -46,6 +46,7 @@ router.use(requireAdmin);
 // User CRUD operations
 router.get('/', userController.getUsers);
 router.get('/stats', userController.getUserStats);
+router.get('/potential-leaders/:role', userController.getPotentialLeaders);
 router.get('/:id', userController.getUserById);
 router.post('/', userController.createUser);
 router.put('/:id', userController.updateUser);

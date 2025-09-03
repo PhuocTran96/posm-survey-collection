@@ -1018,3 +1018,910 @@ async handleChangePassword(e) {
 *Review completed by: Reviewer Agent*  
 *Review date: September 1, 2025*  
 *Architecture validation: Confirmed against Gemini analysis*
+
+---
+
+# Enhancement Proposal - Leader Dropdown Dynamic Population
+**Date**: September 3, 2025  
+**Proposal Type**: Bug Fix & Feature Enhancement - User Management  
+**Priority**: High - Core Functionality Issue  
+
+## Summary
+
+Fix and enhance the Leader dropdown functionality in the Edit User form of the POSM Survey Collection web application. The current implementation has critical gaps that prevent proper leader assignment based on role hierarchy. This proposal addresses the broken dropdown population and implements a robust role-based leader selection system.
+
+## Current State Analysis
+
+### 1. Identified Issues
+
+#### 1.1 Leader Dropdown Population Problems
+**Current Implementation Problems**:
+- The `fetchAllLeaders()` method (lines 1200-1303 in user-management.js) uses a flawed approach
+- It fetches `/api/users?limit=5000&isActive=true` but relies on existing leader assignments to determine potential leaders
+- For new deployments or when no leaders are assigned yet, this results in empty dropdowns
+- The logic tries to determine "valid leader roles" by reverse-engineering from existing assignments
+- No direct API endpoint for role-based leader selection
+
+#### 1.2 Role Hierarchy Issues
+**Backend Hierarchy Rules** (from User.js lines 169-176):
+```javascript
+const validHierarchy = {
+  admin: [], // admin doesn't report to anyone
+  PRT: ['TDS', 'TDL', 'admin'], // PRT can report to TDS, TDL, or admin
+  TDS: ['TDL', 'admin'], // TDS can report to TDL or admin
+  TDL: ['admin'], // TDL can report to admin
+  user: ['TDS', 'TDL', 'admin'], // users can report to TDS, TDL, or admin
+};
+```
+
+**Current Frontend Logic Problems**:
+- The `loadLeadersDropdown()` method (lines 1306-1425) uses complex heuristics to determine leader eligibility
+- It tries to infer role hierarchy dynamically instead of using the backend's definitive rules
+- Fallback logic creates "dummy" leader entries when user records can't be found
+- No direct integration with `User.validateHierarchy()` backend logic
+
+### 2. Architecture Gap Analysis
+
+#### 2.1 Missing Backend API
+**Current State**: No dedicated endpoint for fetching potential leaders by role
+**Impact**: Frontend must implement complex logic that duplicates backend hierarchy rules
+**Risk**: Frontend and backend hierarchy validation can become inconsistent
+
+#### 2.2 Frontend Complexity
+**Current State**: 225+ lines of complex leader dropdown logic with multiple fallback mechanisms
+**Impact**: Difficult to maintain, debug, and extend
+**Risk**: High likelihood of bugs when hierarchy rules change
+
+### 3. User Experience Issues
+
+#### 3.1 Empty Dropdown Problem
+**Scenario**: When editing a user with role "PRT"
+**Expected**: Dropdown shows all active TDS, TDL, and admin users
+**Actual**: Dropdown may show "Không có Leader khả dụng trong hệ thống"
+
+#### 3.2 Inconsistent Selection
+**Scenario**: Role change triggers dropdown refresh
+**Expected**: Dropdown immediately updates with role-appropriate leaders
+**Actual**: May not update properly or show incorrect options
+
+## Proposed Solution
+
+### 1. Backend API Enhancement
+
+#### 1.1 New API Endpoint: Get Potential Leaders by Role
+**Endpoint**: `GET /api/users/potential-leaders/:role`
+**Purpose**: Return all active users who can lead the specified role based on hierarchy rules
+
+**Implementation in `userController.js`**:
+```javascript
+/**
+ * Get potential leaders for a given role
+ * Returns all active users whose roles can lead the specified role
+ */
+const getPotentialLeadersByRole = async (req, res) => {
+  try {
+    const { role } = req.params;
+    
+    // Validate role parameter
+    const validRoles = ['admin', 'user', 'PRT', 'TDS', 'TDL'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid role specified'
+      });
+    }
+
+    // Use the existing hierarchy validation to determine valid leader roles
+    const validHierarchy = {
+      admin: [], // admin doesn't report to anyone
+      PRT: ['TDS', 'TDL', 'admin'],
+      TDS: ['TDL', 'admin'],
+      TDL: ['admin'],
+      user: ['TDS', 'TDL', 'admin'],
+    };
+
+    const allowedLeaderRoles = validHierarchy[role];
+    
+    // If role doesn't need a leader (admin), return empty array
+    if (!allowedLeaderRoles || allowedLeaderRoles.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+        needsLeader: false,
+        message: `Role ${role} does not require a leader`
+      });
+    }
+
+    // Find all active users with roles that can lead this role
+    const potentialLeaders = await User.find({
+      role: { $in: allowedLeaderRoles },
+      isActive: true
+    })
+    .select('userid username loginid role')
+    .sort({ role: 1, username: 1 });
+
+    res.json({
+      success: true,
+      data: potentialLeaders,
+      needsLeader: true,
+      allowedLeaderRoles: allowedLeaderRoles,
+      requestedRole: role
+    });
+
+  } catch (error) {
+    console.error('Get potential leaders error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch potential leaders'
+    });
+  }
+};
+```
+
+#### 1.2 Route Registration
+**Add to `userRoutes.js`**:
+```javascript
+// Add this route before the existing routes
+router.get('/potential-leaders/:role', userController.getPotentialLeadersByRole);
+```
+
+### 2. Frontend Enhancement
+
+#### 2.1 Simplified Leader Dropdown Logic
+**Replace the complex `loadLeadersDropdown()` method in user-management.js**:
+
+```javascript
+/**
+ * Load leaders dropdown based on selected role
+ * Uses the new dedicated API endpoint for accurate role-based filtering
+ */
+async loadLeadersDropdown(selectedLeader = null, userRole = null) {
+  try {
+    const currentRole = userRole || document.getElementById('role')?.value;
+    const leaderSelect = document.getElementById('leader');
+
+    if (!leaderSelect) {
+      console.error('Leader select element not found');
+      return;
+    }
+
+    if (!currentRole) {
+      leaderSelect.innerHTML = '<option value="">Chọn vai trò trước</option>';
+      leaderSelect.disabled = true;
+      return;
+    }
+
+    this.showLeaderDropdownLoading(true);
+
+    // Call the new API endpoint
+    const response = await this.makeAuthenticatedRequest(`/api/users/potential-leaders/${currentRole}`);
+    
+    if (!response || !response.ok) {
+      throw new Error(`HTTP ${response?.status}: Failed to fetch potential leaders`);
+    }
+
+    const result = await response.json();
+    console.log('Potential leaders API response:', result);
+
+    // Clear existing options
+    leaderSelect.innerHTML = '';
+
+    if (!result.success) {
+      throw new Error(result.message || 'API request failed');
+    }
+
+    // If role doesn't need a leader
+    if (!result.needsLeader) {
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = `Vai trò ${currentRole} không cần Leader`;
+      leaderSelect.appendChild(option);
+      leaderSelect.disabled = true;
+      return;
+    }
+
+    // Enable dropdown and add default option
+    leaderSelect.disabled = false;
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = 'Chọn Leader';
+    leaderSelect.appendChild(defaultOption);
+
+    // Populate with potential leaders
+    if (!result.data || result.data.length === 0) {
+      const noLeadersOption = document.createElement('option');
+      noLeadersOption.value = '';
+      noLeadersOption.textContent = `Không có ${result.allowedLeaderRoles?.join(', ')} nào trong hệ thống`;
+      noLeadersOption.disabled = true;
+      leaderSelect.appendChild(noLeadersOption);
+      return;
+    }
+
+    // Sort leaders by role priority then by name
+    const rolePriority = { admin: 1, TDL: 2, TDS: 3 };
+    const sortedLeaders = result.data.sort((a, b) => {
+      const priorityDiff = (rolePriority[a.role] || 999) - (rolePriority[b.role] || 999);
+      return priorityDiff !== 0 ? priorityDiff : a.username.localeCompare(b.username);
+    });
+
+    // Add leader options
+    let selectedFound = false;
+    sortedLeaders.forEach(leader => {
+      const option = document.createElement('option');
+      option.value = leader.username;
+      option.textContent = `${leader.username} (${leader.role})`;
+      
+      if (selectedLeader && leader.username === selectedLeader) {
+        option.selected = true;
+        selectedFound = true;
+      }
+      
+      leaderSelect.appendChild(option);
+    });
+
+    // If selectedLeader was provided but not found in results, add it as a disabled option
+    if (selectedLeader && !selectedFound) {
+      const currentLeaderOption = document.createElement('option');
+      currentLeaderOption.value = selectedLeader;
+      currentLeaderOption.textContent = `${selectedLeader} (Hiện tại - có thể không hợp lệ)`;
+      currentLeaderOption.selected = true;
+      currentLeaderOption.style.color = '#dc2626'; // Red color to indicate potential issue
+      leaderSelect.appendChild(currentLeaderOption);
+    }
+
+  } catch (error) {
+    console.error('Error loading leaders dropdown:', error);
+    
+    // Fallback UI
+    leaderSelect.innerHTML = '<option value="">Lỗi khi tải danh sách Leader</option>';
+    leaderSelect.disabled = true;
+    
+    this.showNotification('Lỗi khi tải danh sách Leader: ' + error.message, 'error');
+  } finally {
+    this.showLeaderDropdownLoading(false);
+  }
+}
+
+/**
+ * Show/hide loading state for leader dropdown
+ */
+showLeaderDropdownLoading(isLoading) {
+  const leaderSelect = document.getElementById('leader');
+  if (!leaderSelect) return;
+
+  if (isLoading) {
+    leaderSelect.innerHTML = '<option value="">Đang tải...</option>';
+    leaderSelect.disabled = true;
+  }
+  // Note: The actual content will be set by loadLeadersDropdown()
+}
+```
+
+#### 2.2 Enhanced Role Change Handler
+**Update the `onRoleChange()` method**:
+```javascript
+async onRoleChange(role) {
+  console.log('Role changed to:', role);
+  
+  // Get current leader value before refresh
+  const currentLeader = document.getElementById('leader')?.value || null;
+  
+  // Load appropriate leaders for the new role
+  await this.loadLeadersDropdown(currentLeader, role);
+  
+  // Show helpful message if leader was cleared due to role change
+  const newLeaderValue = document.getElementById('leader')?.value || null;
+  if (currentLeader && !newLeaderValue) {
+    this.showNotification(
+      `Leader đã được xóa do thay đổi vai trò. Vui lòng chọn Leader phù hợp với vai trò ${role}.`, 
+      'warning', 
+      7000
+    );
+  }
+}
+```
+
+### 3. Backend Integration Enhancement
+
+#### 3.1 Hierarchy Validation Endpoint (Optional)
+**Additional endpoint for frontend validation**:
+```javascript
+/**
+ * Validate if a specific leader can manage a specific role
+ * Useful for frontend validation feedback
+ */
+const validateLeaderHierarchy = async (req, res) => {
+  try {
+    const { role, leaderUsername } = req.query;
+    
+    if (!role) {
+      return res.status(400).json({
+        success: false,
+        message: 'Role parameter is required'
+      });
+    }
+
+    const isValid = await User.validateHierarchy(role, leaderUsername);
+    
+    // Get additional context if validation fails
+    let message = '';
+    let leaderRole = null;
+    
+    if (leaderUsername) {
+      const leaderUser = await User.findOne({ username: leaderUsername, isActive: true });
+      leaderRole = leaderUser ? leaderUser.role : null;
+      
+      if (!leaderUser) {
+        message = 'Leader không tồn tại hoặc không hoạt động';
+      } else if (!isValid) {
+        message = `Vai trò ${role} không thể báo cáo cho ${leaderRole}`;
+      } else {
+        message = `Hợp lệ: ${role} có thể báo cáo cho ${leaderRole}`;
+      }
+    } else if (isValid) {
+      message = `Vai trò ${role} không cần Leader`;
+    } else {
+      message = `Vai trò ${role} cần có Leader`;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        isValid,
+        role,
+        leaderUsername,
+        leaderRole,
+        message
+      }
+    });
+
+  } catch (error) {
+    console.error('Validate hierarchy error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to validate hierarchy'
+    });
+  }
+};
+```
+
+### 4. Enhanced Error Handling & User Experience
+
+#### 4.1 Real-time Validation Feedback
+**Add instant validation when leader is selected**:
+```javascript
+/**
+ * Validate selected leader against current role in real-time
+ */
+async validateSelectedLeader() {
+  const role = document.getElementById('role')?.value;
+  const leader = document.getElementById('leader')?.value;
+  
+  if (!role || !leader) return;
+
+  try {
+    const response = await this.makeAuthenticatedRequest(
+      `/api/users/validate-hierarchy?role=${role}&leaderUsername=${leader}`
+    );
+    
+    if (response && response.ok) {
+      const result = await response.json();
+      
+      // Show validation feedback
+      const leaderSelect = document.getElementById('leader');
+      if (result.data.isValid) {
+        leaderSelect.style.borderColor = '#10b981'; // Green border
+        this.showValidationMessage(result.data.message, 'success');
+      } else {
+        leaderSelect.style.borderColor = '#ef4444'; // Red border
+        this.showValidationMessage(result.data.message, 'error');
+      }
+    }
+  } catch (error) {
+    console.error('Leader validation error:', error);
+  }
+}
+
+/**
+ * Show temporary validation message near the leader dropdown
+ */
+showValidationMessage(message, type) {
+  // Remove existing validation message
+  const existingMessage = document.getElementById('leaderValidationMessage');
+  if (existingMessage) {
+    existingMessage.remove();
+  }
+
+  // Create new validation message
+  const messageDiv = document.createElement('div');
+  messageDiv.id = 'leaderValidationMessage';
+  messageDiv.className = `validation-message validation-${type}`;
+  messageDiv.textContent = message;
+  
+  // Insert after leader dropdown
+  const leaderFormGroup = document.getElementById('leader').parentNode;
+  leaderFormGroup.appendChild(messageDiv);
+  
+  // Auto-remove after 5 seconds
+  setTimeout(() => {
+    messageDiv.remove();
+  }, 5000);
+}
+```
+
+### 5. Data Flow Architecture
+
+#### 5.1 New API Data Flow
+```
+Frontend Role Selection
+        ↓
+GET /api/users/potential-leaders/{role}
+        ↓
+Backend validates role parameter
+        ↓
+Backend queries User.find({ role: { $in: allowedLeaderRoles }, isActive: true })
+        ↓
+Returns structured response with potential leaders
+        ↓
+Frontend populates dropdown with role-appropriate options
+        ↓
+User selects leader → Optional real-time validation
+        ↓
+Form submission → Existing validation in updateUser()
+```
+
+#### 5.2 Enhanced Frontend Event Flow
+```
+Role Change Event
+        ↓
+onRoleChange() triggered
+        ↓
+Call loadLeadersDropdown(currentLeader, newRole)
+        ↓
+API call to get potential leaders for newRole
+        ↓
+Populate dropdown with appropriate options
+        ↓
+Show notification if current leader is incompatible
+        ↓
+Optional: Real-time validation on leader selection
+```
+
+## Technical Implementation
+
+### 1. Backend Changes Required
+
+#### 1.1 Controller Enhancement
+**File**: `src/controllers/userController.js`
+**Changes**: Add new methods at the end of the file
+
+```javascript
+// Add to the module.exports object:
+module.exports = {
+  getUsers,
+  getUserById,
+  createUser,
+  updateUser,
+  deleteUser,
+  bulkDeleteUsers,
+  resetUserPassword,
+  importUsersFromCSV,
+  exportUsersToCSV,
+  getUserStats,
+  getPotentialLeadersByRole, // NEW
+  validateLeaderHierarchy,    // NEW (optional)
+};
+```
+
+#### 1.2 Route Enhancement
+**File**: `src/routes/userRoutes.js`
+**Changes**: Add new routes before existing routes
+
+```javascript
+// Add these routes after line 45 (before the existing routes):
+router.get('/potential-leaders/:role', userController.getPotentialLeadersByRole);
+router.get('/validate-hierarchy', userController.validateLeaderHierarchy); // Optional
+```
+
+### 2. Frontend Changes Required
+
+#### 2.1 User Management JavaScript Enhancement
+**File**: `public/user-management.js`
+**Changes**: Replace lines 1194-1425 (entire leader dropdown section) with the new implementation
+
+#### 2.2 Enhanced Event Binding
+**Update the role change event listener registration**:
+```javascript
+// Enhanced role change event to include leader validation
+document
+  .getElementById('role')
+  .addEventListener('change', async (e) => {
+    await this.onRoleChange(e.target.value);
+  });
+
+// Add leader change validation (new)
+document
+  .getElementById('leader')
+  .addEventListener('change', async (e) => {
+    if (e.target.value) {
+      await this.validateSelectedLeader();
+    }
+  });
+```
+
+### 3. CSS Enhancements
+
+#### 3.1 Validation Message Styling
+**Add to user-management.html or existing CSS**:
+```css
+.validation-message {
+  font-size: 12px;
+  margin-top: 5px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  transition: opacity 0.3s ease;
+}
+
+.validation-success {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #10b981;
+}
+
+.validation-error {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #ef4444;
+}
+
+.validation-warning {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #f59e0b;
+}
+
+/* Leader dropdown loading state */
+#leader:disabled {
+  background-color: #f9fafb;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+```
+
+## Security Considerations
+
+### 1. Authentication & Authorization
+- **API Protection**: New endpoints use existing `verifyToken` and `requireAdmin` middleware
+- **Role Validation**: Backend validates role parameter against allowed role enum
+- **Data Exposure**: Only necessary user fields are returned (userid, username, role)
+
+### 2. Input Validation
+- **Role Parameter**: Validated against User schema enum values
+- **SQL Injection Prevention**: MongoDB queries use proper parameterization
+- **XSS Prevention**: All user data is properly escaped when rendering
+
+### 3. Business Logic Security
+- **Hierarchy Enforcement**: Backend validation remains the authoritative source
+- **Consistency**: Frontend logic matches backend `validateHierarchy()` exactly
+- **Audit Trail**: Existing user update logging captures leader assignment changes
+
+## Dependencies
+
+### 1. No External Dependencies
+- Uses existing authentication middleware
+- Uses existing User model and validation
+- Uses existing frontend patterns and styling
+- No new npm packages required
+
+### 2. Backward Compatibility
+- Existing user update API remains unchanged
+- Existing hierarchy validation logic remains unchanged
+- New endpoints are additive only
+- Frontend changes are isolated to user management page
+
+## Implementation Roadmap
+
+### Phase 1: Backend API Implementation (1-2 hours)
+- [ ] Add `getPotentialLeadersByRole()` method to userController.js
+- [ ] Add `validateLeaderHierarchy()` method to userController.js (optional)
+- [ ] Register new routes in userRoutes.js
+- [ ] Test API endpoints manually with curl/Postman
+
+### Phase 2: Frontend Enhancement (2-3 hours)
+- [ ] Replace `loadLeadersDropdown()` method with simplified version
+- [ ] Update `onRoleChange()` method with enhanced logic
+- [ ] Add real-time leader validation functionality
+- [ ] Add enhanced event listeners for role and leader changes
+- [ ] Test dropdown population for all role combinations
+
+### Phase 3: UI/UX Polish (1 hour)
+- [ ] Add validation message styling
+- [ ] Add loading states for dropdown population
+- [ ] Test mobile responsiveness
+- [ ] Add accessibility improvements (ARIA labels)
+
+### Phase 4: Integration Testing (1 hour)
+- [ ] Test complete user creation flow
+- [ ] Test user editing flow with role changes
+- [ ] Test hierarchy validation edge cases
+- [ ] Test error handling scenarios
+
+## Testing Strategy
+
+### 1. API Testing
+**Test Cases for `/api/users/potential-leaders/:role`**:
+- [ ] Valid role (PRT) returns correct leaders (TDS, TDL, admin users)
+- [ ] Valid role (TDS) returns correct leaders (TDL, admin users)
+- [ ] Valid role (admin) returns empty array with needsLeader: false
+- [ ] Invalid role returns 400 error
+- [ ] Unauthenticated request returns 401 error
+- [ ] Non-admin request returns 403 error
+
+### 2. Frontend Testing
+**Dropdown Population Tests**:
+- [ ] Role selection immediately updates leader dropdown
+- [ ] Empty system shows appropriate "no leaders available" message
+- [ ] Existing leader selection is preserved when compatible with new role
+- [ ] Incompatible leader selection triggers warning message
+
+**User Experience Tests**:
+- [ ] Loading state shows while fetching leaders
+- [ ] Error messages display properly on API failures
+- [ ] Validation messages appear for valid/invalid leader selections
+- [ ] Dropdown is disabled for roles that don't need leaders
+
+### 3. Integration Testing
+**Complete User Management Flow**:
+- [ ] Create new user with leader assignment
+- [ ] Edit existing user and change role (leader should update appropriately)
+- [ ] Edit user leader selection with real-time validation
+- [ ] Save user with validation at backend level
+
+## Risk Assessment
+
+### 1. Technical Risks
+**Low Risk**: 
+- New APIs are simple CRUD operations
+- Frontend changes are isolated to user management
+- Backend validation logic remains unchanged
+
+**Mitigation**:
+- Comprehensive testing of all role combinations
+- Fallback UI for API failures
+- Gradual rollout possible (new API can be deployed before frontend changes)
+
+### 2. User Experience Risks
+**Medium Risk**: 
+- Users might be confused by leader dropdown changes when role changes
+- Validation messages might be too technical
+
+**Mitigation**:
+- Clear notification messages when leader is auto-cleared
+- User-friendly validation messaging
+- Tooltips or help text for role hierarchy explanation
+
+### 3. Data Consistency Risks
+**Low Risk**:
+- Backend hierarchy validation prevents invalid assignments
+- Existing data validation prevents corruption
+
+## Acceptance Criteria
+
+### 1. Functional Requirements
+- [ ] Leader dropdown populates correctly for all user roles
+- [ ] Role change immediately updates available leader options
+- [ ] Invalid leader assignments are prevented and clearly communicated
+- [ ] Empty systems show appropriate messages
+- [ ] Loading states provide clear feedback during API calls
+
+### 2. Performance Requirements
+- [ ] Leader dropdown population completes within 2 seconds
+- [ ] API responses are under 500ms for typical datasets
+- [ ] No unnecessary API calls during user interaction
+
+### 3. Security Requirements
+- [ ] New APIs require admin authentication
+- [ ] Role hierarchy rules are enforced consistently
+- [ ] No sensitive data exposure in API responses
+- [ ] Input validation prevents injection attacks
+
+### 4. User Experience Requirements
+- [ ] Clear feedback for all user actions
+- [ ] Intuitive dropdown behavior matches user expectations
+- [ ] Error messages are user-friendly and actionable
+- [ ] Mobile interface remains fully functional
+
+## Future Enhancement Opportunities
+
+### 1. Hierarchy Visualization
+- Add visual diagram showing role hierarchy
+- Include tooltips explaining reporting relationships
+- Dynamic visualization that updates with role selection
+
+### 2. Bulk Leader Assignment
+- Tools for assigning multiple users to the same leader
+- Validation and preview of bulk hierarchy changes
+- Integration with user import functionality
+
+### 3. Leader Capability Dashboard
+- Show how many subordinates each potential leader currently has
+- Load balancing suggestions for leader assignments
+- Leader workload visualization
+
+## Next Steps
+
+### Immediate Actions
+1. **[ ] Reviewer Feedback**: Validate technical approach and API design
+2. **[ ] Backend Implementation**: Implement new API endpoints
+3. **[ ] Frontend Enhancement**: Replace complex dropdown logic with simplified version
+4. **[ ] Integration Testing**: Test complete user management workflow
+
+### Success Metrics
+- **Dropdown Reliability**: 100% success rate for leader dropdown population
+- **User Experience**: Elimination of "no leaders available" issues in functioning systems
+- **Code Maintainability**: Reduced complexity in frontend leader management logic
+- **System Consistency**: Perfect alignment between frontend and backend hierarchy rules
+
+---
+
+**Implementation Estimate**: 5-7 hours total development time  
+**Risk Level**: Low-Medium (API addition with frontend simplification)  
+**Business Impact**: High (fixes broken core functionality)  
+**Technical Debt Reduction**: High (eliminates complex frontend hierarchy logic)
+
+---
+
+*Enhancement proposal prepared by: Enhancer Agent*  
+*Date: September 3, 2025*  
+*Based on: Gemini codebase analysis and current implementation review*
+
+---
+
+## REVIEWER FEEDBACK
+
+### Technical Accuracy Assessment: ✅ EXCELLENT
+
+> **Reviewer Comment**: The proposal correctly identifies the core issues and provides technically sound solutions that directly address the requirements.
+
+**Problem Identification**: The analysis of the current `fetchAllLeaders()` implementation is accurate. The method indeed uses a flawed reverse-engineering approach that depends on existing leader assignments, making it fail in clean deployments or systems where leaders haven't been assigned yet.
+
+**API Design**: The proposed `getPotentialLeadersByRole` endpoint correctly implements the role hierarchy rules found in `User.js` lines 169-176. The backend validation logic exactly matches the existing `validateHierarchy()` static method.
+
+**Role Hierarchy Implementation**: The proposal correctly identifies that:
+- PRT roles should see TDS, TDL, and admin users as potential leaders
+- TDS roles should see TDL and admin users as potential leaders  
+- TDL roles should see only admin users as potential leaders
+- Admin roles don't need leaders (empty array)
+- User roles follow the same pattern as PRT
+
+**Security Implementation**: Properly integrates with existing JWT authentication and admin-only access control via `verifyToken` and `requireAdmin` middleware.
+
+### Architecture Alignment Review: ✅ PERFECTLY ALIGNED
+
+> **Reviewer Comment**: The proposed solution follows established architectural patterns and integrates seamlessly with the existing system design.
+
+**API Response Format**: The response structure follows the established pattern from Gemini analysis:
+```javascript
+{
+  success: boolean,
+  data: array,
+  needsLeader: boolean,
+  allowedLeaderRoles: array,
+  message: string
+}
+```
+
+**Frontend Class Integration**: The simplified `loadLeadersDropdown()` method follows existing patterns:
+- Uses `makeAuthenticatedRequest()` method (consistent with existing code)
+- Implements proper error handling with try-catch blocks
+- Uses existing notification system for error display
+- Follows established DOM manipulation patterns
+
+**JWT Authentication**: Correctly uses existing authentication patterns:
+- Bearer token in Authorization header
+- Proper error handling for 401/403 responses
+- Integration with existing session management
+
+**Database Integration**: Leverages existing User model without modifications, using proper MongoDB query patterns with `$in` operator and field selection.
+
+### Implementation Feasibility Review: ✅ HIGHLY FEASIBLE
+
+> **Reviewer Comment**: The proposed implementation is realistic, well-scoped, and can be completed within the estimated timeframe.
+
+**Backend API Implementation**: 
+- New controller methods are straightforward CRUD operations
+- Route registration follows existing patterns in `userRoutes.js`
+- No database schema changes required
+- Uses existing validation logic without modifications
+
+**Frontend Enhancement**:
+- Replacement of complex logic with simplified, API-driven approach
+- Significant reduction in code complexity (from 225+ lines to ~100 lines)
+- Maintains backward compatibility with existing edit user functionality
+- Clear loading and error states improve user experience
+
+**Testing Strategy**: The proposed test cases are comprehensive and cover:
+- All role combinations according to hierarchy rules
+- Error scenarios (invalid roles, network failures, authentication issues)
+- User experience edge cases (empty systems, role changes, validation feedback)
+
+### Completeness Review: ✅ COMPREHENSIVE WITH MINOR GAPS
+
+> **Reviewer Comment**: The proposal covers all necessary aspects with excellent detail, though some minor enhancements could improve implementation guidance.
+
+**Code Examples**: Excellent - provides complete implementation code for both backend and frontend components.
+
+**Testing Strategy**: Very comprehensive - covers API testing, frontend testing, and integration testing scenarios.
+
+**Implementation Steps**: Well-structured phased approach with realistic time estimates.
+
+**Security Considerations**: Properly addresses authentication, authorization, and input validation.
+
+### Issues and Missing Elements
+
+#### 1. Minor Implementation Details
+> **Reviewer Issue**: The proposal doesn't specify exactly where to insert the new controller methods in `userController.js`.
+
+**Recommendation**: Add specific line numbers or section references for where to add the new methods.
+
+#### 2. Route Registration Order
+> **Reviewer Issue**: The route registration should be placed carefully to avoid conflicts with existing parameterized routes.
+
+**Recommendation**: Specify that the new routes should be added after line 45 but before line 47 to ensure proper route matching order.
+
+#### 3. Error Response Consistency  
+> **Reviewer Issue**: The validation endpoint response format differs slightly from the main endpoint.
+
+**Recommendation**: Standardize response format to maintain consistency across all new endpoints.
+
+### Architecture Improvements
+
+#### 1. API Endpoint Optimization
+> **Reviewer Suggestion**: Consider combining both endpoints into a single endpoint with optional validation parameter to reduce API surface area.
+
+#### 2. Frontend Caching
+> **Reviewer Suggestion**: Consider implementing brief client-side caching of potential leaders to reduce API calls when users toggle between the same roles.
+
+#### 3. Error Recovery Enhancement
+> **Reviewer Suggestion**: Add retry mechanism for network failures during dropdown population.
+
+### Implementation Readiness: ✅ APPROVED WITH MINOR REVISIONS
+
+> **Reviewer Decision**: This proposal is technically sound and architecturally aligned. Recommend proceeding with implementation after addressing minor specification gaps.
+
+**Strengths**:
+- Correctly identifies and addresses the core technical issues
+- Provides clean, maintainable solution that reduces code complexity
+- Follows established security and authentication patterns
+- Comprehensive testing strategy covers all critical scenarios
+- Clear implementation roadmap with realistic time estimates
+
+**Required Revisions Before Implementation**:
+1. Specify exact insertion points for new controller methods
+2. Clarify route registration order in userRoutes.js
+3. Standardize error response format across both new endpoints
+
+**Implementation Guidance for Main Agent**:
+1. Start with backend implementation - add controller methods first
+2. Register routes carefully to avoid conflicts with existing routes
+3. Test API endpoints independently before frontend integration
+4. Replace frontend dropdown logic in a single focused commit
+5. Test role hierarchy scenarios thoroughly before deployment
+
+**Final Status: NEEDS MINOR REVISION** ⚠️
+
+**Required Changes**:
+1. **Controller Integration**: Specify exact location in `userController.js` for new methods (recommend adding after line 400+ where other export functions are defined)
+2. **Route Order**: Specify that new routes should be inserted after line 45 but before line 47 in `userRoutes.js`
+3. **Response Format**: Ensure validation endpoint follows same response structure as potential leaders endpoint
+
+**Post-Revision Status**: Ready for immediate implementation
+**Confidence Level**: High - Core technical approach is sound, only minor specification details need clarification
+**Priority**: High - Fixes critical user management functionality
+
+---
+
+*Review completed by: Reviewer Agent*  
+*Review date: September 3, 2025*  
+*Architecture validation: Confirmed against Gemini analysis and existing User.js hierarchy rules*  
+*Code pattern validation: Verified against existing frontend class structures and API patterns*

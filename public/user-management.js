@@ -1197,99 +1197,74 @@ class UserManagementApp {
   }
 
   // Centralized function to fetch all available leaders
+  // Simplified function to fetch potential leaders for a specific role
+  async fetchPotentialLeaders(role) {
+    try {
+      console.log('🚀 Fetching potential leaders for role:', role);
+      
+      if (!role) {
+        console.warn('⚠️ No role provided to fetchPotentialLeaders');
+        return [];
+      }
+
+      const response = await this.makeAuthenticatedRequest(`/api/users/potential-leaders/${role}`);
+
+      if (response && response.ok) {
+        const result = await response.json();
+        
+        if (result.success) {
+          console.log('✅ Successfully fetched potential leaders:', {
+            role: role,
+            count: result.data.length,
+            leaders: result.data.map(u => `${u.username} (${u.role})`)
+          });
+          return result.data;
+        } else {
+          console.error('❌ API returned error:', result.message);
+          return [];
+        }
+      } else {
+        console.error('❌ Failed to fetch potential leaders - HTTP status:', response?.status);
+        return [];
+      }
+    } catch (error) {
+      console.error('❌ Error fetching potential leaders:', error);
+      return [];
+    }
+  }
+
+  // Legacy function for compatibility - now uses new API-driven approach
   async fetchAllLeaders() {
     try {
-      console.log('🚀 Fetching all leaders from API...');
+      console.log('🚀 Fetching all leaders (legacy compatibility mode)...');
       const response = await this.makeAuthenticatedRequest('/api/users?limit=5000&isActive=true');
 
       if (response && response.ok) {
         const usersData = await response.json();
         const users = usersData.success && usersData.data ? usersData.data : [];
 
-        // Analyze all roles in database
-        const roleDistribution = users.reduce((acc, user) => {
-          if (user.role) {
-            acc[user.role] = (acc[user.role] || 0) + 1;
-          }
-          return acc;
-        }, {});
-
-        console.log('📊 API Response:', {
-          success: usersData.success,
-          totalUsers: users.length,
-          roleDistribution: roleDistribution,
-          sampleUser: users[0]
-            ? {
-                username: users[0].username,
-                role: users[0].role,
-                leader: users[0].leader,
-                isActive: users[0].isActive,
-              }
-            : null,
-        });
-
-        // Get unique leaders from all users (currently assigned leaders)
+        // Get assigned leaders for compatibility
         const assignedLeaders = [
           ...new Set(
             users.filter((user) => user.leader && user.leader.trim()).map((user) => user.leader)
           ),
         ];
 
-        // Debug: Let's see what usernames actually exist in the database
-        const allUsernames = users.map((user) => user.username).filter((name) => name);
-
-        // Find users who are currently acting as leaders to determine which roles can be leaders
-        const currentLeaderUsers = users.filter((user) => {
-          const isLeader = assignedLeaders.includes(user.username);
-          const isActive = user.isActive === true;
-
-          // Debug individual matches
-          if (assignedLeaders.includes(user.username)) {
-            console.log(
-              `✅ Found leader user: ${user.username} (${user.role}) - Active: ${user.isActive}`
-            );
-          }
-
-          return isLeader && isActive;
-        });
-
-        const leaderRoles = [...new Set(currentLeaderUsers.map((user) => user.role))];
-
-        // Get potential leaders: users with roles that are currently acting as leaders, plus admin
-        const validLeaderRoles = [...new Set([...leaderRoles, 'admin', 'TDS', 'TDL'])]; // Include defaults just in case
-
-        const potentialLeaders = users.filter(
-          (user) =>
-            user &&
-            user.role &&
-            validLeaderRoles.includes(user.role) &&
-            user.isActive === true &&
-            user.username &&
-            user.username.trim()
-        );
-
-        // Combine and deduplicate all leaders
-        const allLeaderNames = [
-          ...new Set([...assignedLeaders, ...potentialLeaders.map((user) => user.username)]),
-        ].sort();
-
-        const result = {
+        // Return in legacy format for existing code compatibility
+        return {
           assignedLeaders,
-          potentialLeaders,
-          allLeaderNames,
+          potentialLeaders: users.filter(user => ['admin', 'TDS', 'TDL'].includes(user.role) && user.isActive),
+          allLeaderNames: assignedLeaders.sort(),
           allUsers: users,
         };
-
-        return result;
       } else {
         console.error('❌ Failed to fetch leaders - HTTP status:', response?.status);
-        const errorResult = {
+        return {
           assignedLeaders: [],
           potentialLeaders: [],
           allLeaderNames: [],
           allUsers: [],
         };
-        return errorResult;
       }
     } catch (error) {
       console.error('❌ Error fetching leaders:', error);
@@ -1313,114 +1288,81 @@ class UserManagementApp {
         return;
       }
 
-      // Fetch leader data first to determine dynamic role hierarchy
-      const leaderData = await this.fetchAllLeaders();
-      const potentialLeaders = leaderData.potentialLeaders;
+      if (!currentRole) {
+        console.warn('⚠️ No role selected, clearing leader dropdown');
+        leaderSelect.innerHTML = '<option value="">Chọn role trước</option>';
+        leaderSelect.disabled = true;
+        return;
+      }
 
-      // Determine which roles need leaders dynamically
-      // If there are users with leaders assigned, those roles need leaders
-      const rolesWithLeaders = [
-        ...new Set(
-          leaderData.allUsers
-            .filter((user) => user.leader && user.leader.trim())
-            .map((user) => user.role)
-        ),
-      ];
+      console.log(`🔄 Loading leaders dropdown for role: ${currentRole}`);
 
-      const leaderRoles = [...new Set(potentialLeaders.map((user) => user.role))];
+      // Fetch potential leaders using new API
+      const potentialLeaders = await this.fetchPotentialLeaders(currentRole);
 
-      // A role needs a leader if:
-      // 1. Other users of this role currently have leaders, OR
-      // 2. This role is not a leader role itself (not in the leader roles list)
-      const needsLeader =
-        rolesWithLeaders.includes(currentRole) ||
-        (!leaderRoles.includes(currentRole) && currentRole !== 'admin');
+      // Clear and populate dropdown
+      leaderSelect.innerHTML = '';
+      leaderSelect.disabled = false;
 
-      if (!needsLeader) {
-        // No leader needed for this role
+      // Check if this role needs a leader
+      if (potentialLeaders.length === 0) {
         leaderSelect.innerHTML = '<option value="">Không cần Leader</option>';
         leaderSelect.disabled = true;
         return;
       }
 
-      leaderSelect.disabled = false;
-      leaderSelect.innerHTML = '<option value="">Chọn Leader</option>';
+      // Add default option
+      const defaultOption = document.createElement('option');
+      defaultOption.value = '';
+      defaultOption.textContent = 'Chọn Leader';
+      leaderSelect.appendChild(defaultOption);
 
-      // If no potential leaders found based on role, show all currently assigned leaders
-      let leadersToShow = potentialLeaders;
-      if (potentialLeaders.length === 0) {
-        // Approach 1: Try to find user records for current leaders
-        let fallbackLeaders = leaderData.allUsers.filter(
-          (user) =>
-            leaderData.assignedLeaders.includes(user.username) &&
-            user.isActive === true &&
-            user.username &&
-            user.username.trim()
-        );
-
-        // Approach 2: If we still can't find user records, create dummy entries for current leaders
-        if (fallbackLeaders.length === 0) {
-          fallbackLeaders = leaderData.assignedLeaders.map((leaderName) => ({
-            username: leaderName,
-            role: 'Leader', // Generic role since we can't determine actual role
-            isActive: true,
-          }));
+      // Sort leaders by role hierarchy and then by name
+      const sortedLeaders = potentialLeaders.sort((a, b) => {
+        const roleOrder = { admin: 1, TDL: 2, TDS: 3 };
+        const roleComparison = (roleOrder[a.role] || 99) - (roleOrder[b.role] || 99);
+        if (roleComparison !== 0) {
+          return roleComparison;
         }
+        return a.username.localeCompare(b.username);
+      });
 
-        leadersToShow = fallbackLeaders;
-      }
-
-      if (leadersToShow.length === 0) {
+      // Add leaders as options
+      let selectedFound = false;
+      sortedLeaders.forEach((leader) => {
         const option = document.createElement('option');
-        option.value = '';
-        option.textContent = 'Không có Leader khả dụng trong hệ thống';
-        option.disabled = true;
-        leaderSelect.appendChild(option);
-      } else {
-        // Sort leaders by role hierarchy and then by name
-        const sortedLeaders = leadersToShow.sort((a, b) => {
-          // Dynamic role ordering based on what we found
-          const roleOrder = { admin: 1, TDL: 2, TDS: 3 };
-          const roleComparison = (roleOrder[a.role] || 99) - (roleOrder[b.role] || 99);
-          if (roleComparison !== 0) {
-            return roleComparison;
-          }
-          return a.username.localeCompare(b.username);
-        });
+        option.value = leader.username;
+        option.textContent = `${leader.username} (${leader.role})`;
 
-        let selectedFound = false;
-        sortedLeaders.forEach((leader) => {
-          const option = document.createElement('option');
-          option.value = leader.username;
-          option.textContent = `${leader.username} (${leader.role})`;
-
-          // Check for exact match or partial match for pre-selection
-          const isSelected =
-            selectedLeader &&
-            (leader.username === selectedLeader ||
-              leader.username.includes(selectedLeader) ||
-              selectedLeader.includes(leader.username));
-
-          if (isSelected) {
-            option.selected = true;
-            selectedFound = true;
-          }
-
-          leaderSelect.appendChild(option);
-        });
-
-        if (selectedLeader && !selectedFound) {
-          // Add the current leader as an option even if not in potential leaders list
-          const option = document.createElement('option');
-          option.value = selectedLeader;
-          option.textContent = `${selectedLeader} (Current)`;
+        if (selectedLeader && leader.username === selectedLeader) {
           option.selected = true;
-          leaderSelect.appendChild(option);
+          selectedFound = true;
         }
+
+        leaderSelect.appendChild(option);
+      });
+
+      // If selected leader is not in the list (legacy data), add it as current
+      if (selectedLeader && !selectedFound) {
+        const option = document.createElement('option');
+        option.value = selectedLeader;
+        option.textContent = `${selectedLeader} (Current)`;
+        option.selected = true;
+        leaderSelect.appendChild(option);
       }
+
+      console.log(`✅ Loaded ${sortedLeaders.length} potential leaders for ${currentRole}`);
+
     } catch (error) {
       console.error('❌ Error loading leaders dropdown:', error);
       this.showNotification('Lỗi khi tải danh sách Leader: ' + error.message, 'error');
+      
+      // Fallback: show empty dropdown
+      const leaderSelect = document.getElementById('leader');
+      if (leaderSelect) {
+        leaderSelect.innerHTML = '<option value="">Lỗi tải dữ liệu</option>';
+        leaderSelect.disabled = true;
+      }
     }
   }
 

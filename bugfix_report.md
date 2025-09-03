@@ -284,3 +284,581 @@ The claimed testing results are realistic and comprehensive:
 - Consider adding similar debouncing to any future autocomplete features
 - The 300ms delay strikes the right balance between responsiveness and performance
 - The fix demonstrates excellent understanding of the authentication architecture
+
+---
+
+# NEW BUG ANALYSIS: Admin Page Role Change Issue
+
+## Critical Bug Summary
+
+**Issue**: Admin page doesn't allow changing a user's role to another role - role changes are silently failing or being blocked.
+
+**Root Cause**: Multiple critical bugs in the hierarchy validation logic causing legitimate role changes to be rejected.
+
+**Status**: 🔴 **ACTIVE BUG** - Requires immediate attention
+
+## Detailed Root Cause Analysis
+
+### Primary Issue 1: Async validateHierarchy called synchronously
+
+**Location**: `src/controllers/userController.js` lines 151, 277, and 289
+
+**Critical Bug**: The `validateHierarchy` static method is defined as `async` in the User model but is being called **without await** in the user controller, causing it to always return a Promise object instead of a boolean value.
+
+```javascript
+// CURRENT (BROKEN) - Lines 151, 277, 289
+if (leader && !User.validateHierarchy(role, leader)) {
+  // validateHierarchy returns Promise<boolean>, not boolean
+  // !Promise evaluates to false, so this condition NEVER triggers
+  // This means hierarchy validation is COMPLETELY BYPASSED
+}
+
+// CORRECT FIX REQUIRED
+if (leader && !(await User.validateHierarchy(role, leader))) {
+  // Properly awaits the Promise to get boolean result
+}
+```
+
+### Primary Issue 2: Incomplete hierarchy validation rules
+
+**Location**: `src/models/User.js` lines 169-180
+
+**Critical Gap**: The `validHierarchy` object is missing rules for `admin` and `TDL` roles, causing the validation to fail for any role change involving these roles.
+
+```javascript
+// CURRENT (INCOMPLETE) - Lines 169-173
+const validHierarchy = {
+  PRT: ['TDS'], // PRT reports to TDS
+  TDS: ['TDL'], // TDS reports to TDL
+  user: ['TDS', 'TDL'], // users can report to TDS or TDL
+  // MISSING: admin, TDL rules cause undefined lookup
+};
+
+const allowedLeaderRoles = validHierarchy[role]; // undefined for admin/TDL
+if (!allowedLeaderRoles) {
+  return false; // Always fails for admin/TDL roles
+}
+```
+
+### Primary Issue 3: Logic flaw in role-leader validation sequence
+
+**Location**: `src/controllers/userController.js` lines 275-284
+
+**Logic Error**: When updating a user's role, the system validates the new role against the current leader without considering that the role change might require a different leader or no leader at all.
+
+```javascript
+// PROBLEMATIC SEQUENCE
+if (role && role !== user.role) {
+  // Validate new role with OLD leader - this is wrong!
+  if (leader && !User.validateHierarchy(role, leader)) {
+    // Fails when changing admin->user because admin shouldn't have leader
+    // but validation checks if user can report to admin's (null) leader
+  }
+}
+```
+
+## Affected Files and Specific Code Sections
+
+### 1. src/controllers/userController.js (Primary Issues)
+
+**Line 151 (createUser function)**:
+```javascript
+// BROKEN: Missing await
+if (leader && !User.validateHierarchy(role, leader)) {
+
+// SHOULD BE:
+if (leader && !(await User.validateHierarchy(role, leader))) {
+```
+
+**Line 277 (updateUser function - role change validation)**:
+```javascript
+// BROKEN: Missing await + wrong logic sequence
+if (role && role !== user.role) {
+  if (leader && !User.validateHierarchy(role, leader)) {
+
+// SHOULD BE:
+if (role && role !== user.role) {
+  // Determine if new role needs leader
+  const needsLeader = !['admin', 'TDL'].includes(role);
+  const currentLeader = leader !== undefined ? leader : user.leader;
+  
+  if (needsLeader && !currentLeader) {
+    return res.status(400).json({
+      success: false,
+      message: `Role ${role} requires a leader`,
+    });
+  }
+  
+  if (!needsLeader && currentLeader) {
+    // Auto-clear leader for admin/TDL roles
+    user.leader = null;
+  } else if (needsLeader && currentLeader && !(await User.validateHierarchy(role, currentLeader))) {
+    return res.status(400).json({
+      success: false,
+      message: `Invalid hierarchy: ${role} cannot report to ${currentLeader}`,
+    });
+  }
+```
+
+**Line 289 (updateUser function - leader validation)**:
+```javascript
+// BROKEN: Missing await
+if (!User.validateHierarchy(user.role, leader)) {
+
+// SHOULD BE:
+if (!(await User.validateHierarchy(user.role, leader))) {
+```
+
+### 2. src/models/User.js (Secondary Issues)
+
+**Lines 169-180 (validateHierarchy function)**:
+```javascript
+// INCOMPLETE: Missing admin and TDL rules
+const validHierarchy = {
+  PRT: ['TDS'],
+  TDS: ['TDL'], 
+  user: ['TDS', 'TDL'],
+  // Missing admin and TDL!
+};
+
+// COMPLETE VERSION NEEDED:
+const validHierarchy = {
+  PRT: ['TDS'], // PRT reports to TDS
+  TDS: ['TDL'], // TDS reports to TDL
+  user: ['TDS', 'TDL'], // users can report to TDS or TDL
+  admin: [], // Admin doesn't report to anyone
+  TDL: [], // TDL is top of hierarchy
+};
+```
+
+### 3. public/user-management.js (Frontend Issues)
+
+**Lines 1519-1583 (saveUser function)**:
+- No client-side role-leader compatibility validation
+- No feedback to user about role change requirements
+- Silent failures when backend validation fails
+
+**Lines 1194-1197 (onRoleChange method)**:
+- Doesn't validate role-leader compatibility
+- Doesn't auto-adjust leader dropdown based on role requirements
+
+## Current System Behavior Analysis
+
+### What's Actually Happening
+
+1. **Admin tries to change user role from 'user' to 'admin'**:
+   - Frontend sends PUT request to `/api/users/:id` with `role: 'admin'`
+   - Backend `updateUser` function executes line 277
+   - `User.validateHierarchy('admin', existingLeader)` returns Promise object
+   - `!Promise` evaluates to `false`, so validation passes incorrectly
+   - Then line 289 validation also passes incorrectly
+   - BUT the model's pre-save hook (line 123) tries to validate
+   - Model validation calls `validateHierarchy('admin', existingLeader)`
+   - This correctly returns false because admin shouldn't have a leader
+   - **Result**: Save fails with "Invalid hierarchy" error from model
+
+2. **Role changes appear to work but don't persist**:
+   - Frontend shows success message (because 400 errors aren't properly returned)
+   - But database save fails silently due to model validation
+   - User refreshes page and sees role hasn't changed
+
+## Validation Rules Currently Causing Problems
+
+### Hierarchy Enforcement (Lines 169-180)
+```javascript
+const validHierarchy = {
+  PRT: ['TDS'], // ✅ Works
+  TDS: ['TDL'], // ✅ Works  
+  user: ['TDS', 'TDL'], // ✅ Works
+  // admin: MISSING - causes all admin role changes to fail
+  // TDL: MISSING - causes all TDL role changes to fail
+};
+```
+
+### Leader Requirement Rules (Lines 159-161)
+```javascript
+// If no leader specified, only TDL and admin are allowed to have no leader
+if (!leaderUsername) {
+  return ['TDL', 'admin'].includes(role);
+}
+// ✅ This part works correctly
+```
+
+## Security Considerations
+
+### Current Security Issues
+1. **Silent Validation Bypass**: The async bug causes hierarchy validation to be completely bypassed in the controller
+2. **Inconsistent State Risk**: Users might end up with invalid role-leader combinations
+3. **Data Integrity**: Model-level validation catches some issues, but controller should catch them first
+4. **Admin Protection**: Super admin protection works correctly, but regular role validation is broken
+
+### Security Impact Assessment
+- **Risk Level**: MEDIUM-HIGH
+- **Data Integrity**: At risk due to validation bypasses
+- **Admin Operations**: Severely impaired
+- **Authentication**: Not directly affected
+- **Authorization**: Role-based access could be inconsistent
+
+## Recommended Fix Implementation
+
+### Phase 1: Critical Fixes (Must Implement Immediately)
+
+#### 1. Fix async/await in userController.js
+```javascript
+// Line 151 (createUser)
+if (leader && !(await User.validateHierarchy(role, leader))) {
+
+// Line 277 (updateUser - role change)
+if (leader && !(await User.validateHierarchy(role, leader))) {
+
+// Line 289 (updateUser - leader change)  
+if (!(await User.validateHierarchy(user.role, leader))) {
+```
+
+#### 2. Complete hierarchy rules in User.js
+```javascript
+userSchema.statics.validateHierarchy = async function (role, leaderUsername) {
+  // If no leader specified, only TDL and admin are allowed to have no leader
+  if (!leaderUsername) {
+    return ['TDL', 'admin'].includes(role);
+  }
+
+  // Find the leader user to check their role
+  const leaderUser = await this.findOne({ username: leaderUsername, isActive: true });
+  if (!leaderUser) {
+    return false; // Leader doesn't exist or is inactive
+  }
+
+  const validHierarchy = {
+    PRT: ['TDS'], // PRT reports to TDS
+    TDS: ['TDL'], // TDS reports to TDL
+    user: ['TDS', 'TDL'], // users can report to TDS or TDL
+    admin: [], // Admin doesn't report to anyone
+    TDL: [], // TDL is top of hierarchy
+  };
+
+  const allowedLeaderRoles = validHierarchy[role];
+  if (!allowedLeaderRoles) {
+    return false; // Role not found in hierarchy
+  }
+
+  // Empty array means no leader allowed for this role
+  if (allowedLeaderRoles.length === 0) {
+    return false; // This role shouldn't have a leader
+  }
+
+  return allowedLeaderRoles.includes(leaderUser.role);
+};
+```
+
+### Phase 2: Enhanced Role Change Logic
+
+#### 3. Smart role-leader management in updateUser
+```javascript
+// Replace lines 275-284 with:
+if (role && role !== user.role) {
+  const newRole = role.trim();
+  
+  // Auto-adjust leader based on role requirements
+  if (['admin', 'TDL'].includes(newRole)) {
+    // These roles don't need leaders
+    user.leader = null;
+  } else {
+    // These roles need leaders
+    const currentLeader = leader !== undefined ? leader : user.leader;
+    if (!currentLeader) {
+      return res.status(400).json({
+        success: false,
+        message: `Role ${newRole} requires a leader. Please specify a leader.`,
+      });
+    }
+    
+    // Validate the leader is appropriate for the new role
+    if (!(await User.validateHierarchy(newRole, currentLeader))) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid hierarchy: ${newRole} cannot report to ${currentLeader}`,
+      });
+    }
+  }
+  
+  user.role = newRole;
+}
+```
+
+### Phase 3: Frontend Improvements
+
+#### 4. Add client-side validation in user-management.js
+```javascript
+// Enhance onRoleChange method (line 1195)
+async onRoleChange(role) {
+  const leaderSelect = document.getElementById('leader');
+  
+  // Auto-clear and disable leader for admin/TDL roles
+  if (['admin', 'TDL'].includes(role)) {
+    leaderSelect.value = '';
+    leaderSelect.disabled = true;
+    leaderSelect.style.background = '#f5f5f5';
+  } else {
+    leaderSelect.disabled = false;
+    leaderSelect.style.background = '';
+    await this.loadLeadersDropdown(null, role);
+  }
+}
+
+// Add pre-submission validation in saveUser method
+// Before line 1541
+const role = formData.get('role');
+const leader = formData.get('leader');
+
+// Validate role-leader combination
+if (['PRT', 'TDS', 'user'].includes(role) && !leader) {
+  this.showNotification(`Vai trò ${role} cần có Leader`, 'error');
+  return;
+}
+
+if (['admin', 'TDL'].includes(role) && leader) {
+  this.showNotification(`Vai trò ${role} không cần Leader`, 'error');  
+  return;
+}
+```
+
+## Testing Strategy
+
+### Critical Test Cases
+
+1. **Role Change Without Leader Issues**:
+   ```javascript
+   // Test: Change user role from 'user' to 'admin'
+   // Expected: Should clear leader automatically and succeed
+   PUT /api/users/:id { role: 'admin', leader: null }
+   ```
+
+2. **Role Change With Leader Requirements**:
+   ```javascript
+   // Test: Change admin to user without specifying leader
+   // Expected: Should fail with "Role user requires a leader" message
+   PUT /api/users/:id { role: 'user' }
+   ```
+
+3. **Hierarchy Validation**:
+   ```javascript
+   // Test: Try to make PRT report to another PRT
+   // Expected: Should fail with hierarchy error
+   PUT /api/users/:id { role: 'PRT', leader: 'some_prt_username' }
+   ```
+
+### Regression Testing
+
+- Verify existing user creation still works
+- Verify CSV import functionality isn't broken
+- Verify super admin protection still works
+- Verify bulk operations aren't affected
+
+## API Endpoints Affected
+
+- **`PUT /api/users/:id`** - Primary user update endpoint (main issue)
+- **`POST /api/users`** - User creation endpoint (same validation bug)
+- **`POST /api/users/import/csv`** - CSV import (inherits same validation logic)
+
+## Expected Behavior After Fix
+
+### Successful Role Changes
+- ✅ user → admin (auto-clears leader)
+- ✅ admin → user (requires leader to be specified)
+- ✅ PRT → TDS (requires TDL leader)
+- ✅ TDS → TDL (auto-clears leader)
+- ✅ Any role with compatible leader assignment
+
+### Properly Rejected Role Changes
+- ❌ PRT → admin with leader specified
+- ❌ user → PRT without TDS leader
+- ❌ Any role with incompatible leader
+
+## Implementation Priority
+
+**🔴 CRITICAL - Phase 1**: Fix async/await bugs (lines 151, 277, 289)
+**🔴 CRITICAL - Phase 1**: Complete hierarchy rules in User model  
+**🟡 HIGH - Phase 2**: Add smart role-leader management logic
+**🟢 MEDIUM - Phase 3**: Frontend validation improvements
+
+## Current Workaround for Admins
+
+Until the fix is implemented:
+
+1. **For admin/TDL role changes**:
+   - First clear the leader field (set to empty)
+   - Then change the role
+
+2. **For subordinate role changes**:
+   - First set appropriate leader for target role
+   - Then change the role
+
+3. **Alternative**: Use CSV import which may have different validation behavior
+
+## Risk Assessment
+
+**Risk Level**: HIGH (Administrative Impact)
+- ✅ **No Security Breach**: Authentication and authorization remain secure
+- ⚠️ **Broken Admin Functionality**: Core user management features non-functional
+- ⚠️ **Data Inconsistency Risk**: Silent validation failures could create invalid states
+- ⚠️ **User Experience**: Poor admin experience with confusing error messages
+
+## Files Requiring Changes
+
+1. **`src/controllers/userController.js`** - Add await keywords (3 locations)
+2. **`src/models/User.js`** - Complete validateHierarchy rules  
+3. **`public/user-management.js`** - Add client-side validation (optional improvement)
+
+## Next Steps
+
+1. **Immediate**: Fix the async/await bugs in userController.js
+2. **Immediate**: Complete the hierarchy rules in User model
+3. **Short-term**: Add enhanced role change logic 
+4. **Medium-term**: Improve frontend validation and UX
+5. **Testing**: Comprehensive role change testing across all role combinations
+
+This bug significantly impacts administrative operations and should be treated as a **high-priority fix** due to its impact on core user management functionality.
+
+---
+
+## Reviewer Analysis & Final Assessment
+
+> **Reviewer Comment**: After thoroughly examining the source code and cross-referencing with the bugfix analysis, I can provide the following comprehensive review:
+
+### ✅ Root Cause Validation - CONFIRMED ACCURATE
+
+**Primary Issue 1 - Async/Await Bug**: VERIFIED
+- **Line 151**: `if (leader && !User.validateHierarchy(role, leader))` - Missing `await` confirmed in actual code
+- **Line 277**: `if (leader && !User.validateHierarchy(role, leader))` - Missing `await` confirmed in actual code  
+- **Line 289**: `if (!User.validateHierarchy(user.role, leader))` - Missing `await` confirmed in actual code
+- **Impact**: These calls return Promise objects that always evaluate to truthy, completely bypassing validation
+
+**Primary Issue 2 - Incomplete Hierarchy Rules**: VERIFIED
+- Examined `src/models/User.js` lines 169-173
+- `validHierarchy` object confirmed missing `admin` and `TDL` entries
+- This causes `allowedLeaderRoles` to be `undefined` for these roles, triggering automatic failure
+- The analysis correctly identifies this as a critical gap
+
+**Primary Issue 3 - Logic Sequence Error**: CONFIRMED  
+- The controller logic at lines 275-284 is indeed flawed
+- It validates new role against existing leader without considering role requirements
+- No automatic leader adjustment for roles that shouldn't have leaders
+
+### ✅ Technical Architecture Assessment
+
+**Authentication System Integration**: SOUND
+- The proposed fixes do not interfere with the existing token management system
+- `updateActivity` middleware (lines 281-288 in auth.js) remains unaffected
+- Role-based authentication will function correctly after hierarchy validation is fixed
+
+**Model-Controller Separation**: PROPER
+- The fix correctly identifies that model pre-save validation (line 123) is working
+- Controller validation should catch issues before reaching the model layer
+- The separation of concerns is maintained in the proposed solution
+
+### ✅ Security Impact Analysis
+
+**Current Security Vulnerabilities**:
+1. **CRITICAL**: Hierarchy validation completely bypassed in controller due to async bug
+2. **HIGH**: Super admin protection works, but regular admin operations are compromised
+3. **MEDIUM**: Data integrity risks from silent validation failures
+
+**Proposed Fix Security Assessment**:
+- ✅ **No New Attack Vectors**: Fixes only add proper validation, no new endpoints or permissions
+- ✅ **Maintains Existing Security**: Super admin protection and authentication remain intact
+- ✅ **Improves Data Integrity**: Proper hierarchy validation prevents invalid role-leader combinations
+- ✅ **No Privilege Escalation**: Fixes don't modify authorization logic, only validation
+
+### ✅ Implementation Approach Validation
+
+**Phase 1 (Critical Fixes)**: APPROPRIATE
+- Async/await fixes are minimal and low-risk
+- Completing hierarchy rules follows existing patterns
+- Both changes are non-breaking and backward compatible
+
+**Phase 2 (Enhanced Logic)**: WELL-DESIGNED
+- Smart role-leader management is logical and user-friendly
+- Auto-clearing leaders for admin/TDL roles follows business logic
+- Error messages are clear and actionable
+
+**Phase 3 (Frontend Improvements)**: OPTIONAL BUT VALUABLE
+- Client-side validation improves user experience
+- Prevents unnecessary server round-trips
+- Provides immediate feedback to users
+
+### ⚠️ Edge Cases and Additional Considerations
+
+**Missing from Analysis**:
+1. **CSV Import Impact**: The validation bugs also affect `POST /api/users/import/csv` endpoint
+2. **Circular Leadership**: Need to prevent users from being their own leader (not addressed)
+3. **Leader Deactivation**: What happens when a leader is deactivated while having subordinates?
+4. **Role Change Cascading**: Consider impact when a leader's role changes and affects subordinate validity
+
+**Recommended Additional Validations**:
+```javascript
+// Prevent self-leadership
+if (leaderUsername === this.username) {
+  return false;
+}
+
+// Consider adding validation for circular hierarchies
+// (A reports to B, B reports to C, C reports to A)
+```
+
+### ✅ Testing Strategy Assessment
+
+**Proposed Test Cases**: COMPREHENSIVE
+- Covers all role transition scenarios
+- Includes both positive and negative test cases
+- Regression testing scope is appropriate
+
+**Additional Test Recommendations**:
+1. **Concurrent User Updates**: Test multiple admins updating roles simultaneously
+2. **Database Transaction Testing**: Ensure partial failures don't leave inconsistent state
+3. **Error Message Validation**: Verify user-friendly error messages in frontend
+4. **Performance Testing**: Validate hierarchy checks don't impact response times
+
+### ✅ Code Quality and Maintainability
+
+**Strengths**:
+- Clear separation of concerns between controller and model validation
+- Comprehensive error handling with specific messages
+- Follows existing code patterns and conventions
+- Well-documented with inline comments
+
+**Maintainability Score**: HIGH
+- Changes are localized to specific functions
+- No architectural modifications required
+- Easy to test and validate
+
+### 🔍 Critical Issues Found in Analysis
+
+**Issue 1**: The bugfix analysis incorrectly states the model validation "correctly returns false" for admin roles. Looking at the actual code (lines 169-173), admin is NOT in the validHierarchy object, so it would return false due to undefined lookup, not correct business logic.
+
+**Issue 2**: The analysis doesn't address the isActive check in hierarchy validation. Line 164 finds leader without checking isActive status, but line 297 in controller does check isActive. This inconsistency could cause issues.
+
+### 📋 Final Reviewer Decision
+
+**Status: ✅ APPROVED WITH MODIFICATIONS**
+
+**Immediate Action Required**:
+1. Fix all three async/await bugs in userController.js (lines 151, 277, 289)
+2. Add admin and TDL to validHierarchy object in User.js
+3. Add isActive check to line 164 in User.js: `findOne({ username: leaderUsername, isActive: true })`
+
+**Recommended Enhancements**:
+1. Implement smart role-leader management logic
+2. Add client-side validation for better UX
+3. Add circular hierarchy prevention
+4. Include comprehensive test coverage
+
+**Risk Assessment**: LOW-MEDIUM
+- Fixes are minimal and targeted
+- No breaking changes to existing functionality  
+- Improves system security and data integrity
+- Well-scoped implementation with clear rollback path
+
+**Implementation Priority**: HIGH - These fixes should be implemented immediately as they address core administrative functionality that is currently broken.
+
+The bugfix analysis demonstrates excellent understanding of the authentication system and provides a solid foundation for resolving the role change issues. The proposed solutions are architecturally sound and maintain system security while fixing the critical validation bugs.

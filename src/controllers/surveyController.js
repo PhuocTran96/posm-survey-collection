@@ -264,38 +264,37 @@ const getSurveyResponses = async (req, res) => {
 const getSurveyResponseById = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     console.log(`📋 Admin fetching survey response: ${id}`);
-    
+
     // Validate ObjectId format
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid survey ID format'
+        message: 'Invalid survey ID format',
       });
     }
-    
+
     const survey = await SurveyResponse.findById(id).lean();
-    
+
     if (!survey) {
       return res.status(404).json({
         success: false,
-        message: 'Survey response not found'
+        message: 'Survey response not found',
       });
     }
-    
+
     console.log(`✅ Found survey: ${survey.shopName} by ${survey.submittedBy}`);
-    
+
     res.json({
       success: true,
-      data: survey
+      data: survey,
     });
-    
   } catch (error) {
     console.error('Error fetching survey response by ID:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to retrieve survey response'
+      message: 'Failed to retrieve survey response',
     });
   }
 };
@@ -713,6 +712,353 @@ const updateSurveyResponse = async (req, res) => {
   }
 };
 
+/**
+ * Delete a specific model response from within a survey
+ * Admin only function
+ */
+const deleteModelFromSurvey = async (req, res) => {
+  try {
+    const { surveyId, modelIndex } = req.params;
+    console.log(`🗑️ Delete model request: surveyId=${surveyId}, modelIndex=${modelIndex}`);
+
+    // Validate surveyId format
+    if (!mongoose.Types.ObjectId.isValid(surveyId)) {
+      console.log(`❌ Invalid ObjectId format: ${surveyId}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid survey ID format',
+      });
+    }
+
+    // Validate modelIndex is a number
+    const index = parseInt(modelIndex);
+    if (isNaN(index) || index < 0) {
+      console.log(`❌ Invalid model index: ${modelIndex}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid model index',
+      });
+    }
+
+    // Find the survey
+    const survey = await SurveyResponse.findById(surveyId);
+    if (!survey) {
+      console.log(`❌ Survey response not found: ${surveyId}`);
+      return res.status(404).json({
+        success: false,
+        message: 'Survey response not found',
+      });
+    }
+
+    // Check if model index is valid
+    if (!survey.responses || index >= survey.responses.length) {
+      console.log(`❌ Model index out of range: ${index}/${survey.responses?.length || 0}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Model index out of range',
+      });
+    }
+
+    // Prevent deletion if it's the last model in the survey
+    if (survey.responses.length <= 1) {
+      console.log(`❌ Cannot delete last model from survey: ${surveyId}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete the last model from a survey. Delete the entire survey instead.',
+      });
+    }
+
+    const modelToDelete = survey.responses[index];
+    console.log(`✅ Found model to delete: ${modelToDelete.model} (index: ${index})`);
+
+    // Extract image URLs for S3 cleanup
+    const imageData = [];
+    if (modelToDelete.images && Array.isArray(modelToDelete.images)) {
+      modelToDelete.images.forEach((url) => {
+        const s3Key = extractS3KeyFromUrl(url);
+        if (s3Key) {
+          imageData.push({ url, s3Key });
+        } else {
+          console.warn(`⚠️ Could not extract S3 key from URL: ${url}`);
+        }
+      });
+    }
+
+    console.log(`📸 Found ${imageData.length} images to delete from S3`);
+
+    // Phase 1: Delete images from S3
+    const s3DeletionResults = [];
+    for (const { url, s3Key } of imageData) {
+      try {
+        await s3
+          .deleteObject({
+            Bucket: process.env.AWS_S3_BUCKET,
+            Key: s3Key,
+          })
+          .promise();
+        console.log(`✅ Deleted S3 image: ${s3Key}`);
+        s3DeletionResults.push({ url, s3Key, success: true });
+      } catch (err) {
+        console.error(`❌ Failed to delete S3 image: ${s3Key}`, err);
+        s3DeletionResults.push({ url, s3Key, success: false, error: err.message });
+      }
+    }
+
+    const failedS3Deletions = s3DeletionResults.filter((result) => !result.success);
+
+    // Check deletion policy for S3 failures
+    if (failedS3Deletions.length > 0 && DELETION_CONFIG.strictMode) {
+      console.error(
+        `❌ ${failedS3Deletions.length} S3 deletions failed. Aborting operation due to strict mode.`
+      );
+      return res.status(500).json({
+        success: false,
+        message: `Failed to delete ${failedS3Deletions.length} image(s) from S3. Operation aborted.`,
+        failedImages: failedS3Deletions.map((f) => ({ url: f.url, error: f.error })),
+      });
+    }
+
+    // Phase 2: Remove model from survey responses array
+    survey.responses.splice(index, 1);
+    survey.updatedAt = new Date();
+
+    const updatedSurvey = await survey.save();
+    console.log(`✅ Model deleted successfully from survey: ${surveyId}`);
+
+    // Prepare response with detailed results
+    const responseData = {
+      success: true,
+      message: 'Model deleted successfully from survey',
+      data: {
+        surveyId: updatedSurvey._id,
+        deletedModel: modelToDelete.model,
+        modelIndex: index,
+        remainingModels: updatedSurvey.responses.length,
+      },
+      imagesDeleted: s3DeletionResults.filter((r) => r.success).length,
+      totalImages: imageData.length,
+    };
+
+    // Add warnings if there were S3 deletion failures
+    if (failedS3Deletions.length > 0) {
+      responseData.warnings = [
+        `Failed to delete ${failedS3Deletions.length} image(s) from S3. Model was still removed from survey.`,
+      ];
+      responseData.failedImages = failedS3Deletions.map((f) => ({ url: f.url, error: f.error }));
+    }
+
+    res.status(200).json(responseData);
+  } catch (error) {
+    console.error('❌ Error deleting model from survey:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting model from survey',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
+/**
+ * Bulk delete specific models from multiple surveys
+ * Admin only function
+ */
+const bulkDeleteModelsFromSurveys = async (req, res) => {
+  try {
+    const { deletions } = req.body;
+    console.log(`🗑️ Bulk delete models request for ${deletions?.length || 0} models`);
+
+    if (!Array.isArray(deletions) || deletions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No deletions provided for bulk model delete',
+      });
+    }
+
+    // Validate deletion objects
+    for (const deletion of deletions) {
+      if (!deletion.surveyId || typeof deletion.modelIndex !== 'number') {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid deletion format. Each deletion must have surveyId and modelIndex.',
+        });
+      }
+      if (!mongoose.Types.ObjectId.isValid(deletion.surveyId)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid survey ID format: ${deletion.surveyId}`,
+        });
+      }
+    }
+
+    console.log('📋 Processing bulk model deletions...');
+
+    const results = {
+      successful: [],
+      failed: [],
+      s3Images: { deleted: 0, failed: 0 },
+      warnings: [],
+    };
+
+    // Group deletions by survey ID and sort by modelIndex descending
+    // This ensures we delete from highest index first to avoid index shifting issues
+    const deletionsBySurvey = {};
+    deletions.forEach((deletion) => {
+      if (!deletionsBySurvey[deletion.surveyId]) {
+        deletionsBySurvey[deletion.surveyId] = [];
+      }
+      deletionsBySurvey[deletion.surveyId].push(deletion);
+    });
+
+    // Sort each survey's deletions by index descending
+    Object.keys(deletionsBySurvey).forEach((surveyId) => {
+      deletionsBySurvey[surveyId].sort((a, b) => b.modelIndex - a.modelIndex);
+    });
+
+    // Process each survey
+    for (const [surveyId, surveyDeletions] of Object.entries(deletionsBySurvey)) {
+      try {
+        const survey = await SurveyResponse.findById(surveyId);
+        if (!survey) {
+          surveyDeletions.forEach((deletion) => {
+            results.failed.push({
+              surveyId: deletion.surveyId,
+              modelIndex: deletion.modelIndex,
+              error: 'Survey not found',
+            });
+          });
+          continue;
+        }
+
+        // Check if we would delete all models from this survey
+        const validDeletions = surveyDeletions.filter(
+          (d) => d.modelIndex >= 0 && d.modelIndex < survey.responses.length
+        );
+
+        if (validDeletions.length >= survey.responses.length) {
+          surveyDeletions.forEach((deletion) => {
+            results.failed.push({
+              surveyId: deletion.surveyId,
+              modelIndex: deletion.modelIndex,
+              error: 'Cannot delete all models from survey',
+            });
+          });
+          continue;
+        }
+
+        // Process S3 image cleanup for valid deletions
+        const imageData = [];
+        validDeletions.forEach((deletion) => {
+          const modelToDelete = survey.responses[deletion.modelIndex];
+          if (modelToDelete && modelToDelete.images) {
+            modelToDelete.images.forEach((url) => {
+              const s3Key = extractS3KeyFromUrl(url);
+              if (s3Key) {
+                imageData.push({ url, s3Key });
+              }
+            });
+          }
+        });
+
+        // Delete S3 images
+        for (const { url, s3Key } of imageData) {
+          try {
+            await s3
+              .deleteObject({
+                Bucket: process.env.AWS_S3_BUCKET,
+                Key: s3Key,
+              })
+              .promise();
+            results.s3Images.deleted++;
+          } catch (err) {
+            console.error(`❌ Failed to delete S3 image: ${s3Key}`, err);
+            results.s3Images.failed++;
+            if (!DELETION_CONFIG.strictMode) {
+              results.warnings.push(`Failed to delete S3 image: ${s3Key}`);
+            }
+          }
+        }
+
+        // If strict mode and S3 failures, skip this survey
+        if (results.s3Images.failed > 0 && DELETION_CONFIG.strictMode) {
+          validDeletions.forEach((deletion) => {
+            results.failed.push({
+              surveyId: deletion.surveyId,
+              modelIndex: deletion.modelIndex,
+              error: 'S3 deletion failed in strict mode',
+            });
+          });
+          continue;
+        }
+
+        // Remove models from survey (in descending index order)
+        validDeletions.forEach((deletion) => {
+          const modelToDelete = survey.responses[deletion.modelIndex];
+          survey.responses.splice(deletion.modelIndex, 1);
+          results.successful.push({
+            surveyId: deletion.surveyId,
+            modelIndex: deletion.modelIndex,
+            deletedModel: modelToDelete.model,
+          });
+        });
+
+        // Save updated survey
+        survey.updatedAt = new Date();
+        await survey.save();
+
+        console.log(`✅ Deleted ${validDeletions.length} models from survey ${surveyId}`);
+
+        // Mark invalid deletions as failed
+        surveyDeletions
+          .filter((d) => !validDeletions.includes(d))
+          .forEach((deletion) => {
+            results.failed.push({
+              surveyId: deletion.surveyId,
+              modelIndex: deletion.modelIndex,
+              error: 'Invalid model index',
+            });
+          });
+      } catch (error) {
+        console.error(`❌ Error processing survey ${surveyId}:`, error);
+        surveyDeletions.forEach((deletion) => {
+          results.failed.push({
+            surveyId: deletion.surveyId,
+            modelIndex: deletion.modelIndex,
+            error: error.message,
+          });
+        });
+      }
+    }
+
+    const successCount = results.successful.length;
+    const failCount = results.failed.length;
+
+    console.log(`📊 Bulk model deletion summary: ${successCount} successful, ${failCount} failed`);
+
+    const responseData = {
+      success: true,
+      message: `Bulk model deletion completed: ${successCount} successful, ${failCount} failed`,
+      results: {
+        successful: results.successful,
+        failed: results.failed,
+        s3Images: results.s3Images,
+      },
+    };
+
+    if (results.warnings.length > 0) {
+      responseData.warnings = results.warnings;
+    }
+
+    res.status(200).json(responseData);
+  } catch (error) {
+    console.error('❌ Error in bulk model delete operation:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error during bulk model delete operation',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
 module.exports = {
   getLeaders,
   getShopsByLeader,
@@ -723,6 +1069,8 @@ module.exports = {
   deleteSurveyResponse,
   updateSurveyResponse,
   bulkDeleteSurveyResponses,
+  deleteModelFromSurvey,
+  bulkDeleteModelsFromSurveys,
   getModelAutocomplete,
   getPosmByModel,
 };

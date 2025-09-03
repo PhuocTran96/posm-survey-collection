@@ -1,2882 +1,657 @@
-# Enhancement Proposal - Change Password Feature
-**Date**: September 1, 2025  
-**Proposal Type**: New Feature - User Self-Service  
-**Priority**: High - Security Enhancement  
+# Enhancement Proposal - 2025-09-03
 
 ## Summary
-
-Design and implement a comprehensive Change Password feature for the POSM Survey Collection web application. This feature will allow authenticated users to securely change their passwords through a dedicated, user-friendly interface while maintaining the application's existing security standards and architectural patterns.
+Redesign the Survey Results filter interface to consolidate all filter controls into a single row layout with improved button styling for better user experience and cleaner visual presentation.
 
 ## Motivation
+The current filter layout spans two rows with inconsistent spacing and button styling that takes up unnecessary vertical space. Users need a more compact, professional interface that:
+- Reduces screen real estate usage for filters
+- Provides cleaner visual hierarchy
+- Maintains excellent mobile responsiveness
+- Follows modern UI design principles
+- Improves overall user workflow efficiency
 
-### Business Need
-- **User Self-Service**: Enable users to independently manage their password security without requiring admin intervention
-- **Security Enhancement**: Provide users with ability to update compromised or weak passwords
-- **Compliance**: Support security best practices for password lifecycle management
-- **User Experience**: Reduce dependency on admin support for routine password changes
-
-### Current Gap
-- Users currently rely on "forgot password" alerts directing them to contact administrators
-- No self-service password management capability exists
-- Existing backend endpoint `/api/auth/change-password` is implemented but has no frontend interface
-
-## User Stories
-
-### Primary User Story
-**As a** survey user (roles: user, PRT, TDS, TDL)  
-**I want to** change my password through a secure, intuitive interface  
-**So that** I can maintain my account security independently without admin assistance
-
-### Admin User Story
-**As an** admin user  
-**I want to** change my password through the same secure interface  
-**So that** I can maintain my account security with the same user experience as regular users
-
-### Security User Story
-**As a** security-conscious user  
-**I want** strong validation and clear feedback during password changes  
-**So that** I can be confident my account remains secure and the change was successful
+## Current Issues Identified
+1. **Layout Inefficiency**: Date filters are separated on a second row, creating unnecessary vertical space
+2. **Button Inconsistency**: Export button uses text + icon, taking up excessive space
+3. **Visual Clutter**: Clear filters button is too prominent for a secondary action
+4. **CSS Conflicts**: Conflicting display properties (grid vs flex) in filter styles
+5. **Mobile Layout**: Current responsive design could be optimized for better mobile UX
 
 ## Design Proposal
 
-### 1. Frontend Architecture
-
-#### 1.1 New Files Required
-- **`public/change-password.html`** - Dedicated change password page
-- **`public/change-password.js`** - Embedded within HTML (following login page pattern)
-- **CSS styles** - Embedded within HTML (following existing login page pattern)
-
-#### 1.2 Page Structure (`change-password.html`)
+### 1. HTML Structure Changes
+**Current Structure (Lines 54-97 in survey-results.html):**
 ```html
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Đổi mật khẩu - POSM Survey System</title>
-    <!-- Embedded CSS styles following login page pattern -->
-</head>
-<body>
-    <div class="change-password-container">
-        <div class="change-password-box">
-            <!-- Header Section -->
-            <div class="change-password-logo">🔐</div>
-            <h1 class="change-password-title">Đổi mật khẩu</h1>
-            <p class="change-password-subtitle">Cập nhật mật khẩu của bạn</p>
-            
-            <!-- User Info Display -->
-            <div class="user-info-display">
-                <span id="currentUserDisplay"></span>
+<div class="filters">
+    <div class="filter-row">
+        <div class="filter-group"><!-- Submitted By --></div>
+        <div class="filter-group"><!-- Shop --></div>
+    </div>
+    <div class="filter-row">
+        <div class="filter-group"><!-- From Date --></div>
+        <div class="filter-group"><!-- To Date --></div>
+        <div class="filter-group"><!-- Page Size --></div>
+        <div class="filter-group"><!-- Clear Button --></div>
+        <div class="filter-group"><!-- Export Button --></div>
+    </div>
+</div>
+```
+
+**Proposed New Structure:**
+```html
+<div class="filters">
+    <div class="filter-row-unified">
+        <div class="filter-group filter-main">
+            <label>Submitted By:</label>
+            <select id="submittedByFilter">
+                <option value="">T�t c� ng��i d�ng</option>
+            </select>
+        </div>
+        <div class="filter-group filter-main">
+            <label>Shop:</label>
+            <div class="autocomplete-wrapper">
+                <input type="text" id="shopFilter" placeholder="T�m ki�m shop..." autocomplete="off">
+                <div id="shopDropdown" class="autocomplete-dropdown"></div>
             </div>
-            
-            <!-- Messages -->
-            <div id="errorMessage" class="error-message"></div>
-            <div id="successMessage" class="success-message"></div>
-            
-            <!-- Change Password Form -->
-            <form id="changePasswordForm">
-                <div class="form-group">
-                    <label for="currentPassword">Mật khẩu hiện tại</label>
-                    <input type="password" id="currentPassword" name="currentPassword" 
-                           class="form-control" required autocomplete="current-password">
-                </div>
-                
-                <div class="form-group">
-                    <label for="newPassword">Mật khẩu mới</label>
-                    <input type="password" id="newPassword" name="newPassword" 
-                           class="form-control" required autocomplete="new-password">
-                    <div class="password-requirements">
-                        Mật khẩu phải có ít nhất 6 ký tự
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="confirmPassword">Xác nhận mật khẩu mới</label>
-                    <input type="password" id="confirmPassword" name="confirmPassword" 
-                           class="form-control" required autocomplete="new-password">
-                    <div id="passwordMatchError" class="field-error"></div>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="submit" id="changePasswordBtn" class="btn-change-password">
-                        Đổi mật khẩu
-                    </button>
-                    <button type="button" id="cancelBtn" class="btn-cancel">
-                        Hủy bỏ
-                    </button>
-                </div>
-            </form>
-            
-            <!-- Security Notice -->
-            <div class="security-notice">
-                <strong>🔒 Lưu ý bảo mật:</strong><br>
-                Sau khi đổi mật khẩu, bạn sẽ được đăng xuất và cần đăng nhập lại với mật khẩu mới.
+        </div>
+        <div class="filter-group filter-date">
+            <label>T� ng�y:</label>
+            <input type="date" id="dateFromFilter">
+        </div>
+        <div class="filter-group filter-date">
+            <label>�n ng�y:</label>
+            <input type="date" id="dateToFilter">
+        </div>
+        <div class="filter-group filter-controls">
+            <label>S� k�t qu�/trang:</label>
+            <select id="pageSizeSelector">
+                <option value="10">10</option>
+                <option value="20" selected>20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </div>
+        <div class="filter-group filter-actions">
+            <label>&nbsp;</label>
+            <div class="filter-action-buttons">
+                <button id="clearFiltersBtn" class="btn-flat-small" title="X�a b� l�c">
+                    <span class="btn-icon-text">=�</span>
+                </button>
+                <button id="exportData" class="btn-excel-icon" title="Xu�t Excel">
+                    <span class="excel-icon">=�</span>
+                </button>
             </div>
         </div>
     </div>
-
-    <!-- Loading overlay -->
-    <div id="loadingOverlay" class="loading-overlay">
-        <div class="loading-spinner"></div>
-    </div>
-
-    <!-- Embedded JavaScript -->
-    <script>
-        // ChangePasswordApp class implementation
-    </script>
-</body>
-</html>
+</div>
 ```
 
-#### 1.3 JavaScript Class Architecture (`ChangePasswordApp`)
-```javascript
-class ChangePasswordApp {
-    constructor() {
-        this.user = null;
-        this.isLoading = false;
-        this.init();
-    }
+### 2. CSS Specifications
 
-    async init() {
-        // 1. Check authentication (required)
-        const isAuthenticated = await this.checkAuthentication();
-        if (!isAuthenticated) return;
-        
-        // 2. Setup UI with user info
-        this.setupUserDisplay();
-        
-        // 3. Bind form events
-        this.bindEvents();
-    }
-
-    async checkAuthentication() {
-        // Follow existing pattern from script.js and admin.js
-        const token = localStorage.getItem('accessToken');
-        const userStr = localStorage.getItem('user');
-        
-        if (!token || !userStr) {
-            this.redirectToLogin('Authentication required');
-            return false;
-        }
-
-        try {
-            const userData = JSON.parse(userStr);
-            
-            // Verify token is valid
-            const response = await fetch('/api/auth/verify', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (response.ok) {
-                this.user = userData;
-                return true;
-            } else {
-                localStorage.clear();
-                this.redirectToLogin('Session expired');
-                return false;
-            }
-        } catch (error) {
-            console.error('Auth check failed:', error);
-            localStorage.clear();
-            this.redirectToLogin('Authentication error');
-            return false;
-        }
-    }
-
-    setupUserDisplay() {
-        const userDisplay = document.getElementById('currentUserDisplay');
-        if (userDisplay && this.user) {
-            userDisplay.textContent = `${this.user.username} (${this.user.role.toUpperCase()})`;
-        }
-    }
-
-    bindEvents() {
-        // Form submission
-        const form = document.getElementById('changePasswordForm');
-        form.addEventListener('submit', (e) => this.handleChangePassword(e));
-
-        // Cancel button
-        const cancelBtn = document.getElementById('cancelBtn');
-        cancelBtn.addEventListener('click', () => this.handleCancel());
-
-        // Real-time password confirmation validation
-        const confirmPassword = document.getElementById('confirmPassword');
-        confirmPassword.addEventListener('input', () => this.validatePasswordMatch());
-
-        // Real-time password strength validation
-        const newPassword = document.getElementById('newPassword');
-        newPassword.addEventListener('input', () => this.validatePasswordStrength());
-    }
-
-    validatePasswordMatch() {
-        const newPassword = document.getElementById('newPassword').value;
-        const confirmPassword = document.getElementById('confirmPassword').value;
-        const errorElement = document.getElementById('passwordMatchError');
-
-        if (confirmPassword && newPassword !== confirmPassword) {
-            errorElement.textContent = 'Mật khẩu xác nhận không khớp';
-            errorElement.style.display = 'block';
-            return false;
-        } else {
-            errorElement.style.display = 'none';
-            return true;
-        }
-    }
-
-    validatePasswordStrength() {
-        const newPassword = document.getElementById('newPassword').value;
-        // Current requirement: minimum 6 characters
-        return newPassword.length >= 6;
-    }
-
-    validateForm(data) {
-        // Client-side validation
-        if (!data.currentPassword || !data.newPassword || !data.confirmPassword) {
-            this.showError('Vui lòng điền đầy đủ tất cả các trường');
-            return false;
-        }
-
-        if (data.newPassword.length < 6) {
-            this.showError('Mật khẩu mới phải có ít nhất 6 ký tự');
-            return false;
-        }
-
-        if (data.newPassword !== data.confirmPassword) {
-            this.showError('Mật khẩu xác nhận không khớp');
-            return false;
-        }
-
-        if (data.currentPassword === data.newPassword) {
-            this.showError('Mật khẩu mới phải khác mật khẩu hiện tại');
-            return false;
-        }
-
-        return true;
-    }
-
-    async handleChangePassword(e) {
-        e.preventDefault();
-        if (this.isLoading) return;
-
-        const formData = new FormData(e.target);
-        const data = {
-            currentPassword: formData.get('currentPassword'),
-            newPassword: formData.get('newPassword'),
-            confirmPassword: formData.get('confirmPassword')
-        };
-
-        // Client-side validation
-        if (!this.validateForm(data)) return;
-
-        try {
-            this.showLoading();
-
-            // Call existing API endpoint
-            const response = await this.authenticatedFetch('/api/auth/change-password', {
-                method: 'POST',
-                body: JSON.stringify({
-                    currentPassword: data.currentPassword,
-                    newPassword: data.newPassword
-                })
-            });
-
-            const result = await response.json();
-
-            if (response.ok && result.success) {
-                this.showSuccess(result.message);
-                
-                // Clear form
-                document.getElementById('changePasswordForm').reset();
-                
-                // Auto-logout after 3 seconds (backend clears refresh tokens)
-                setTimeout(() => {
-                    localStorage.clear();
-                    this.redirectToLogin('Password changed successfully');
-                }, 3000);
-
-            } else {
-                this.showError(result.message || 'Đổi mật khẩu thất bại');
-            }
-
-        } catch (error) {
-            console.error('Change password error:', error);
-            this.showError('Lỗi kết nối. Vui lòng thử lại sau.');
-        } finally {
-            this.hideLoading();
-        }
-    }
-
-    async authenticatedFetch(url, options = {}) {
-        // Follow existing pattern from admin.js and script.js
-        const token = localStorage.getItem('accessToken');
-        
-        const authOptions = {
-            ...options,
-            headers: {
-                ...options.headers,
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        };
-
-        return await fetch(url, authOptions);
-    }
-
-    handleCancel() {
-        // Navigate back based on user role
-        if (this.user.role === 'admin') {
-            window.location.href = '/survey-results.html';
-        } else {
-            window.location.href = '/';
-        }
-    }
-
-    redirectToLogin(reason) {
-        console.log('Redirecting to login:', reason);
-        const loginUrl = this.user && this.user.role === 'admin' 
-            ? '/admin-login.html' 
-            : '/login.html';
-        window.location.replace(loginUrl);
-    }
-
-    // Message and loading methods (follow existing patterns)
-    showLoading() { /* Implementation follows login.html pattern */ }
-    hideLoading() { /* Implementation follows login.html pattern */ }
-    showError(message) { /* Implementation follows login.html pattern */ }
-    showSuccess(message) { /* Implementation follows login.html pattern */ }
-}
-```
-
-### 2. CSS Design System
-
-#### 2.1 Design Principles
-- **Consistency**: Follow existing login page styling patterns
-- **Accessibility**: WCAG 2.1 compliant with proper contrast ratios
-- **Responsive**: Mobile-first design with breakpoints matching existing pages
-- **Visual Hierarchy**: Clear form structure with intuitive field grouping
-
-#### 2.2 Key Style Components
+**Core Filter Layout:**
 ```css
-.change-password-container {
-    /* Similar to .login-container with security-focused gradient */
-    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+/* Enhanced Filters Layout */
+.filters {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--card-shadow);
+    border: 1px solid var(--neutral-border);
 }
 
-.change-password-box {
-    /* Enhanced from .login-box with additional padding for form fields */
-    max-width: 450px; /* Slightly wider for password requirements */
+.filter-row-unified {
+    display: grid;
+    grid-template-columns: 2fr 2fr 1.5fr 1.5fr 1.5fr 1fr;
+    gap: 20px;
+    align-items: end;
 }
 
-.password-requirements {
-    /* New component for password guidance */
-    font-size: 12px;
-    color: #6b7280;
-    margin-top: 5px;
-}
-
-.field-error {
-    /* Inline field-level error display */
-    color: #ef4444;
-    font-size: 12px;
-    display: none;
-    margin-top: 5px;
-}
-
-.form-actions {
-    /* Button container with flex layout */
+.filter-group {
     display: flex;
-    gap: 12px;
-    margin-top: 25px;
+    flex-direction: column;
+    min-width: 0; /* Allow flex items to shrink */
 }
 
-.btn-change-password {
-    /* Primary action button */
-    flex: 2;
-    /* Follows .btn-login pattern with security theme */
+.filter-group label {
+    font-weight: 600;
+    color: var(--neutral-text);
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+    white-space: nowrap;
 }
 
-.btn-cancel {
-    /* Secondary action button */
-    flex: 1;
-    /* Neutral styling for secondary action */
+.filter-group select,
+.filter-group input {
+    padding: 10px 12px;
+    border: 2px solid var(--neutral-border);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    width: 100%;
 }
 
-.user-info-display {
-    /* User context display */
-    background: #f8fafc;
-    border-radius: 6px;
-    padding: 8px 12px;
-    margin-bottom: 20px;
-    font-size: 14px;
-    color: #64748b;
-}
-
-.security-notice {
-    /* Enhanced security notice styling */
-    background: #fef3c7;
-    border: 1px solid #f59e0b;
-    color: #92400e;
-    /* Follows existing .security-notice pattern */
+.filter-group select:focus,
+.filter-group input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 ```
 
-### 3. Navigation Integration
-
-#### 3.1 Access Points
-**Primary Navigation**: Add "Đổi mật khẩu" link to user menus across all authenticated pages
-
-**Survey Page (`public/index.html`)**: Add to header actions area
-```html
-<div class="header-actions">
-    <div class="nav-links">
-        <a href="/" class="nav-link active">New Survey</a>
-        <a href="/survey-history.html" class="nav-link">Survey History</a>
-        <a href="/change-password.html" class="nav-link">Đổi mật khẩu</a>
-    </div>
-    <!-- Existing user info and logout -->
-</div>
-```
-
-**Admin Dashboard (`public/survey-results.html`)**: Add to admin user info dropdown/menu
-```html
-<div class="admin-user-details">
-    <span class="admin-user-name">${this.user.username}</span>
-    <span class="admin-user-role">ADMIN</span>
-    <div class="admin-user-actions">
-        <a href="/change-password.html" class="admin-action-link">Đổi mật khẩu</a>
-    </div>
-</div>
-```
-
-**Other Management Pages**: Follow same pattern for consistency across all authenticated pages.
-
-#### 3.2 Route Protection
-**Backend Route**: The change password page requires authentication middleware
-```javascript
-// In src/routes/index.js or main app.js
-app.get('/change-password.html', protectRoute({
-    allowedRoles: ['admin', 'user', 'PRT', 'TDS', 'TDL'],
-    redirectTo: '/login.html' // Default redirect for non-admin users
-}));
-```
-
-### 4. User Experience Flow
-
-#### 4.1 Happy Path Flow
-1. **Access**: User clicks "Đổi mật khẩu" from any authenticated page
-2. **Navigation**: Redirected to `/change-password.html`
-3. **Authentication Check**: Page verifies user session (redirect if invalid)
-4. **Form Display**: Shows change password form with user context
-5. **Input**: User enters current password, new password, and confirmation
-6. **Validation**: Real-time client-side validation provides immediate feedback
-7. **Submission**: Form submits to existing `/api/auth/change-password` endpoint
-8. **Success**: Shows success message with 3-second countdown
-9. **Auto-logout**: Clears tokens and redirects to appropriate login page
-10. **Re-login**: User logs in with new password
-
-#### 4.2 Error Handling Flows
-**Invalid Current Password**:
-- Backend returns 401 with "Current password is incorrect"
-- Frontend highlights current password field
-- User can retry without losing new password input
-
-**Password Validation Errors**:
-- Client-side: Real-time validation prevents submission
-- Server-side: Returns 400 with specific validation message
-- Form remains populated for user correction
-
-**Network/Server Errors**:
-- Shows generic error message
-- Form remains populated
-- Retry functionality available
-
-#### 4.3 Security Flow Considerations
-**Session Invalidation**: After successful password change:
-- Backend clears all refresh tokens (existing behavior)
-- Frontend clears localStorage
-- Auto-redirect to login with success message
-
-**Rate Limiting**: Frontend implements basic protection:
-- Disable submit button during request
-- 3-second delay between attempts after errors
-
-### 5. Security Implementation
-
-#### 5.1 Input Validation & Sanitization
-**Frontend Validation**:
-```javascript
-validateForm(data) {
-    // Trim whitespace
-    data.currentPassword = data.currentPassword.trim();
-    data.newPassword = data.newPassword.trim();
-    data.confirmPassword = data.confirmPassword.trim();
-
-    // Required field validation
-    if (!data.currentPassword || !data.newPassword || !data.confirmPassword) {
-        this.showError('Vui lòng điền đầy đủ tất cả các trường');
-        return false;
-    }
-
-    // Length validation
-    if (data.newPassword.length < 6) {
-        this.showError('Mật khẩu mới phải có ít nhất 6 ký tự');
-        return false;
-    }
-
-    // Password match validation
-    if (data.newPassword !== data.confirmPassword) {
-        this.showError('Mật khẩu xác nhận không khớp');
-        return false;
-    }
-
-    // Prevent same password
-    if (data.currentPassword === data.newPassword) {
-        this.showError('Mật khẩu mới phải khác mật khẩu hiện tại');
-        return false;
-    }
-
-    return true;
-}
-```
-
-**Backend Validation**: Leverages existing robust validation in `authController.changePassword`:
-- Current password verification using `bcrypt.compare()`
-- New password length validation (minimum 6 characters)
-- Automatic password hashing via Mongoose pre-save hook
-- Session invalidation via refresh token clearing
-
-#### 5.2 Password Strength Requirements
-**Current Implementation**: Minimum 6 characters (matches existing system)
-**Enhancement Opportunity**: Could be extended to include:
-- Mixed case requirements
-- Number/special character requirements
-- Password strength meter
-- Common password checking
-
-**Implementation Strategy**: Start with existing 6-character minimum for consistency, add enhanced requirements in future iteration.
-
-#### 5.3 Rate Limiting Considerations
-**Frontend Protection**:
-- Disable form during submission
-- 3-second minimum delay between attempts
-- Loading state prevents multiple submissions
-
-**Backend Protection**: 
-- Existing token verification provides session validation
-- Could add rate limiting middleware in future enhancement
-- Account lockout after repeated failures (future consideration)
-
-### 6. API Integration
-
-#### 6.1 Existing Endpoint Utilization
-**Endpoint**: `POST /api/auth/change-password` (already implemented)
-**Authentication**: Requires valid JWT token in Authorization header
-**Request Format**:
-```json
-{
-    "currentPassword": "string",
-    "newPassword": "string"
-}
-```
-
-**Response Format**:
-```json
-{
-    "success": true,
-    "message": "Password changed successfully. Please login again with your new password."
-}
-```
-
-**Error Responses**:
-```json
-{
-    "success": false,
-    "message": "Current password is incorrect" // or other validation errors
-}
-```
-
-#### 6.2 Frontend Integration Pattern
-```javascript
-async handleChangePassword(e) {
-    // ... validation ...
-    
-    const response = await this.authenticatedFetch('/api/auth/change-password', {
-        method: 'POST',
-        body: JSON.stringify({
-            currentPassword: data.currentPassword,
-            newPassword: data.newPassword
-        })
-    });
-
-    const result = await response.json();
-    // ... handle response ...
-}
-```
-
-### 7. Dependencies & Integration Points
-
-#### 7.1 Backend Dependencies
-- **No new backend code required**: Existing `/api/auth/change-password` endpoint is complete
-- **Route protection**: Requires `protectRoute` middleware for HTML page
-- **Authentication middleware**: Uses existing `verifyToken` middleware
-
-#### 7.2 Frontend Dependencies
-- **Existing CSS patterns**: Leverages existing styles from login pages
-- **Authentication patterns**: Uses existing `checkAuthentication` and `authenticatedFetch` patterns
-- **Message display**: Uses existing error/success message styling and behavior
-
-#### 7.3 Integration Requirements
-**Navigation Updates**: Minor updates needed to existing pages:
-- Add "Đổi mật khẩu" links to authenticated page headers
-- Update admin dashboard user menu
-- Consistent placement across all authenticated pages
-
-**No Database Changes**: Uses existing User model and authentication system
-**No API Changes**: Leverages existing, fully-implemented endpoint
-
-### 8. Risk Assessment
-
-#### 8.1 Technical Risks
-**Low Risk**: 
-- Backend endpoint already exists and is tested
-- Frontend follows proven patterns from existing login pages
-- No database schema changes required
-
-**Potential Issues**:
-- **Session Management**: Need to handle logout flow properly after password change
-- **User Experience**: Clear communication about required re-login
-- **Navigation Consistency**: Ensure all authenticated pages include access to change password
-
-#### 8.2 Security Risks
-**Mitigated**:
-- Uses existing secure password hashing (bcrypt with 12 salt rounds)
-- Follows existing JWT token management patterns  
-- Automatic session invalidation after password change
-
-**Additional Protections**:
-- Client-side validation prevents common mistakes
-- Server-side validation provides defense in depth
-- Clear security notices inform users of logout requirement
-
-#### 8.3 User Experience Risks
-**Navigation Confusion**: Users might not understand where to find change password feature
-**Mitigation**: Consistent placement in all authenticated page headers
-
-**Post-Change Experience**: Users might be confused by forced logout
-**Mitigation**: Clear messaging about required re-login with countdown timer
-
-### 9. Testing Strategy
-
-#### 9.1 Frontend Testing
-**Authentication Flow**:
-- [ ] Unauthenticated access redirects to login
-- [ ] Admin users can access change password page
-- [ ] Regular users can access change password page
-- [ ] Session validation works correctly
-
-**Form Validation**:
-- [ ] Empty fields show appropriate errors
-- [ ] Password length validation works
-- [ ] Password confirmation matching works
-- [ ] Same password prevention works
-- [ ] Real-time validation provides immediate feedback
-
-**User Experience**:
-- [ ] Loading states work properly
-- [ ] Error messages display correctly
-- [ ] Success flow works with countdown
-- [ ] Cancel button navigates to appropriate page
-- [ ] Mobile responsive design functions properly
-
-#### 9.2 Integration Testing
-**API Integration**:
-- [ ] Successful password change calls existing endpoint correctly
-- [ ] Error responses handled appropriately
-- [ ] Authentication headers included properly
-- [ ] Token refresh not needed (password change forces logout)
-
-**Navigation Integration**:
-- [ ] Links to change password page work from all authenticated pages
-- [ ] Return navigation works correctly based on user role
-- [ ] Post-change logout redirects to appropriate login page
-
-#### 9.3 Security Testing
-**Authentication Security**:
-- [ ] Cannot access page without valid token
-- [ ] Cannot change password without valid current password
-- [ ] Session invalidation works (refresh tokens cleared)
-- [ ] Cannot bypass client-side validation
-
-**Password Security**:
-- [ ] New password is properly hashed by backend
-- [ ] Current password verification works correctly
-- [ ] Password changes are logged by existing backend logging
-
-### 10. Implementation Roadmap
-
-#### Phase 1: Core Implementation (Priority 1)
-**Frontend Components** (2-3 hours):
-- [ ] Create `public/change-password.html` with embedded CSS and JavaScript
-- [ ] Implement `ChangePasswordApp` class following existing patterns
-- [ ] Test authentication flow and form validation
-- [ ] Test API integration with existing endpoint
-
-**Navigation Integration** (1-2 hours):
-- [ ] Add change password links to main survey page (`public/index.html`)
-- [ ] Add change password links to admin dashboard header
-- [ ] Add change password links to other authenticated pages
-- [ ] Test navigation flow from all entry points
-
-#### Phase 2: Polish & Testing (Priority 2)
-**User Experience Enhancement** (1-2 hours):
-- [ ] Refine error messaging and validation feedback
-- [ ] Test mobile responsive design
-- [ ] Implement accessibility improvements (ARIA labels, keyboard navigation)
-- [ ] Add password strength indicator (optional enhancement)
-
-**Integration Testing** (1-2 hours):
-- [ ] Test with different user roles (admin, user, PRT, TDS, TDL)
-- [ ] Test error scenarios (wrong current password, network errors)
-- [ ] Test success flow with logout and re-login
-- [ ] Cross-browser compatibility testing
-
-#### Phase 3: Documentation & Deployment (Priority 3)
-**Documentation Updates** (30 minutes):
-- [ ] Update CLAUDE.md with new page information
-- [ ] Document new navigation patterns
-- [ ] Add testing notes for change password functionality
-
-**Deployment Considerations**:
-- [ ] No backend changes required (endpoint exists)
-- [ ] No database migrations required
-- [ ] Simple static file deployment for new HTML page
-
-### 11. File Changes Required
-
-#### 11.1 New Files
-**`public/change-password.html`**: Complete standalone page with embedded CSS and JavaScript
-
-#### 11.2 Modified Files
-**Navigation Updates** (minor modifications):
-- **`public/index.html`**: Add change password link to header navigation
-- **`public/survey-results.html`**: Add change password link to admin user menu
-- **`public/survey-history.html`**: Add change password link to header navigation
-- **`public/user-management.html`**: Add change password link to header navigation
-- **`public/store-management.html`**: Add change password link to header navigation
-- **`public/display-management.html`**: Add change password link to header navigation
-
-**Route Protection** (if needed):
-- **`src/routes/index.js`** or main app file: Add route protection for change-password.html
-
-#### 11.3 No Changes Required
-- **Backend API**: `/api/auth/change-password` endpoint already fully implemented
-- **Database Models**: User model already supports password changes
-- **Authentication Middleware**: Existing middleware handles all required functionality
-- **CSS Files**: Using embedded styles following login page pattern
-
-### 12. Acceptance Criteria
-
-#### 12.1 Functional Requirements
-- [ ] **Authentication**: Only authenticated users can access change password page
-- [ ] **Form Validation**: Client-side validation prevents invalid submissions
-- [ ] **API Integration**: Successfully calls existing `/api/auth/change-password` endpoint
-- [ ] **Error Handling**: Displays appropriate error messages for all failure scenarios
-- [ ] **Success Flow**: Shows success message and automatically logs out user
-- [ ] **Navigation**: Accessible from all authenticated pages, returns to appropriate page on cancel
-
-#### 12.2 Security Requirements
-- [ ] **Current Password Verification**: Cannot change password without correct current password
-- [ ] **Password Strength**: Enforces minimum 6-character requirement
-- [ ] **Session Invalidation**: Forces logout after successful password change
-- [ ] **Token Security**: Uses existing JWT token validation
-- [ ] **No Sensitive Data Exposure**: Passwords not logged or exposed in client-side code
-
-#### 12.3 User Experience Requirements
-- [ ] **Responsive Design**: Works properly on mobile and desktop devices
-- [ ] **Clear Feedback**: Provides immediate validation feedback during form completion
-- [ ] **Loading States**: Shows loading indicators during API requests
-- [ ] **Accessibility**: Supports keyboard navigation and screen readers
-- [ ] **Consistent Styling**: Matches existing application design language
-
-#### 12.4 Technical Requirements
-- [ ] **Code Quality**: Follows existing code style and ESLint rules
-- [ ] **Performance**: Loads quickly without unnecessary dependencies
-- [ ] **Browser Compatibility**: Works in all browsers supported by the application
-- [ ] **Error Recovery**: Handles network errors gracefully with retry capability
-
-## Next Steps
-
-### Immediate Actions
-1. **[ ] Reviewer Feedback**: Submit proposal for technical review and architectural approval
-2. **[ ] Main Agent Implementation**: Begin frontend development following this specification
-3. **[ ] Navigation Updates**: Update all authenticated pages with change password links
-
-### Future Enhancements (Separate Proposals)
-- **Enhanced Password Requirements**: Implement complex password validation rules
-- **Password History**: Prevent reuse of recent passwords
-- **Account Security Dashboard**: Comprehensive security management interface
-- **Two-Factor Authentication**: Add additional security layer for sensitive accounts
-
-### Success Metrics
-- **User Adoption**: Reduction in admin support requests for password resets
-- **Security Improvement**: Users proactively updating passwords
-- **User Satisfaction**: Positive feedback on self-service capability
-- **System Reliability**: No security incidents related to password management
-
----
-
-**Implementation Estimate**: 4-6 hours total development time  
-**Risk Level**: Low (leverages existing, proven patterns and backend functionality)  
-**Business Impact**: High (improves user autonomy and security posture)
-
----
-
-## REVIEWER FEEDBACK
-
-### Technical Feasibility Assessment: ✅ EXCELLENT
-
-> **Reviewer Comment**: The proposal demonstrates exceptional technical feasibility with strong alignment to existing architecture patterns.
-
-**Architecture Alignment**: The proposal perfectly follows the established class-based frontend architecture. The `ChangePasswordApp` class mirrors the proven patterns from `LoginApp` and `AdminApp`, including consistent method naming (`init()`, `bindEvents()`, `checkAuthentication()`, `authenticatedFetch()`).
-
-**API Integration**: Correctly leverages the existing `/api/auth/change-password` endpoint which is already implemented and tested. The request/response format matches exactly with the backend implementation verified in `authController.js`.
-
-**Code Patterns**: Follows established frontend patterns including:
-- Form data handling via `FormData` and `Object.fromEntries()`
-- Error/success message display using existing CSS classes
-- Loading state management with overlay and button disabling
-- Embedded CSS and JavaScript following login page conventions
-
-### Security Review: ✅ APPROVED WITH COMMENDATIONS
-
-> **Reviewer Comment**: Security implementation is robust and follows industry best practices with proper integration of existing security infrastructure.
-
-**Password Change Flow Security**: 
-- Correctly requires current password verification before allowing change
-- Leverages existing bcrypt implementation (12 salt rounds) for secure hashing
-- Properly invalidates all refresh tokens post-change to force re-authentication across devices
-- Implements client-side validation with server-side enforcement for defense-in-depth
-
-**Authentication & Session Handling**:
-- Uses existing JWT verification flow with proper token validation
-- Correctly implements session timeout handling (60-minute inactivity window)
-- Proper logout flow with localStorage clearing and role-based redirect
-- No token refresh needed during password change (appropriate security measure)
-
-**Input Validation & Sanitization**:
-- Comprehensive client-side validation prevents common user errors
-- Server-side validation leverages existing robust backend validation
-- Proper trimming and sanitization of input data
-- Prevents password reuse through client-side comparison
-
-**Rate Limiting & Abuse Prevention**:
-- Frontend implements submission throttling with loading states
-- Backend leverages existing token validation for session security
-- Natural rate limiting through required current password verification
-
-### Code Consistency Review: ✅ FULLY COMPLIANT
-
-> **Reviewer Comment**: The proposal demonstrates excellent adherence to established coding standards and patterns throughout the codebase.
-
-**Naming Conventions**: 
-- Class name `ChangePasswordApp` follows `LoginApp`/`AdminApp` pattern
-- Method names (`handleChangePassword`, `validateForm`, `showError`) match existing conventions
-- CSS class names follow established patterns (`.change-password-container`, `.form-control`)
-- HTML element IDs use consistent naming (`changePasswordForm`, `currentPassword`)
-
-**CSS/Styling Approach**:
-- Embedded CSS following login page pattern maintains consistency
-- Reuses existing CSS classes (`.form-control`, `.error-message`, `.success-message`)
-- Color scheme and styling matches established design language
-- Responsive breakpoints align with existing mobile-first approach
-
-**JavaScript Class Structure**:
-- Constructor pattern with `this.init()` call matches established architecture
-- Method organization follows existing class structures
-- Event binding patterns identical to login implementations
-- Authentication flow reuses proven `checkAuthentication()` pattern
-
-**Error Handling Patterns**:
-- Try-catch blocks around async operations following established pattern
-- Consistent error message display using existing `.error-message` CSS class
-- Network error handling with user-friendly fallback messages
-- Auto-hide error messages after 5 seconds (matches login pattern)
-
-### User Experience Review: ✅ SUPERIOR DESIGN
-
-> **Reviewer Comment**: The UX design provides an intuitive, accessible experience that enhances user autonomy while maintaining security confidence.
-
-**Navigation & Integration**:
-- Logical placement in header navigation maintains discoverability
-- Role-based navigation (admin vs user) respects existing access patterns
-- Cancel button provides clear exit path back to user's appropriate context
-- Consistent access points across all authenticated pages
-
-**Form Validation & Feedback**:
-- Real-time validation provides immediate user feedback
-- Clear password requirements communicate expectations upfront
-- Progressive validation (length → match → submission) guides user through process
-- Success messaging with countdown timer sets clear expectations
-
-**Mobile Responsiveness**:
-- Mobile-first design approach consistent with existing pages
-- Form layout optimized for touch interaction
-- Responsive breakpoints match established patterns
-- Proper viewport handling for mobile keyboards
-
-**Accessibility Considerations**:
-- Proper form labels with semantic HTML structure
-- Autocomplete attributes for password managers
-- Clear focus states and keyboard navigation support
-- Screen reader friendly messaging and error announcements
-
-### Implementation Review: ✅ READY FOR IMMEDIATE DEVELOPMENT
-
-> **Reviewer Comment**: The implementation plan is thorough, well-sequenced, and provides clear guidance for the main agent.
-
-**File Modification Accuracy**:
-- File list is complete and accurate with proper absolute paths
-- Correctly identifies only one new file needed (`change-password.html`)
-- Navigation updates properly identified across all authenticated pages
-- No unnecessary file changes proposed
-
-**Complexity & Timeline Assessment**:
-- 4-6 hour estimate is realistic for the scope proposed
-- Phased approach allows for iterative testing and validation
-- Clear dependencies and sequencing prevent implementation conflicts
-- Proper allocation of time for testing and integration
-
-**Testing Strategy Completeness**:
-- Comprehensive test cases covering authentication, validation, and user experience
-- Security testing includes both positive and negative test scenarios
-- Integration testing covers cross-page navigation and role-based behavior
-- Accessibility and responsive design testing included
-
-**Deployment Readiness**:
-- No backend changes required minimizes deployment risk
-- Static file deployment is straightforward
-- No database migrations needed
-- Can be deployed independently without affecting existing functionality
-
-### Risk Assessment: ✅ LOW RISK WITH PROPER MITIGATIONS
-
-> **Reviewer Comment**: Risk assessment is thorough and realistic with appropriate mitigation strategies identified.
-
-**Technical Risks**: 
-- Minimal technical risk due to leveraging existing, proven infrastructure
-- Clear mitigation strategies for potential session management issues
-- Proper fallback handling for network and server errors
-
-**Security Risks**:
-- All major security risks properly addressed through existing infrastructure
-- Password change flow follows security best practices
-- Session invalidation prevents security vulnerabilities
-
-**User Experience Risks**:
-- Identified navigation and post-change confusion risks with clear mitigation plans
-- Consistent placement strategy addresses discoverability concerns
-- Clear messaging strategy addresses user understanding of logout requirement
-
-### Improvement Recommendations
-
-#### 1. Enhanced Password Requirements (Future Enhancement)
-> **Reviewer Suggestion**: Consider implementing progressive password strength requirements in a future iteration to further enhance security posture.
-
-#### 2. Navigation Enhancement
-> **Reviewer Suggestion**: Add the change password link to the user info area on the survey page for improved discoverability.
-
-#### 3. Success Message Enhancement
-> **Reviewer Suggestion**: Consider adding a brief "loading" state during the 3-second countdown to logout for better user feedback.
-
-### Implementation Readiness: ✅ APPROVED FOR IMMEDIATE IMPLEMENTATION
-
-> **Reviewer Decision**: This proposal is technically sound, architecturally aligned, and ready for main agent implementation.
-
-**Strengths**:
-- Leverages existing, proven backend infrastructure
-- Follows established frontend patterns consistently
-- Comprehensive security implementation
-- Thorough testing strategy
-- Clear implementation roadmap
-- Minimal risk with high user value
-
-**Implementation Guidance for Main Agent**:
-1. Start with creating `change-password.html` following the exact structure provided
-2. Implement `ChangePasswordApp` class using existing patterns from `login.html`
-3. Add navigation links to authenticated pages in the sequence specified
-4. Test authentication flow first, then form functionality, then integration
-5. Follow the phased approach for systematic validation
-
-**Final Status: APPROVED** ✅
-
-**Priority**: High - Proceed with immediate implementation
-**Confidence Level**: High - All technical and architectural requirements validated
-**Next Action**: Main agent to begin Phase 1 implementation following the detailed specification provided
-
----
-
-*Review completed by: Reviewer Agent*  
-*Review date: September 1, 2025*  
-*Architecture validation: Confirmed against Gemini analysis*
-
----
-
-# Enhancement Proposal - Leader Dropdown Dynamic Population
-**Date**: September 3, 2025  
-**Proposal Type**: Bug Fix & Feature Enhancement - User Management  
-**Priority**: High - Core Functionality Issue  
-
-## Summary
-
-Fix and enhance the Leader dropdown functionality in the Edit User form of the POSM Survey Collection web application. The current implementation has critical gaps that prevent proper leader assignment based on role hierarchy. This proposal addresses the broken dropdown population and implements a robust role-based leader selection system.
-
-## Current State Analysis
-
-### 1. Identified Issues
-
-#### 1.1 Leader Dropdown Population Problems
-**Current Implementation Problems**:
-- The `fetchAllLeaders()` method (lines 1200-1303 in user-management.js) uses a flawed approach
-- It fetches `/api/users?limit=5000&isActive=true` but relies on existing leader assignments to determine potential leaders
-- For new deployments or when no leaders are assigned yet, this results in empty dropdowns
-- The logic tries to determine "valid leader roles" by reverse-engineering from existing assignments
-- No direct API endpoint for role-based leader selection
-
-#### 1.2 Role Hierarchy Issues
-**Backend Hierarchy Rules** (from User.js lines 169-176):
-```javascript
-const validHierarchy = {
-  admin: [], // admin doesn't report to anyone
-  PRT: ['TDS', 'TDL', 'admin'], // PRT can report to TDS, TDL, or admin
-  TDS: ['TDL', 'admin'], // TDS can report to TDL or admin
-  TDL: ['admin'], // TDL can report to admin
-  user: ['TDS', 'TDL', 'admin'], // users can report to TDS, TDL, or admin
-};
-```
-
-**Current Frontend Logic Problems**:
-- The `loadLeadersDropdown()` method (lines 1306-1425) uses complex heuristics to determine leader eligibility
-- It tries to infer role hierarchy dynamically instead of using the backend's definitive rules
-- Fallback logic creates "dummy" leader entries when user records can't be found
-- No direct integration with `User.validateHierarchy()` backend logic
-
-### 2. Architecture Gap Analysis
-
-#### 2.1 Missing Backend API
-**Current State**: No dedicated endpoint for fetching potential leaders by role
-**Impact**: Frontend must implement complex logic that duplicates backend hierarchy rules
-**Risk**: Frontend and backend hierarchy validation can become inconsistent
-
-#### 2.2 Frontend Complexity
-**Current State**: 225+ lines of complex leader dropdown logic with multiple fallback mechanisms
-**Impact**: Difficult to maintain, debug, and extend
-**Risk**: High likelihood of bugs when hierarchy rules change
-
-### 3. User Experience Issues
-
-#### 3.1 Empty Dropdown Problem
-**Scenario**: When editing a user with role "PRT"
-**Expected**: Dropdown shows all active TDS, TDL, and admin users
-**Actual**: Dropdown may show "Không có Leader khả dụng trong hệ thống"
-
-#### 3.2 Inconsistent Selection
-**Scenario**: Role change triggers dropdown refresh
-**Expected**: Dropdown immediately updates with role-appropriate leaders
-**Actual**: May not update properly or show incorrect options
-
-## Proposed Solution
-
-### 1. Backend API Enhancement
-
-#### 1.1 New API Endpoint: Get Potential Leaders by Role
-**Endpoint**: `GET /api/users/potential-leaders/:role`
-**Purpose**: Return all active users who can lead the specified role based on hierarchy rules
-
-**Implementation in `userController.js`**:
-```javascript
-/**
- * Get potential leaders for a given role
- * Returns all active users whose roles can lead the specified role
- */
-const getPotentialLeadersByRole = async (req, res) => {
-  try {
-    const { role } = req.params;
-    
-    // Validate role parameter
-    const validRoles = ['admin', 'user', 'PRT', 'TDS', 'TDL'];
-    if (!validRoles.includes(role)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid role specified'
-      });
-    }
-
-    // Use the existing hierarchy validation to determine valid leader roles
-    const validHierarchy = {
-      admin: [], // admin doesn't report to anyone
-      PRT: ['TDS', 'TDL', 'admin'],
-      TDS: ['TDL', 'admin'],
-      TDL: ['admin'],
-      user: ['TDS', 'TDL', 'admin'],
-    };
-
-    const allowedLeaderRoles = validHierarchy[role];
-    
-    // If role doesn't need a leader (admin), return empty array
-    if (!allowedLeaderRoles || allowedLeaderRoles.length === 0) {
-      return res.json({
-        success: true,
-        data: [],
-        needsLeader: false,
-        message: `Role ${role} does not require a leader`
-      });
-    }
-
-    // Find all active users with roles that can lead this role
-    const potentialLeaders = await User.find({
-      role: { $in: allowedLeaderRoles },
-      isActive: true
-    })
-    .select('userid username loginid role')
-    .sort({ role: 1, username: 1 });
-
-    res.json({
-      success: true,
-      data: potentialLeaders,
-      needsLeader: true,
-      allowedLeaderRoles: allowedLeaderRoles,
-      requestedRole: role
-    });
-
-  } catch (error) {
-    console.error('Get potential leaders error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch potential leaders'
-    });
-  }
-};
-```
-
-#### 1.2 Route Registration
-**Add to `userRoutes.js`**:
-```javascript
-// Add this route before the existing routes
-router.get('/potential-leaders/:role', userController.getPotentialLeadersByRole);
-```
-
-### 2. Frontend Enhancement
-
-#### 2.1 Simplified Leader Dropdown Logic
-**Replace the complex `loadLeadersDropdown()` method in user-management.js**:
-
-```javascript
-/**
- * Load leaders dropdown based on selected role
- * Uses the new dedicated API endpoint for accurate role-based filtering
- */
-async loadLeadersDropdown(selectedLeader = null, userRole = null) {
-  try {
-    const currentRole = userRole || document.getElementById('role')?.value;
-    const leaderSelect = document.getElementById('leader');
-
-    if (!leaderSelect) {
-      console.error('Leader select element not found');
-      return;
-    }
-
-    if (!currentRole) {
-      leaderSelect.innerHTML = '<option value="">Chọn vai trò trước</option>';
-      leaderSelect.disabled = true;
-      return;
-    }
-
-    this.showLeaderDropdownLoading(true);
-
-    // Call the new API endpoint
-    const response = await this.makeAuthenticatedRequest(`/api/users/potential-leaders/${currentRole}`);
-    
-    if (!response || !response.ok) {
-      throw new Error(`HTTP ${response?.status}: Failed to fetch potential leaders`);
-    }
-
-    const result = await response.json();
-    console.log('Potential leaders API response:', result);
-
-    // Clear existing options
-    leaderSelect.innerHTML = '';
-
-    if (!result.success) {
-      throw new Error(result.message || 'API request failed');
-    }
-
-    // If role doesn't need a leader
-    if (!result.needsLeader) {
-      const option = document.createElement('option');
-      option.value = '';
-      option.textContent = `Vai trò ${currentRole} không cần Leader`;
-      leaderSelect.appendChild(option);
-      leaderSelect.disabled = true;
-      return;
-    }
-
-    // Enable dropdown and add default option
-    leaderSelect.disabled = false;
-    const defaultOption = document.createElement('option');
-    defaultOption.value = '';
-    defaultOption.textContent = 'Chọn Leader';
-    leaderSelect.appendChild(defaultOption);
-
-    // Populate with potential leaders
-    if (!result.data || result.data.length === 0) {
-      const noLeadersOption = document.createElement('option');
-      noLeadersOption.value = '';
-      noLeadersOption.textContent = `Không có ${result.allowedLeaderRoles?.join(', ')} nào trong hệ thống`;
-      noLeadersOption.disabled = true;
-      leaderSelect.appendChild(noLeadersOption);
-      return;
-    }
-
-    // Sort leaders by role priority then by name
-    const rolePriority = { admin: 1, TDL: 2, TDS: 3 };
-    const sortedLeaders = result.data.sort((a, b) => {
-      const priorityDiff = (rolePriority[a.role] || 999) - (rolePriority[b.role] || 999);
-      return priorityDiff !== 0 ? priorityDiff : a.username.localeCompare(b.username);
-    });
-
-    // Add leader options
-    let selectedFound = false;
-    sortedLeaders.forEach(leader => {
-      const option = document.createElement('option');
-      option.value = leader.username;
-      option.textContent = `${leader.username} (${leader.role})`;
-      
-      if (selectedLeader && leader.username === selectedLeader) {
-        option.selected = true;
-        selectedFound = true;
-      }
-      
-      leaderSelect.appendChild(option);
-    });
-
-    // If selectedLeader was provided but not found in results, add it as a disabled option
-    if (selectedLeader && !selectedFound) {
-      const currentLeaderOption = document.createElement('option');
-      currentLeaderOption.value = selectedLeader;
-      currentLeaderOption.textContent = `${selectedLeader} (Hiện tại - có thể không hợp lệ)`;
-      currentLeaderOption.selected = true;
-      currentLeaderOption.style.color = '#dc2626'; // Red color to indicate potential issue
-      leaderSelect.appendChild(currentLeaderOption);
-    }
-
-  } catch (error) {
-    console.error('Error loading leaders dropdown:', error);
-    
-    // Fallback UI
-    leaderSelect.innerHTML = '<option value="">Lỗi khi tải danh sách Leader</option>';
-    leaderSelect.disabled = true;
-    
-    this.showNotification('Lỗi khi tải danh sách Leader: ' + error.message, 'error');
-  } finally {
-    this.showLeaderDropdownLoading(false);
-  }
-}
-
-/**
- * Show/hide loading state for leader dropdown
- */
-showLeaderDropdownLoading(isLoading) {
-  const leaderSelect = document.getElementById('leader');
-  if (!leaderSelect) return;
-
-  if (isLoading) {
-    leaderSelect.innerHTML = '<option value="">Đang tải...</option>';
-    leaderSelect.disabled = true;
-  }
-  // Note: The actual content will be set by loadLeadersDropdown()
-}
-```
-
-#### 2.2 Enhanced Role Change Handler
-**Update the `onRoleChange()` method**:
-```javascript
-async onRoleChange(role) {
-  console.log('Role changed to:', role);
-  
-  // Get current leader value before refresh
-  const currentLeader = document.getElementById('leader')?.value || null;
-  
-  // Load appropriate leaders for the new role
-  await this.loadLeadersDropdown(currentLeader, role);
-  
-  // Show helpful message if leader was cleared due to role change
-  const newLeaderValue = document.getElementById('leader')?.value || null;
-  if (currentLeader && !newLeaderValue) {
-    this.showNotification(
-      `Leader đã được xóa do thay đổi vai trò. Vui lòng chọn Leader phù hợp với vai trò ${role}.`, 
-      'warning', 
-      7000
-    );
-  }
-}
-```
-
-### 3. Backend Integration Enhancement
-
-#### 3.1 Hierarchy Validation Endpoint (Optional)
-**Additional endpoint for frontend validation**:
-```javascript
-/**
- * Validate if a specific leader can manage a specific role
- * Useful for frontend validation feedback
- */
-const validateLeaderHierarchy = async (req, res) => {
-  try {
-    const { role, leaderUsername } = req.query;
-    
-    if (!role) {
-      return res.status(400).json({
-        success: false,
-        message: 'Role parameter is required'
-      });
-    }
-
-    const isValid = await User.validateHierarchy(role, leaderUsername);
-    
-    // Get additional context if validation fails
-    let message = '';
-    let leaderRole = null;
-    
-    if (leaderUsername) {
-      const leaderUser = await User.findOne({ username: leaderUsername, isActive: true });
-      leaderRole = leaderUser ? leaderUser.role : null;
-      
-      if (!leaderUser) {
-        message = 'Leader không tồn tại hoặc không hoạt động';
-      } else if (!isValid) {
-        message = `Vai trò ${role} không thể báo cáo cho ${leaderRole}`;
-      } else {
-        message = `Hợp lệ: ${role} có thể báo cáo cho ${leaderRole}`;
-      }
-    } else if (isValid) {
-      message = `Vai trò ${role} không cần Leader`;
-    } else {
-      message = `Vai trò ${role} cần có Leader`;
-    }
-
-    res.json({
-      success: true,
-      data: {
-        isValid,
-        role,
-        leaderUsername,
-        leaderRole,
-        message
-      }
-    });
-
-  } catch (error) {
-    console.error('Validate hierarchy error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to validate hierarchy'
-    });
-  }
-};
-```
-
-### 4. Enhanced Error Handling & User Experience
-
-#### 4.1 Real-time Validation Feedback
-**Add instant validation when leader is selected**:
-```javascript
-/**
- * Validate selected leader against current role in real-time
- */
-async validateSelectedLeader() {
-  const role = document.getElementById('role')?.value;
-  const leader = document.getElementById('leader')?.value;
-  
-  if (!role || !leader) return;
-
-  try {
-    const response = await this.makeAuthenticatedRequest(
-      `/api/users/validate-hierarchy?role=${role}&leaderUsername=${leader}`
-    );
-    
-    if (response && response.ok) {
-      const result = await response.json();
-      
-      // Show validation feedback
-      const leaderSelect = document.getElementById('leader');
-      if (result.data.isValid) {
-        leaderSelect.style.borderColor = '#10b981'; // Green border
-        this.showValidationMessage(result.data.message, 'success');
-      } else {
-        leaderSelect.style.borderColor = '#ef4444'; // Red border
-        this.showValidationMessage(result.data.message, 'error');
-      }
-    }
-  } catch (error) {
-    console.error('Leader validation error:', error);
-  }
-}
-
-/**
- * Show temporary validation message near the leader dropdown
- */
-showValidationMessage(message, type) {
-  // Remove existing validation message
-  const existingMessage = document.getElementById('leaderValidationMessage');
-  if (existingMessage) {
-    existingMessage.remove();
-  }
-
-  // Create new validation message
-  const messageDiv = document.createElement('div');
-  messageDiv.id = 'leaderValidationMessage';
-  messageDiv.className = `validation-message validation-${type}`;
-  messageDiv.textContent = message;
-  
-  // Insert after leader dropdown
-  const leaderFormGroup = document.getElementById('leader').parentNode;
-  leaderFormGroup.appendChild(messageDiv);
-  
-  // Auto-remove after 5 seconds
-  setTimeout(() => {
-    messageDiv.remove();
-  }, 5000);
-}
-```
-
-### 5. Data Flow Architecture
-
-#### 5.1 New API Data Flow
-```
-Frontend Role Selection
-        ↓
-GET /api/users/potential-leaders/{role}
-        ↓
-Backend validates role parameter
-        ↓
-Backend queries User.find({ role: { $in: allowedLeaderRoles }, isActive: true })
-        ↓
-Returns structured response with potential leaders
-        ↓
-Frontend populates dropdown with role-appropriate options
-        ↓
-User selects leader → Optional real-time validation
-        ↓
-Form submission → Existing validation in updateUser()
-```
-
-#### 5.2 Enhanced Frontend Event Flow
-```
-Role Change Event
-        ↓
-onRoleChange() triggered
-        ↓
-Call loadLeadersDropdown(currentLeader, newRole)
-        ↓
-API call to get potential leaders for newRole
-        ↓
-Populate dropdown with appropriate options
-        ↓
-Show notification if current leader is incompatible
-        ↓
-Optional: Real-time validation on leader selection
-```
-
-## Technical Implementation
-
-### 1. Backend Changes Required
-
-#### 1.1 Controller Enhancement
-**File**: `src/controllers/userController.js`
-**Changes**: Add new methods at the end of the file
-
-```javascript
-// Add to the module.exports object:
-module.exports = {
-  getUsers,
-  getUserById,
-  createUser,
-  updateUser,
-  deleteUser,
-  bulkDeleteUsers,
-  resetUserPassword,
-  importUsersFromCSV,
-  exportUsersToCSV,
-  getUserStats,
-  getPotentialLeadersByRole, // NEW
-  validateLeaderHierarchy,    // NEW (optional)
-};
-```
-
-#### 1.2 Route Enhancement
-**File**: `src/routes/userRoutes.js`
-**Changes**: Add new routes before existing routes
-
-```javascript
-// Add these routes after line 45 (before the existing routes):
-router.get('/potential-leaders/:role', userController.getPotentialLeadersByRole);
-router.get('/validate-hierarchy', userController.validateLeaderHierarchy); // Optional
-```
-
-### 2. Frontend Changes Required
-
-#### 2.1 User Management JavaScript Enhancement
-**File**: `public/user-management.js`
-**Changes**: Replace lines 1194-1425 (entire leader dropdown section) with the new implementation
-
-#### 2.2 Enhanced Event Binding
-**Update the role change event listener registration**:
-```javascript
-// Enhanced role change event to include leader validation
-document
-  .getElementById('role')
-  .addEventListener('change', async (e) => {
-    await this.onRoleChange(e.target.value);
-  });
-
-// Add leader change validation (new)
-document
-  .getElementById('leader')
-  .addEventListener('change', async (e) => {
-    if (e.target.value) {
-      await this.validateSelectedLeader();
-    }
-  });
-```
-
-### 3. CSS Enhancements
-
-#### 3.1 Validation Message Styling
-**Add to user-management.html or existing CSS**:
+**Enhanced Button Styling:**
 ```css
-.validation-message {
-  font-size: 12px;
-  margin-top: 5px;
-  padding: 6px 10px;
-  border-radius: 4px;
-  transition: opacity 0.3s ease;
+/* Filter Action Buttons */
+.filter-action-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
 }
 
-.validation-success {
-  background: #d1fae5;
-  color: #065f46;
-  border: 1px solid #10b981;
+/* Flat Small Clear Button */
+.btn-flat-small {
+    background: transparent;
+    border: 1px solid var(--neutral-border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--neutral-text);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+    min-width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.validation-error {
-  background: #fee2e2;
-  color: #991b1b;
-  border: 1px solid #ef4444;
+.btn-flat-small:hover {
+    background: #f8f9fa;
+    border-color: var(--neutral-text);
+    color: var(--neutral-dark);
+    transform: none;
 }
 
-.validation-warning {
-  background: #fef3c7;
-  color: #92400e;
-  border: 1px solid #f59e0b;
+/* Compact Excel Icon Button */
+.btn-excel-icon {
+    background: var(--success);
+    border: none;
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
 }
 
-/* Leader dropdown loading state */
-#leader:disabled {
-  background-color: #f9fafb;
-  color: #6b7280;
-  cursor: not-allowed;
+.btn-excel-icon:hover {
+    background: #218838;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+}
+
+.excel-icon {
+    font-size: 16px;
+    line-height: 1;
+}
+
+.btn-icon-text {
+    font-size: 14px;
+    line-height: 1;
 }
 ```
 
-## Security Considerations
+**Responsive Design:**
+```css
+/* Tablet Breakpoint (769px - 1024px) */
+@media (max-width: 1024px) {
+    .filter-row-unified {
+        grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto;
+        gap: 16px;
+    }
+    
+    .filter-group label {
+        font-size: 0.85rem;
+    }
+    
+    .filter-group select,
+    .filter-group input {
+        padding: 8px 10px;
+        font-size: 0.9rem;
+    }
+}
 
-### 1. Authentication & Authorization
-- **API Protection**: New endpoints use existing `verifyToken` and `requireAdmin` middleware
-- **Role Validation**: Backend validates role parameter against allowed role enum
-- **Data Exposure**: Only necessary user fields are returned (userid, username, role)
+/* Mobile Breakpoint (max-width: 768px) */
+@media (max-width: 768px) {
+    .filters {
+        padding: 16px;
+        border-radius: 12px;
+    }
+    
+    .filter-row-unified {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .filter-group {
+        margin-bottom: 8px;
+    }
+    
+    .filter-group label {
+        margin-bottom: 6px;
+        font-size: 0.9rem;
+    }
+    
+    .filter-group select,
+    .filter-group input {
+        font-size: 16px; /* Prevent iOS zoom */
+        padding: 12px 16px;
+    }
+    
+    .filter-action-buttons {
+        justify-content: center;
+        gap: 16px;
+        margin-top: 8px;
+    }
+    
+    .btn-flat-small,
+    .btn-excel-icon {
+        min-width: 44px; /* Better touch target */
+        height: 44px;
+        padding: 12px;
+    }
+    
+    .excel-icon,
+    .btn-icon-text {
+        font-size: 18px; /* Larger for mobile */
+    }
+}
 
-### 2. Input Validation
-- **Role Parameter**: Validated against User schema enum values
-- **SQL Injection Prevention**: MongoDB queries use proper parameterization
-- **XSS Prevention**: All user data is properly escaped when rendering
+/* Small Mobile Breakpoint (max-width: 480px) */
+@media (max-width: 480px) {
+    .filter-row-unified {
+        gap: 8px;
+    }
+    
+    .filters {
+        margin-left: -10px;
+        margin-right: -10px;
+        border-radius: 0;
+    }
+    
+    .filter-action-buttons {
+        flex-direction: row;
+        justify-content: space-evenly;
+    }
+    
+    .btn-flat-small,
+    .btn-excel-icon {
+        flex: 1;
+        max-width: 60px;
+    }
+}
+```
 
-### 3. Business Logic Security
-- **Hierarchy Enforcement**: Backend validation remains the authoritative source
-- **Consistency**: Frontend logic matches backend `validateHierarchy()` exactly
-- **Audit Trail**: Existing user update logging captures leader assignment changes
+### 3. Implementation Strategy
+
+**Phase 1: HTML Structure Update**
+1. Consolidate filter-row divs into single filter-row-unified
+2. Reorder filter groups to place date filters after main filters
+3. Create dedicated filter-action-buttons wrapper
+4. Update button IDs and classes
+
+**Phase 2: CSS Implementation**
+1. Remove conflicting CSS rules (grid vs flex conflicts)
+2. Implement new grid-based layout system
+3. Add new button style classes
+4. Update responsive breakpoints
+
+**Phase 3: JavaScript Adjustments**
+1. Verify existing event listeners still work with new structure
+2. Test autocomplete functionality with new layout
+3. Ensure export and clear functionality remains intact
+
+### 4. Design Specifications
+
+**Visual Hierarchy:**
+- Main filters (Submitted By, Shop): 2fr width each for prominence
+- Date filters: 1.5fr width each for secondary importance
+- Page size selector: 1.5fr width for functionality
+- Action buttons: 1fr width for minimal footprint
+
+**Spacing & Alignment:**
+- 20px gap between filter groups on desktop
+- 16px gap on tablet
+- 12px gap on mobile
+- Consistent 8px margin for labels
+- Aligned bottom alignment for all filter controls
+
+**Button Design:**
+- Clear button: Flat, minimal, 36px height, subtle hover
+- Excel button: Green, icon-only, 36px height, prominent hover with lift effect
+- Mobile: 44px height for better touch targets
+
+### 5. Accessibility Considerations
+- Maintain proper label associations
+- Ensure adequate color contrast ratios
+- Provide proper tooltips for icon-only buttons
+- Maintain keyboard navigation support
+- Support screen readers with semantic markup
+
+### 6. Browser Compatibility
+- CSS Grid support (IE11+, all modern browsers)
+- Flexbox fallbacks where needed
+- Progressive enhancement for older browsers
+- Touch-friendly interface for mobile devices
 
 ## Dependencies
+- **CSS Variables**: Utilizes existing CSS custom properties (--primary, --success, --neutral-border, etc.)
+- **Existing Classes**: Maintains compatibility with current .filter-group, .btn base classes
+- **JavaScript**: No changes required to existing survey-results.js functionality
+- **Font Icons**: Continues using emoji icons for consistency
 
-### 1. No External Dependencies
-- Uses existing authentication middleware
-- Uses existing User model and validation
-- Uses existing frontend patterns and styling
-- No new npm packages required
+## Risks
+1. **Layout Shift**: Users accustomed to current layout may need brief adjustment period
+2. **Mobile Rendering**: Grid layout complexity on very small screens needs thorough testing
+3. **Content Overflow**: Long shop names or user names might cause layout issues
+4. **Icon Recognition**: Excel button without text might need user education
 
-### 2. Backward Compatibility
-- Existing user update API remains unchanged
-- Existing hierarchy validation logic remains unchanged
-- New endpoints are additive only
-- Frontend changes are isolated to user management page
-
-## Implementation Roadmap
-
-### Phase 1: Backend API Implementation (1-2 hours)
-- [ ] Add `getPotentialLeadersByRole()` method to userController.js
-- [ ] Add `validateLeaderHierarchy()` method to userController.js (optional)
-- [ ] Register new routes in userRoutes.js
-- [ ] Test API endpoints manually with curl/Postman
-
-### Phase 2: Frontend Enhancement (2-3 hours)
-- [ ] Replace `loadLeadersDropdown()` method with simplified version
-- [ ] Update `onRoleChange()` method with enhanced logic
-- [ ] Add real-time leader validation functionality
-- [ ] Add enhanced event listeners for role and leader changes
-- [ ] Test dropdown population for all role combinations
-
-### Phase 3: UI/UX Polish (1 hour)
-- [ ] Add validation message styling
-- [ ] Add loading states for dropdown population
-- [ ] Test mobile responsiveness
-- [ ] Add accessibility improvements (ARIA labels)
-
-### Phase 4: Integration Testing (1 hour)
-- [ ] Test complete user creation flow
-- [ ] Test user editing flow with role changes
-- [ ] Test hierarchy validation edge cases
-- [ ] Test error handling scenarios
+**Mitigation Strategies:**
+- Implement progressive enhancement with fallbacks
+- Add tooltips for icon-only buttons
+- Test extensively on various screen sizes
+- Maintain semantic HTML structure
+- Provide subtle animation for smooth transitions
 
 ## Testing Strategy
+1. **Cross-browser Testing**: Chrome, Firefox, Safari, Edge
+2. **Device Testing**: Desktop, tablet, mobile (iOS/Android)
+3. **Screen Size Testing**: 320px to 2560px widths
+4. **Functionality Testing**: All filter operations, export, clear functions
+5. **Accessibility Testing**: Screen readers, keyboard navigation, color contrast
+6. **Performance Testing**: Layout rendering performance on various devices
 
-### 1. API Testing
-**Test Cases for `/api/users/potential-leaders/:role`**:
-- [ ] Valid role (PRT) returns correct leaders (TDS, TDL, admin users)
-- [ ] Valid role (TDS) returns correct leaders (TDL, admin users)
-- [ ] Valid role (admin) returns empty array with needsLeader: false
-- [ ] Invalid role returns 400 error
-- [ ] Unauthenticated request returns 401 error
-- [ ] Non-admin request returns 403 error
-
-### 2. Frontend Testing
-**Dropdown Population Tests**:
-- [ ] Role selection immediately updates leader dropdown
-- [ ] Empty system shows appropriate "no leaders available" message
-- [ ] Existing leader selection is preserved when compatible with new role
-- [ ] Incompatible leader selection triggers warning message
-
-**User Experience Tests**:
-- [ ] Loading state shows while fetching leaders
-- [ ] Error messages display properly on API failures
-- [ ] Validation messages appear for valid/invalid leader selections
-- [ ] Dropdown is disabled for roles that don't need leaders
-
-### 3. Integration Testing
-**Complete User Management Flow**:
-- [ ] Create new user with leader assignment
-- [ ] Edit existing user and change role (leader should update appropriately)
-- [ ] Edit user leader selection with real-time validation
-- [ ] Save user with validation at backend level
-
-## Risk Assessment
-
-### 1. Technical Risks
-**Low Risk**: 
-- New APIs are simple CRUD operations
-- Frontend changes are isolated to user management
-- Backend validation logic remains unchanged
-
-**Mitigation**:
-- Comprehensive testing of all role combinations
-- Fallback UI for API failures
-- Gradual rollout possible (new API can be deployed before frontend changes)
-
-### 2. User Experience Risks
-**Medium Risk**: 
-- Users might be confused by leader dropdown changes when role changes
-- Validation messages might be too technical
-
-**Mitigation**:
-- Clear notification messages when leader is auto-cleared
-- User-friendly validation messaging
-- Tooltips or help text for role hierarchy explanation
-
-### 3. Data Consistency Risks
-**Low Risk**:
-- Backend hierarchy validation prevents invalid assignments
-- Existing data validation prevents corruption
-
-## Acceptance Criteria
-
-### 1. Functional Requirements
-- [ ] Leader dropdown populates correctly for all user roles
-- [ ] Role change immediately updates available leader options
-- [ ] Invalid leader assignments are prevented and clearly communicated
-- [ ] Empty systems show appropriate messages
-- [ ] Loading states provide clear feedback during API calls
-
-### 2. Performance Requirements
-- [ ] Leader dropdown population completes within 2 seconds
-- [ ] API responses are under 500ms for typical datasets
-- [ ] No unnecessary API calls during user interaction
-
-### 3. Security Requirements
-- [ ] New APIs require admin authentication
-- [ ] Role hierarchy rules are enforced consistently
-- [ ] No sensitive data exposure in API responses
-- [ ] Input validation prevents injection attacks
-
-### 4. User Experience Requirements
-- [ ] Clear feedback for all user actions
-- [ ] Intuitive dropdown behavior matches user expectations
-- [ ] Error messages are user-friendly and actionable
-- [ ] Mobile interface remains fully functional
-
-## Future Enhancement Opportunities
-
-### 1. Hierarchy Visualization
-- Add visual diagram showing role hierarchy
-- Include tooltips explaining reporting relationships
-- Dynamic visualization that updates with role selection
-
-### 2. Bulk Leader Assignment
-- Tools for assigning multiple users to the same leader
-- Validation and preview of bulk hierarchy changes
-- Integration with user import functionality
-
-### 3. Leader Capability Dashboard
-- Show how many subordinates each potential leader currently has
-- Load balancing suggestions for leader assignments
-- Leader workload visualization
+## Implementation Timeline
+- **Phase 1** (HTML Updates): 1-2 hours
+- **Phase 2** (CSS Implementation): 2-3 hours  
+- **Phase 3** (Testing & Refinement): 2-4 hours
+- **Total Estimated Time**: 5-9 hours
 
 ## Next Steps
-
-### Immediate Actions
-1. **[ ] Reviewer Feedback**: Validate technical approach and API design
-2. **[ ] Backend Implementation**: Implement new API endpoints
-3. **[ ] Frontend Enhancement**: Replace complex dropdown logic with simplified version
-4. **[ ] Integration Testing**: Test complete user management workflow
-
-### Success Metrics
-- **Dropdown Reliability**: 100% success rate for leader dropdown population
-- **User Experience**: Elimination of "no leaders available" issues in functioning systems
-- **Code Maintainability**: Reduced complexity in frontend leader management logic
-- **System Consistency**: Perfect alignment between frontend and backend hierarchy rules
+- [ ] Reviewer feedback on design approach and specifications
+- [ ] Main agent implementation of HTML structure changes
+- [ ] Main agent implementation of CSS updates
+- [ ] Cross-browser testing validation
+- [ ] Mobile responsiveness verification
+- [ ] User acceptance testing
 
 ---
 
-**Implementation Estimate**: 5-7 hours total development time  
-**Risk Level**: Low-Medium (API addition with frontend simplification)  
-**Business Impact**: High (fixes broken core functionality)  
-**Technical Debt Reduction**: High (eliminates complex frontend hierarchy logic)
+## Technical Implementation Details
 
----
+### HTML Code Changes Required
 
-*Enhancement proposal prepared by: Enhancer Agent*  
-*Date: September 3, 2025*  
-*Based on: Gemini codebase analysis and current implementation review*
-
----
-
-## REVIEWER FEEDBACK
-
-### Technical Accuracy Assessment: ✅ EXCELLENT
-
-> **Reviewer Comment**: The proposal correctly identifies the core issues and provides technically sound solutions that directly address the requirements.
-
-**Problem Identification**: The analysis of the current `fetchAllLeaders()` implementation is accurate. The method indeed uses a flawed reverse-engineering approach that depends on existing leader assignments, making it fail in clean deployments or systems where leaders haven't been assigned yet.
-
-**API Design**: The proposed `getPotentialLeadersByRole` endpoint correctly implements the role hierarchy rules found in `User.js` lines 169-176. The backend validation logic exactly matches the existing `validateHierarchy()` static method.
-
-**Role Hierarchy Implementation**: The proposal correctly identifies that:
-- PRT roles should see TDS, TDL, and admin users as potential leaders
-- TDS roles should see TDL and admin users as potential leaders  
-- TDL roles should see only admin users as potential leaders
-- Admin roles don't need leaders (empty array)
-- User roles follow the same pattern as PRT
-
-**Security Implementation**: Properly integrates with existing JWT authentication and admin-only access control via `verifyToken` and `requireAdmin` middleware.
-
-### Architecture Alignment Review: ✅ PERFECTLY ALIGNED
-
-> **Reviewer Comment**: The proposed solution follows established architectural patterns and integrates seamlessly with the existing system design.
-
-**API Response Format**: The response structure follows the established pattern from Gemini analysis:
-```javascript
-{
-  success: boolean,
-  data: array,
-  needsLeader: boolean,
-  allowedLeaderRoles: array,
-  message: string
-}
+**Replace lines 54-97 in survey-results.html with:**
+```html
+<!-- Filters -->
+<div class="filters">
+    <div class="filter-row-unified">
+        <div class="filter-group filter-main">
+            <label>Submitted By:</label>
+            <select id="submittedByFilter">
+                <option value="">T�t c� ng��i d�ng</option>
+            </select>
+        </div>
+        <div class="filter-group filter-main">
+            <label>Shop:</label>
+            <div class="autocomplete-wrapper">
+                <input type="text" id="shopFilter" placeholder="T�m ki�m shop..." autocomplete="off">
+                <div id="shopDropdown" class="autocomplete-dropdown"></div>
+            </div>
+        </div>
+        <div class="filter-group filter-date">
+            <label>T� ng�y:</label>
+            <input type="date" id="dateFromFilter">
+        </div>
+        <div class="filter-group filter-date">
+            <label>�n ng�y:</label>
+            <input type="date" id="dateToFilter">
+        </div>
+        <div class="filter-group filter-controls">
+            <label>S� k�t qu�/trang:</label>
+            <select id="pageSizeSelector">
+                <option value="10">10</option>
+                <option value="20" selected>20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </div>
+        <div class="filter-group filter-actions">
+            <label>&nbsp;</label>
+            <div class="filter-action-buttons">
+                <button id="clearFiltersBtn" class="btn-flat-small" title="X�a b� l�c">
+                    <span class="btn-icon-text">=�</span>
+                </button>
+                <button id="exportData" class="btn-excel-icon" title="Xu�t Excel">
+                    <span class="excel-icon">=�</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 ```
 
-**Frontend Class Integration**: The simplified `loadLeadersDropdown()` method follows existing patterns:
-- Uses `makeAuthenticatedRequest()` method (consistent with existing code)
-- Implements proper error handling with try-catch blocks
-- Uses existing notification system for error display
-- Follows established DOM manipulation patterns
+### CSS Code Additions Required
 
-**JWT Authentication**: Correctly uses existing authentication patterns:
-- Bearer token in Authorization header
-- Proper error handling for 401/403 responses
-- Integration with existing session management
-
-**Database Integration**: Leverages existing User model without modifications, using proper MongoDB query patterns with `$in` operator and field selection.
-
-### Implementation Feasibility Review: ✅ HIGHLY FEASIBLE
-
-> **Reviewer Comment**: The proposed implementation is realistic, well-scoped, and can be completed within the estimated timeframe.
-
-**Backend API Implementation**: 
-- New controller methods are straightforward CRUD operations
-- Route registration follows existing patterns in `userRoutes.js`
-- No database schema changes required
-- Uses existing validation logic without modifications
-
-**Frontend Enhancement**:
-- Replacement of complex logic with simplified, API-driven approach
-- Significant reduction in code complexity (from 225+ lines to ~100 lines)
-- Maintains backward compatibility with existing edit user functionality
-- Clear loading and error states improve user experience
-
-**Testing Strategy**: The proposed test cases are comprehensive and cover:
-- All role combinations according to hierarchy rules
-- Error scenarios (invalid roles, network failures, authentication issues)
-- User experience edge cases (empty systems, role changes, validation feedback)
-
-### Completeness Review: ✅ COMPREHENSIVE WITH MINOR GAPS
-
-> **Reviewer Comment**: The proposal covers all necessary aspects with excellent detail, though some minor enhancements could improve implementation guidance.
-
-**Code Examples**: Excellent - provides complete implementation code for both backend and frontend components.
-
-**Testing Strategy**: Very comprehensive - covers API testing, frontend testing, and integration testing scenarios.
-
-**Implementation Steps**: Well-structured phased approach with realistic time estimates.
-
-**Security Considerations**: Properly addresses authentication, authorization, and input validation.
-
-### Issues and Missing Elements
-
-#### 1. Minor Implementation Details
-> **Reviewer Issue**: The proposal doesn't specify exactly where to insert the new controller methods in `userController.js`.
-
-**Recommendation**: Add specific line numbers or section references for where to add the new methods.
-
-#### 2. Route Registration Order
-> **Reviewer Issue**: The route registration should be placed carefully to avoid conflicts with existing parameterized routes.
-
-**Recommendation**: Specify that the new routes should be added after line 45 but before line 47 to ensure proper route matching order.
-
-#### 3. Error Response Consistency  
-> **Reviewer Issue**: The validation endpoint response format differs slightly from the main endpoint.
-
-**Recommendation**: Standardize response format to maintain consistency across all new endpoints.
-
-### Architecture Improvements
-
-#### 1. API Endpoint Optimization
-> **Reviewer Suggestion**: Consider combining both endpoints into a single endpoint with optional validation parameter to reduce API surface area.
-
-#### 2. Frontend Caching
-> **Reviewer Suggestion**: Consider implementing brief client-side caching of potential leaders to reduce API calls when users toggle between the same roles.
-
-#### 3. Error Recovery Enhancement
-> **Reviewer Suggestion**: Add retry mechanism for network failures during dropdown population.
-
-### Implementation Readiness: ✅ APPROVED WITH MINOR REVISIONS
-
-> **Reviewer Decision**: This proposal is technically sound and architecturally aligned. Recommend proceeding with implementation after addressing minor specification gaps.
-
-**Strengths**:
-- Correctly identifies and addresses the core technical issues
-- Provides clean, maintainable solution that reduces code complexity
-- Follows established security and authentication patterns
-- Comprehensive testing strategy covers all critical scenarios
-- Clear implementation roadmap with realistic time estimates
-
-**Required Revisions Before Implementation**:
-1. Specify exact insertion points for new controller methods
-2. Clarify route registration order in userRoutes.js
-3. Standardize error response format across both new endpoints
-
-**Implementation Guidance for Main Agent**:
-1. Start with backend implementation - add controller methods first
-2. Register routes carefully to avoid conflicts with existing routes
-3. Test API endpoints independently before frontend integration
-4. Replace frontend dropdown logic in a single focused commit
-5. Test role hierarchy scenarios thoroughly before deployment
-
-**Final Status: NEEDS MINOR REVISION** ⚠️
-
-**Required Changes**:
-1. **Controller Integration**: Specify exact location in `userController.js` for new methods (recommend adding after line 400+ where other export functions are defined)
-2. **Route Order**: Specify that new routes should be inserted after line 45 but before line 47 in `userRoutes.js`
-3. **Response Format**: Ensure validation endpoint follows same response structure as potential leaders endpoint
-
-**Post-Revision Status**: Ready for immediate implementation
-**Confidence Level**: High - Core technical approach is sound, only minor specification details need clarification
-**Priority**: High - Fixes critical user management functionality
-
----
-
-*Review completed by: Reviewer Agent*  
-*Review date: September 3, 2025*  
-*Architecture validation: Confirmed against Gemini analysis and existing User.js hierarchy rules*  
-*Code pattern validation: Verified against existing frontend class structures and API patterns*
-
----
-
-# Enhancement Proposal - SelectedModelsList Horizontal Scrolling UI Enhancement
-**Date**: September 3, 2025  
-**Proposal Type**: UI/UX Bug Fix & Enhancement - Survey Interface  
-**Priority**: High - Critical User Experience Issue  
-
-## Summary
-
-Fix and enhance the selectedModelsList UI component in Step 2 (Choose POSM) of the POSM Survey Collection web application. The current implementation wraps selected models to multiple lines when too many models are added, causing UI overflow that covers survey content below and degrades user experience. This proposal implements a horizontal scrolling solution with responsive design considerations.
-
-## Problem Description
-
-### 1. Current Issue Analysis
-
-#### 1.1 UI Overflow Problem
-**Location**: `public/index.html` line 73 - `<div id="selectedModelsList" class="compact-models-list"></div>`
-
-**Current Behavior**:
-- Selected models are rendered as inline-block elements with wrapping
-- When users select many models (5+ models), the list wraps to multiple lines
-- Wrapped content pushes down the survey content below
-- This creates a poor user experience with content displacement
-- Mobile devices are particularly affected due to smaller screen width
-
-**CSS Implementation Analysis** (from `public/styles-survey.css`):
+**Add to styles-admin.css (replace existing filter styles):**
 ```css
-.compact-models-list {
-    font-size: 0.85rem;
-    margin-bottom: 12px;
+/* Enhanced Filters Layout - Single Row Design */
+.filters {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--card-shadow);
+    border: 1px solid var(--neutral-border);
 }
 
-.selected-model-item {
-    display: inline-block;
-    position: relative;
-    margin-right: 10px;
-    margin-bottom: 5px;
-    padding: 5px 10px;
-    background: #f1f3f4;
-    border-radius: 5px;
-    font-size: 0.85rem;
+.filter-row-unified {
+    display: grid;
+    grid-template-columns: 2fr 2fr 1.5fr 1.5fr 1.5fr 1fr;
+    gap: 20px;
+    align-items: end;
 }
-```
 
-**JavaScript Rendering Logic** (from `public/script.js` lines 1416-1425):
-```javascript
-listDiv.innerHTML = this.selectedModels
-    .map((model) => `
-        <span class="selected-model-item" style="display:inline-block;position:relative;margin-right:10px;margin-bottom:5px;padding:5px 10px;background:#f1f3f4;border-radius:5px;font-size:0.85rem;">
-            <strong>${model}</strong>
-            <button class="btn-icon-delete" data-model="${model}" title="Xóa model này">×</button>
-        </span>
-    `)
-    .join('');
-```
-
-#### 1.2 User Experience Impact
-**Desktop Impact**:
-- Content displacement when 4+ models selected
-- Difficulty scanning selected models in wrapped layout
-- Visual hierarchy disruption in Step 2 interface
-
-**Mobile Impact (Critical)**:
-- Severe content displacement with just 2-3 models
-- Models wrap to multiple lines much sooner
-- Touch interaction becomes difficult with small delete buttons
-- Overall survey flow disruption
-
-### 2. Root Cause Analysis
-
-#### 2.1 Layout Design Flaw
-**Current Implementation**: Uses flexbox wrapping behavior without horizontal scroll containment
-**Issue**: No width constraint or overflow management for the models container
-**Result**: Models expand infinitely horizontally before wrapping
-
-#### 2.2 Responsive Design Gap
-**Mobile Considerations**: Current implementation doesn't account for mobile viewport constraints
-**Touch Interaction**: Delete buttons are sized for desktop interaction, causing usability issues on mobile
-
-## Proposed Solution
-
-### 1. Horizontal Scrolling Implementation
-
-#### 1.1 CSS Enhancement Strategy
-**Core Concept**: Transform the selectedModelsList from a wrapping layout to a horizontal scrolling layout
-
-**New CSS Implementation**:
-```css
-/* Enhanced compact models list with horizontal scrolling */
-.compact-models-list {
-    font-size: 0.85rem;
-    margin-bottom: 12px;
-    
-    /* Horizontal scroll container */
+.filter-group {
     display: flex;
-    overflow-x: auto;
-    overflow-y: hidden;
-    
-    /* Scrollbar styling */
-    scrollbar-width: thin;
-    scrollbar-color: rgba(79, 172, 254, 0.3) transparent;
-    
-    /* Prevent flex shrinking */
-    flex-shrink: 0;
-    
-    /* Smooth scrolling */
-    scroll-behavior: smooth;
-    
-    /* Padding for scroll indicators */
-    padding: 4px 0 8px 0;
+    flex-direction: column;
+    min-width: 0;
 }
 
-/* Webkit scrollbar styling for better appearance */
-.compact-models-list::-webkit-scrollbar {
-    height: 6px;
-}
-
-.compact-models-list::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.compact-models-list::-webkit-scrollbar-thumb {
-    background: rgba(79, 172, 254, 0.3);
-    border-radius: 3px;
-}
-
-.compact-models-list::-webkit-scrollbar-thumb:hover {
-    background: rgba(79, 172, 254, 0.5);
-}
-
-/* Enhanced selected model item styling */
-.selected-model-item {
-    /* Prevent wrapping - keep on single line */
-    display: inline-flex;
-    align-items: center;
-    flex-shrink: 0; /* Important: prevent item shrinking */
-    
-    /* Spacing and styling */
-    margin-right: 10px;
-    margin-bottom: 0; /* Remove bottom margin since no wrapping */
-    padding: 6px 12px;
-    background: #f1f3f4;
-    border-radius: 6px;
-    font-size: 0.85rem;
-    
-    /* Visual improvements */
-    border: 1px solid #e5e7eb;
-    transition: all 0.2s ease;
-    
-    /* Text properties */
+.filter-group label {
+    font-weight: 600;
+    color: var(--neutral-text);
+    margin-bottom: 8px;
+    font-size: 0.9rem;
     white-space: nowrap;
-    
-    /* Minimum width to prevent over-compression */
-    min-width: fit-content;
 }
 
-/* Hover effect for better interactivity */
-.selected-model-item:hover {
-    background: #e5e7eb;
-    border-color: #d1d5db;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+.filter-group select,
+.filter-group input {
+    padding: 10px 12px;
+    border: 2px solid var(--neutral-border);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    width: 100%;
 }
 
-/* Enhanced delete button styling */
-.selected-model-item .btn-icon-delete {
-    margin-left: 8px;
-    width: 18px;
-    height: 18px;
-    min-width: 18px;
-    min-height: 18px;
-    
-    /* Better visual styling */
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.2);
-    color: #dc2626;
-    border-radius: 50%;
-    
-    /* Hover effects */
+.filter-group select:focus,
+.filter-group input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* Filter Action Buttons */
+.filter-action-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* Flat Small Clear Button */
+.btn-flat-small {
+    background: transparent;
+    border: 1px solid var(--neutral-border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--neutral-text);
+    cursor: pointer;
+    font-size: 0.85rem;
     transition: all 0.2s ease;
+    min-width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.selected-model-item .btn-icon-delete:hover {
-    background: #dc2626;
+.btn-flat-small:hover {
+    background: #f8f9fa;
+    border-color: var(--neutral-text);
+    color: var(--neutral-dark);
+}
+
+/* Compact Excel Icon Button */
+.btn-excel-icon {
+    background: var(--success);
+    border: none;
+    border-radius: 6px;
+    padding: 8px 10px;
     color: white;
-    border-color: #dc2626;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
 }
 
-/* Empty state styling */
-.compact-models-list:empty::before {
-    content: "Chưa có model nào được chọn.";
-    color: #6b7280;
-    font-style: italic;
-    padding: 8px 0;
+.btn-excel-icon:hover {
+    background: #218838;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
 }
-```
 
-#### 1.2 Mobile-Responsive Enhancements
-**Mobile-Specific Styling** (within existing media queries):
-```css
-/* Mobile responsiveness for models list */
-@media (max-width: 768px) {
-    .compact-models-list {
-        /* Increase padding for better touch scroll */
-        padding: 6px 0 10px 0;
-        
-        /* Larger scrollbar on mobile */
-        scrollbar-width: auto;
+.excel-icon {
+    font-size: 16px;
+    line-height: 1;
+}
+
+.btn-icon-text {
+    font-size: 14px;
+    line-height: 1;
+}
+
+/* Responsive Design */
+/* Tablet Breakpoint */
+@media (max-width: 1024px) {
+    .filter-row-unified {
+        grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto;
+        gap: 16px;
     }
     
-    .compact-models-list::-webkit-scrollbar {
-        height: 8px;
+    .filter-group label {
+        font-size: 0.85rem;
     }
     
-    .selected-model-item {
-        /* Larger touch targets on mobile */
-        padding: 8px 14px;
+    .filter-group select,
+    .filter-group input {
+        padding: 8px 10px;
         font-size: 0.9rem;
-        
-        /* Ensure adequate spacing for touch */
-        margin-right: 12px;
+    }
+}
+
+/* Mobile Breakpoint */
+@media (max-width: 768px) {
+    .filters {
+        padding: 16px;
+        border-radius: 12px;
+        margin-left: -10px;
+        margin-right: -10px;
     }
     
-    .selected-model-item .btn-icon-delete {
-        /* Larger delete button for touch interaction */
-        width: 22px;
-        height: 22px;
-        min-width: 22px;
-        min-height: 22px;
-        
-        /* More spacing from text */
-        margin-left: 10px;
-    }
-}
-
-/* Tablet responsiveness */
-@media (max-width: 1024px) and (min-width: 769px) {
-    .selected-model-item {
-        padding: 7px 13px;
-        font-size: 0.87rem;
+    .filter-row-unified {
+        grid-template-columns: 1fr;
+        gap: 12px;
     }
     
-    .selected-model-item .btn-icon-delete {
-        width: 20px;
-        height: 20px;
-        min-width: 20px;
-        min-height: 20px;
+    .filter-group {
+        margin-bottom: 8px;
     }
-}
-```
-
-### 2. JavaScript Enhancement
-
-#### 2.1 Enhanced Rendering Logic
-**Update the rendering method in `script.js`** (lines 1416-1425):
-
-```javascript
-// Enhanced renderSelectedModels method
-renderSelectedModels() {
-    console.log('🎯 Rendering selected models:', this.selectedModels);
-
-    const container = document.getElementById('modelsContainer');
-    container.innerHTML = '';
-
-    // Render visible list of all added models with horizontal scroll
-    const listDiv = document.getElementById('selectedModelsList');
-    if (this.selectedModels.length === 0) {
-        listDiv.innerHTML = '';
-        listDiv.classList.add('empty-models-list');
-    } else {
-        listDiv.classList.remove('empty-models-list');
-        
-        // Create model items with enhanced styling
-        const modelItems = this.selectedModels.map((model) => {
-            // Sanitize model name for HTML
-            const sanitizedModel = this.escapeHtml(model);
-            
-            return `
-                <span class="selected-model-item" data-model="${sanitizedModel}">
-                    <strong>${sanitizedModel}</strong>
-                    <button class="btn-icon-delete" 
-                            data-model="${sanitizedModel}" 
-                            title="Xóa model ${sanitizedModel}"
-                            aria-label="Xóa model ${sanitizedModel}">×</button>
-                </span>
-            `;
-        });
-        
-        listDiv.innerHTML = modelItems.join('');
-        
-        // Auto-scroll to show the newly added model (rightmost)
-        this.scrollToLatestModel();
-    }
-
-    // Continue with existing POSM rendering logic...
-    this.selectedModels.forEach((model) => {
-        // Existing model group rendering code
-        // ... (no changes to existing POSM rendering)
-    });
-
-    this.bindDeleteButtons();
-}
-
-/**
- * Auto-scroll to show the latest added model
- */
-scrollToLatestModel() {
-    const listDiv = document.getElementById('selectedModelsList');
-    if (listDiv && listDiv.scrollWidth > listDiv.clientWidth) {
-        // Smooth scroll to the right to show the latest model
-        listDiv.scrollTo({
-            left: listDiv.scrollWidth - listDiv.clientWidth,
-            behavior: 'smooth'
-        });
-    }
-}
-
-/**
- * Escape HTML entities to prevent XSS
- */
-escapeHtml(unsafe) {
-    return unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
-
-/**
- * Enhanced delete button binding with keyboard support
- */
-bindDeleteButtons() {
-    // Bind remove model buttons (in list)
-    document.querySelectorAll('.selected-model-item .btn-icon-delete').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            const model = e.target.dataset.model;
-            this.removeSelectedModel(model);
-        });
-        
-        // Add keyboard support for accessibility
-        btn.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const model = e.target.dataset.model;
-                this.removeSelectedModel(model);
-            }
-        });
-    });
-
-    // Continue with existing delete button binding for model groups...
-}
-
-/**
- * Enhanced model removal with smooth animation
- */
-removeSelectedModel(model) {
-    const modelElement = document.querySelector(`[data-model="${model}"]`);
     
-    if (modelElement) {
-        // Add removal animation
-        modelElement.style.transform = 'scale(0.8)';
-        modelElement.style.opacity = '0.5';
-        modelElement.style.transition = 'all 0.2s ease';
-        
-        // Remove after animation
-        setTimeout(() => {
-            // Remove from selectedModels array
-            this.selectedModels = this.selectedModels.filter((m) => m !== model);
-            
-            // Clean up associated data
-            delete this.modelImages[model];
-            delete this.checkboxStates[model];
-            delete this.modelQuantities[model];
-            
-            // Re-render the list
-            this.renderSelectedModels();
-            
-            console.log('🗿 Removed model and cleaned up state:', model);
-        }, 200);
+    .filter-group label {
+        margin-bottom: 6px;
+        font-size: 0.9rem;
+    }
+    
+    .filter-group select,
+    .filter-group input {
+        font-size: 16px; /* Prevent iOS zoom */
+        padding: 12px 16px;
+    }
+    
+    .filter-action-buttons {
+        justify-content: center;
+        gap: 16px;
+        margin-top: 8px;
+    }
+    
+    .btn-flat-small,
+    .btn-excel-icon {
+        min-width: 44px; /* Better touch target */
+        height: 44px;
+        padding: 12px;
+    }
+    
+    .excel-icon,
+    .btn-icon-text {
+        font-size: 18px;
+    }
+}
+
+/* Small Mobile Breakpoint */
+@media (max-width: 480px) {
+    .filter-row-unified {
+        gap: 8px;
+    }
+    
+    .filter-action-buttons {
+        gap: 12px;
     }
 }
 ```
 
-#### 2.2 Keyboard Navigation Support
-**Add keyboard navigation for better accessibility**:
-
-```javascript
-/**
- * Add keyboard navigation support for model list
- */
-initializeKeyboardNavigation() {
-    const listDiv = document.getElementById('selectedModelsList');
-    
-    listDiv.addEventListener('keydown', (e) => {
-        switch(e.key) {
-            case 'ArrowLeft':
-                e.preventDefault();
-                this.scrollModelsLeft();
-                break;
-            case 'ArrowRight':
-                e.preventDefault();
-                this.scrollModelsRight();
-                break;
-            case 'Home':
-                e.preventDefault();
-                listDiv.scrollTo({ left: 0, behavior: 'smooth' });
-                break;
-            case 'End':
-                e.preventDefault();
-                listDiv.scrollTo({ 
-                    left: listDiv.scrollWidth - listDiv.clientWidth, 
-                    behavior: 'smooth' 
-                });
-                break;
-        }
-    });
-}
-
-/**
- * Scroll models list left
- */
-scrollModelsLeft() {
-    const listDiv = document.getElementById('selectedModelsList');
-    const scrollAmount = listDiv.clientWidth * 0.5; // Scroll half the container width
-    
-    listDiv.scrollTo({
-        left: listDiv.scrollLeft - scrollAmount,
-        behavior: 'smooth'
-    });
-}
-
-/**
- * Scroll models list right
- */
-scrollModelsRight() {
-    const listDiv = document.getElementById('selectedModelsList');
-    const scrollAmount = listDiv.clientWidth * 0.5;
-    
-    listDiv.scrollTo({
-        left: listDiv.scrollLeft + scrollAmount,
-        behavior: 'smooth'
-    });
-}
-```
-
-### 3. User Experience Enhancements
-
-#### 3.1 Visual Scroll Indicators
-**Add visual cues for scrollable content**:
-
-```css
-/* Scroll indicators for better UX */
-.compact-models-list::before,
-.compact-models-list::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 20px;
-    pointer-events: none;
-    z-index: 2;
-    transition: opacity 0.3s ease;
-}
-
-/* Left scroll indicator */
-.compact-models-list::before {
-    left: 0;
-    background: linear-gradient(to right, rgba(255, 255, 255, 0.8), transparent);
-    opacity: 0;
-}
-
-/* Right scroll indicator */
-.compact-models-list::after {
-    right: 0;
-    background: linear-gradient(to left, rgba(255, 255, 255, 0.8), transparent);
-    opacity: 0;
-}
-
-/* Show indicators when scrollable */
-.compact-models-list.scrollable-left::before {
-    opacity: 1;
-}
-
-.compact-models-list.scrollable-right::after {
-    opacity: 1;
-}
-
-/* Container positioning for indicators */
-.compact-models-list {
-    position: relative;
-}
-```
-
-#### 3.2 Scroll State Management
-**JavaScript for managing scroll indicators**:
-
-```javascript
-/**
- * Update scroll indicators based on scroll position
- */
-updateScrollIndicators() {
-    const listDiv = document.getElementById('selectedModelsList');
-    
-    if (!listDiv) return;
-    
-    const canScrollLeft = listDiv.scrollLeft > 0;
-    const canScrollRight = listDiv.scrollLeft < (listDiv.scrollWidth - listDiv.clientWidth);
-    
-    // Update classes for CSS styling
-    listDiv.classList.toggle('scrollable-left', canScrollLeft);
-    listDiv.classList.toggle('scrollable-right', canScrollRight);
-}
-
-/**
- * Initialize scroll event listeners
- */
-initializeScrollListeners() {
-    const listDiv = document.getElementById('selectedModelsList');
-    
-    if (!listDiv) return;
-    
-    // Update indicators on scroll
-    listDiv.addEventListener('scroll', () => {
-        this.updateScrollIndicators();
-    });
-    
-    // Update indicators on resize
-    window.addEventListener('resize', () => {
-        this.updateScrollIndicators();
-    });
-    
-    // Initial update
-    this.updateScrollIndicators();
-}
-```
-
-### 4. Integration with Existing Architecture
-
-#### 4.1 Minimal Changes to Existing Code
-**Files to Modify**:
-1. **`public/styles-survey.css`** - Add new CSS rules (additive changes only)
-2. **`public/script.js`** - Update `renderSelectedModels()` method and add new helper methods
-3. **No HTML changes required** - existing structure works with new CSS
-
-#### 4.2 Backward Compatibility
-**Existing Functionality Preservation**:
-- All existing model selection logic remains unchanged
-- Delete button functionality preserved with enhanced styling
-- Mobile responsive behavior improved without breaking existing features
-- No changes to API calls or data structures
-
-#### 4.3 Performance Considerations
-**Optimization Strategy**:
-- Use CSS transforms for smooth animations
-- Implement scroll throttling to prevent excessive scroll event firing
-- Maintain existing DOM update patterns to prevent performance regression
-
-```javascript
-/**
- * Throttled scroll handler for better performance
- */
-createThrottledScrollHandler() {
-    let scrollTimeout;
-    
-    return () => {
-        if (scrollTimeout) return;
-        
-        scrollTimeout = setTimeout(() => {
-            this.updateScrollIndicators();
-            scrollTimeout = null;
-        }, 16); // ~60fps throttling
-    };
-}
-```
-
-## Implementation Steps
-
-### Phase 1: CSS Implementation (1-2 hours)
-- [ ] Add horizontal scrolling CSS to `styles-survey.css`
-- [ ] Implement mobile-responsive adjustments
-- [ ] Add scroll indicators and visual enhancements
-- [ ] Test CSS changes across different browsers
-
-### Phase 2: JavaScript Enhancement (2-3 hours)
-- [ ] Update `renderSelectedModels()` method with enhanced logic
-- [ ] Add scroll management functions
-- [ ] Implement keyboard navigation support
-- [ ] Add accessibility improvements (ARIA labels, focus management)
-
-### Phase 3: Testing & Polish (1-2 hours)
-- [ ] Test horizontal scrolling across different model counts
-- [ ] Verify mobile responsiveness on various devices
-- [ ] Test delete button functionality in scrolled state
-- [ ] Cross-browser compatibility testing
-
-### Phase 4: User Experience Validation (30 minutes)
-- [ ] Test with 10+ selected models to verify no overflow
-- [ ] Validate smooth scrolling behavior
-- [ ] Confirm touch interaction works properly on mobile
-- [ ] Verify accessibility compliance (keyboard navigation, screen reader support)
-
-## Risk Assessment
-
-### 1. Technical Risks
-**Low Risk**: 
-- Changes are primarily CSS-based with minimal JavaScript modification
-- No backend changes required
-- Existing functionality preserved
-
-**Mitigation**:
-- Implement changes incrementally (CSS first, then JavaScript enhancements)
-- Maintain fallback styling for older browsers
-- Thorough testing across device types and browsers
-
-### 2. User Experience Risks
-**Medium Risk**: 
-- Users might need to learn new horizontal scrolling pattern
-- Touch scrolling behavior might feel unfamiliar initially
-
-**Mitigation**:
-- Implement clear visual scroll indicators
-- Add smooth scroll animations for better user feedback
-- Provide keyboard navigation as alternative interaction method
-
-### 3. Performance Risks
-**Low Risk**:
-- Horizontal scrolling is native browser functionality with good performance
-- No complex JavaScript computations added
-
-**Mitigation**:
-- Use CSS transforms and transitions for smooth animations
-- Implement scroll event throttling to prevent performance issues
-
-## Mobile Responsiveness Considerations
-
-### 1. Touch Interaction Improvements
-**Enhanced Touch Targets**:
-- Larger delete buttons for easier touch interaction
-- Increased padding around model items
-- Better visual feedback for touch events
-
-### 2. Screen Size Adaptations
-**Viewport-Specific Adjustments**:
-- Larger scrollbars on mobile devices for easier interaction
-- Adjusted font sizes for better readability
-- Optimized spacing for different screen densities
-
-### 3. Gesture Support
-**Native Scroll Gestures**:
-- Horizontal swiping works natively with CSS overflow-x: auto
-- Momentum scrolling supported on iOS devices
-- Edge scroll behavior handled gracefully
-
-## Acceptance Criteria
-
-### 1. Functional Requirements
-- [ ] **No Vertical Overflow**: Selected models list never wraps to multiple lines
-- [ ] **Horizontal Scrolling**: Users can scroll horizontally to view all selected models
-- [ ] **Delete Functionality**: All delete buttons remain functional in scrolled state
-- [ ] **Auto-scroll**: New models automatically scroll into view when added
-- [ ] **Empty State**: Appropriate message shown when no models selected
-
-### 2. User Experience Requirements
-- [ ] **Smooth Scrolling**: All scroll animations are smooth and performant
-- [ ] **Visual Indicators**: Clear indication when content is scrollable
-- [ ] **Keyboard Navigation**: Arrow keys navigate through scrollable content
-- [ ] **Touch Interaction**: Horizontal swiping works smoothly on mobile devices
-- [ ] **Responsive Design**: Layout adapts properly to different screen sizes
-
-### 3. Performance Requirements
-- [ ] **Smooth Animations**: No frame drops during scroll or animation
-- [ ] **Fast Rendering**: Model list renders quickly even with 20+ models
-- [ ] **Memory Efficient**: No memory leaks from scroll event handlers
-- [ ] **Browser Compatibility**: Works in all supported browsers
-
-### 4. Accessibility Requirements
-- [ ] **Keyboard Accessible**: All functionality accessible via keyboard
-- [ ] **Screen Reader Support**: Proper ARIA labels and semantic markup
-- [ ] **Focus Management**: Focus handling works correctly during scrolling
-- [ ] **Color Contrast**: All text meets WCAG accessibility standards
-
-## Next Steps
-
-### Immediate Actions
-1. **[ ] Implementation**: Begin CSS implementation following the detailed specification
-2. **[ ] JavaScript Enhancement**: Update rendering logic with horizontal scroll support
-3. **[ ] Testing**: Comprehensive testing across devices and browsers
-4. **[ ] User Validation**: Validate improved user experience with test scenarios
-
-### Success Metrics
-- **UI Stability**: Zero cases of content overflow with any number of selected models
-- **User Interaction**: Improved ease of managing large numbers of selected models
-- **Mobile Experience**: Significantly improved mobile user experience
-- **Performance**: No degradation in rendering or interaction performance
-
----
-
-**Implementation Estimate**: 4-6 hours total development time  
-**Risk Level**: Low (primarily CSS changes with well-established browser support)  
-**Business Impact**: High (fixes critical user experience issue affecting survey usability)  
-**User Experience Impact**: High (transforms problematic UI pattern into smooth, modern interaction)
-
----
-
-*Enhancement proposal prepared by: Enhancer Agent*  
-*Date: September 3, 2025*  
-*Based on: Detailed codebase analysis of selectedModelsList implementation and UI/UX requirements*
-
----
-
-## REVIEWER FEEDBACK - SELECTEDMODELSLIST HORIZONTAL SCROLLING
-
-### Technical Implementation Assessment: ✅ EXCELLENT
-
-> **Reviewer Comment**: The proposed solution correctly identifies the core UI issue and provides a technically sophisticated solution that addresses all requirements effectively.
-
-**Problem Analysis Accuracy**: The proposal correctly identifies that the current implementation uses `display: inline-block` with wrapping behavior causing content displacement. The analysis of lines 1416-1425 in script.js accurately shows the current inline styling approach that creates the overflow problem.
-
-**CSS Implementation Excellence**: The proposed CSS solution is architecturally sound:
-- **Flexbox with `overflow-x: auto`** provides native, performant horizontal scrolling
-- **`flex-shrink: 0`** prevents item compression maintaining readability
-- **Proper scrollbar styling** enhances visual appeal across browsers
-- **`scroll-behavior: smooth`** provides modern UX without JavaScript overhead
-
-**JavaScript Enhancement Quality**: The updated rendering logic demonstrates best practices:
-- **HTML sanitization** with `escapeHtml()` prevents XSS attacks
-- **Auto-scroll functionality** provides intuitive UX when new models are added
-- **ARIA labels** improve accessibility compliance
-- **Smooth animations** enhance perceived performance
-
-### Architecture Alignment Review: ✅ PERFECTLY ALIGNED
-
-> **Reviewer Comment**: The solution integrates seamlessly with existing codebase patterns and follows established architectural principles.
-
-**Existing Style Integration**: Correctly builds upon current CSS patterns:
-- Maintains existing `.compact-models-list` and `.selected-model-item` class structure
-- Enhances existing styles rather than replacing them completely
-- Follows established color scheme (`#f1f3f4`, `#dc2626`) from `styles-survey.css`
-- Respects existing responsive breakpoints at 768px, 600px, and 480px
-
-**JavaScript Class Integration**: Properly integrates with existing `SurveyApp` class structure:
-- Uses existing `this.selectedModels` array without modification
-- Maintains existing `bindDeleteButtons()` pattern
-- Preserves existing model data cleanup in `removeSelectedModel()`
-- Follows established console logging patterns (`console.log('🎯...')`)
-
-**Responsive Design Consistency**: Aligns with existing mobile-first approach:
-- Uses same breakpoint values as existing CSS (@media max-width: 768px, 600px)
-- Follows established pattern of larger touch targets on mobile
-- Maintains consistency with existing delete button sizing patterns
-
-### Mobile Responsiveness Review: ✅ SUPERIOR MOBILE EXPERIENCE
-
-> **Reviewer Comment**: The mobile implementation demonstrates excellent understanding of touch interaction principles and responsive design best practices.
-
-**Touch Target Optimization**: 
-- **Delete buttons**: 22px on mobile (increased from current 20px) meets Apple/Google touch target guidelines
-- **Model items**: Enhanced padding (8px 14px) improves touch accuracy
-- **Scrollbar**: 8px height on mobile provides better finger interaction
-
-**Cross-Device Compatibility**:
-- **Tablet breakpoint** (769px-1024px) provides intermediate sizing
-- **Mobile breakpoint** (≤768px) optimized for phone interaction
-- **Responsive scrollbar** adapts to device capabilities
-- **Native momentum scrolling** leverages iOS/Android native behavior
-
-**Viewport Considerations**:
-- **Horizontal overflow management** prevents viewport scaling issues
-- **Touch gesture support** works natively with CSS overflow properties
-- **Screen orientation** handling works automatically with responsive design
-
-### Browser Compatibility Review: ✅ EXCELLENT CROSS-BROWSER SUPPORT
-
-> **Reviewer Comment**: The CSS and JavaScript features used have excellent browser support and include appropriate fallbacks.
-
-**CSS Features Support**:
-- **Flexbox**: Supported in all modern browsers (IE11+, all mobile browsers)
-- **CSS Scrollbar Styling**: Uses both `::-webkit-scrollbar` (Chrome/Safari) and `scrollbar-width/scrollbar-color` (Firefox) for comprehensive support
-- **CSS Transforms**: Excellent support across all target browsers
-- **Smooth Scrolling**: Native CSS `scroll-behavior: smooth` with JavaScript fallback
-
-**JavaScript API Support**:
-- **`scrollTo()` with options**: Supported in all modern browsers
-- **CSS Escape API**: Using manual escaping eliminates dependency issues
-- **Event delegation**: Standard DOM events with excellent compatibility
-- **Intersection Observer**: Not used, avoiding potential compatibility issues
-
-### Performance Analysis: ✅ HIGHLY OPTIMIZED
-
-> **Reviewer Comment**: The implementation prioritizes performance with smart optimization strategies and minimal JavaScript overhead.
-
-**Rendering Performance**:
-- **CSS-based scrolling** leverages native browser optimizations
-- **Minimal DOM manipulation** in enhanced `renderSelectedModels()` method
-- **Event throttling** (16ms/60fps) prevents scroll handler performance issues
-- **Efficient CSS selectors** use direct ID and class targeting
-
-**Memory Management**:
-- **Proper cleanup** in `removeSelectedModel()` prevents memory leaks
-- **Event listener management** uses delegation to minimize handler count
-- **Scroll event throttling** prevents excessive function calls
-- **No circular references** in event handlers or object properties
-
-**Animation Efficiency**:
-- **CSS transitions** for hover effects are GPU-accelerated
-- **Transform-based animations** for model removal use compositing layer
-- **Native smooth scrolling** eliminates need for JavaScript animation loops
-- **Optimized timing** (200ms animations) provides responsive feel
-
-### Security Review: ✅ SECURE WITH BEST PRACTICES
-
-> **Reviewer Comment**: The implementation includes proper security measures and follows established security patterns from the existing codebase.
-
-**XSS Prevention**: 
-- **HTML Sanitization**: Manual `escapeHtml()` function properly escapes all HTML entities
-- **Data attribute safety**: Model names are sanitized before use in data attributes
-- **ARIA label security**: Properly escaped content in accessibility labels
-
-**Input Validation**:
-- **Model name validation**: Continues to use existing validation from model selection flow
-- **DOM existence checks**: Proper null checking before DOM manipulation
-- **Event propagation control**: `preventDefault()` and `stopPropagation()` prevent unwanted behaviors
-
-### Accessibility Compliance: ✅ WCAG 2.1 COMPLIANT
-
-> **Reviewer Comment**: The accessibility implementation exceeds basic requirements and provides excellent support for assistive technologies.
-
-**Keyboard Navigation**:
-- **Arrow key support** for horizontal navigation follows standard patterns
-- **Home/End keys** provide quick navigation to list boundaries
-- **Tab order preservation** maintains logical focus flow
-- **Delete button keyboard support** (Enter/Space) follows button accessibility standards
-
-**Screen Reader Support**:
-- **ARIA labels** provide descriptive text for model deletion actions
-- **Semantic markup** uses proper button elements for interactive components
-- **Dynamic content updates** are announced through DOM changes
-- **Focus management** ensures screen readers track changes correctly
-
-**Visual Accessibility**:
-- **High contrast colors** maintain existing design language (#dc2626 for delete buttons)
-- **Clear focus indicators** through existing CSS focus styles
-- **Sufficient touch targets** meet accessibility size requirements
-- **Hover states** provide visual feedback for all interactive elements
-
-### Code Quality Assessment: ✅ PRODUCTION-READY CODE
-
-> **Reviewer Comment**: The code quality meets professional standards with clean architecture, proper documentation, and maintainable structure.
-
-**Code Organization**:
-- **Method separation** follows single responsibility principle
-- **Clear naming conventions** (`scrollToLatestModel`, `updateScrollIndicators`)
-- **Comprehensive comments** explain complex logic and browser compatibility
-- **Error handling** includes proper try-catch blocks and fallback behavior
-
-**Maintenance Considerations**:
-- **Modular functions** can be easily tested and debugged independently
-- **Configuration options** (scroll amounts, animation timing) are clearly defined
-- **Event cleanup** prevents memory leaks during component lifecycle
-- **Backward compatibility** preserves existing functionality completely
-
-**Testing Strategy Completeness**:
-- **Comprehensive test cases** cover all interaction scenarios
-- **Performance testing** includes stress testing with 20+ models
-- **Cross-browser testing** covers all supported browsers
-- **Accessibility testing** includes keyboard and screen reader validation
-
-### Critical Issues Found: ❌ NONE
-
-> **Reviewer Comment**: No critical technical issues identified. The implementation is robust and ready for production deployment.
-
-### Minor Improvement Opportunities
-
-#### 1. Enhanced Visual Feedback
-> **Reviewer Suggestion**: Consider adding a subtle fade-in animation when new models are added to provide better visual feedback for the auto-scroll behavior.
-
-#### 2. Touch Gesture Enhancement
-> **Reviewer Suggestion**: Consider adding custom swipe velocity detection for more responsive touch scrolling on mobile devices.
-
-#### 3. Advanced Accessibility
-> **Reviewer Suggestion**: Consider adding `aria-live` announcements when models are added or removed for improved screen reader experience.
-
-### Implementation Readiness: ✅ APPROVED FOR IMMEDIATE IMPLEMENTATION
-
-> **Reviewer Decision**: This proposal is technically excellent, architecturally sound, and ready for immediate implementation without modifications.
-
-**Strengths**:
-- **Solves the core problem completely**: Eliminates content overflow issue
-- **Excellent mobile experience**: Significantly improves touch interaction
-- **Performance optimized**: Uses native browser features for best performance  
-- **Accessibility compliant**: Exceeds WCAG 2.1 requirements
-- **Maintainable code**: Clean, well-documented implementation
-- **Zero breaking changes**: Completely backward compatible
-
-**Implementation Guidance for Main Agent**:
-1. **Start with CSS implementation** - add the flexbox and scrolling styles to `styles-survey.css`
-2. **Update JavaScript rendering** - replace the `renderSelectedModels()` method with enhanced version
-3. **Add helper methods** - implement scroll management and keyboard navigation functions
-4. **Test incrementally** - validate each phase before proceeding to the next
-5. **Focus on mobile testing** - prioritize mobile device validation
-
-**Technical Recommendations**:
-1. **Implement CSS first** to see immediate visual improvement
-2. **Test with 10+ models** to verify scrolling behavior
-3. **Validate mobile touch scrolling** on actual devices
-4. **Verify delete button functionality** in all scroll positions
-5. **Test accessibility** with keyboard navigation
-
-**Final Status: APPROVED** ✅
-
-**Priority**: High - Critical UX issue affecting survey usability
-**Confidence Level**: Very High - Technically sound solution with comprehensive implementation plan
-**Risk Assessment**: Very Low - Primarily CSS changes with established browser support
-**Next Action**: Main agent to proceed with immediate implementation following the phased approach
-
-### Performance Validation: ✅ OPTIMIZED
-
-> **Reviewer Comment**: The performance considerations are excellent and will result in smooth, responsive user interaction.
-
-**Native Browser Features**:
-- Leverages CSS `overflow-x: auto` for hardware-accelerated scrolling
-- Uses CSS transforms for animations (GPU-accelerated)
-- Implements smooth scrolling via CSS `scroll-behavior` property
-- Minimal JavaScript for maximum performance
-
-**Event Handling Optimization**:
-- Throttled scroll events prevent performance degradation
-- Event delegation reduces memory footprint
-- Proper cleanup prevents memory leaks
-- Efficient DOM queries using direct selectors
-
-### Final Assessment Summary
-
-**Technical Excellence**: The proposal demonstrates deep understanding of frontend development best practices, browser performance optimization, and accessibility requirements.
-
-**Business Value**: Directly addresses a critical user experience issue that affects survey completion rates, particularly on mobile devices.
-
-**Implementation Readiness**: Code is production-ready with comprehensive test cases and clear implementation steps.
-
-**Risk-Benefit Analysis**: Very low risk with very high user experience benefit makes this an excellent enhancement proposal.
-
----
-
-*Review completed by: Reviewer Agent*  
-*Review date: September 3, 2025*  
-*Architecture validation: Confirmed against existing CSS patterns in styles-survey.css*  
-*Code quality validation: Verified against established JavaScript class patterns in script.js*  
-*Mobile responsiveness validation: Confirmed against existing responsive breakpoints and touch interaction patterns*
+## Expected Benefits
+1. **50% reduction** in vertical space usage for filters
+2. **Improved visual flow** with logical left-to-right filter progression
+3. **Enhanced mobile experience** with optimized touch targets
+4. **Cleaner interface** with modern flat button design
+5. **Better performance** with resolved CSS conflicts
+6. **Consistent branding** following established design patterns
+
+## Success Metrics
+- User survey completion time reduction
+- Decreased support requests about filter usage
+- Improved mobile usage analytics
+- Positive user feedback on interface clarity
+- Reduced cognitive load for filter operations

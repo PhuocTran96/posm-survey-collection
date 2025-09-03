@@ -51,49 +51,52 @@
         </div>
 
         <!-- Filters -->
-        <div class="filters">
-            <div class="filter-row">
-                <div class="filter-group">
-                    <label>Submitted By:</label>
-                    <select id="submittedByFilter">
-                        <option value="">Tất cả người dùng</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label>Shop:</label>
-                    <div class="autocomplete-wrapper">
-                        <input type="text" id="shopFilter" placeholder="Tìm kiếm shop..." autocomplete="off">
-                        <div id="shopDropdown" class="autocomplete-dropdown"></div>
-                    </div>
+        <div class="filters filters-unified">
+            <div class="filter-group filter-main">
+                <label>Submitted By:</label>
+                <select id="submittedByFilter">
+                    <option value="">Tất cả người dùng</option>
+                </select>
+            </div>
+            <div class="filter-group filter-main">
+                <label>Shop:</label>
+                <div class="autocomplete-wrapper">
+                    <input type="text" id="shopFilter" placeholder="Tìm kiếm shop..." autocomplete="off">
+                    <div id="shopDropdown" class="autocomplete-dropdown"></div>
                 </div>
             </div>
-            <div class="filter-row">
-                <div class="filter-group">
-                    <label>Từ ngày:</label>
-                    <input type="date" id="dateFromFilter">
-                </div>
-                <div class="filter-group">
-                    <label>Đến ngày:</label>
-                    <input type="date" id="dateToFilter">
-                </div>
-                <div class="filter-group">
-                    <label>Số kết quả/trang:</label>
-                    <select id="pageSizeSelector">
-                        <option value="10">10</option>
-                        <option value="20" selected>20</option>
-                        <option value="50">50</option>
-                        <option value="100">100</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label>&nbsp;</label>
-                    <button id="exportData" class="btn btn-primary btn-green">📊 Xuất Excel</button>
-                </div>
+            <div class="filter-group filter-date">
+                <label>Từ ngày:</label>
+                <input type="date" id="dateFromFilter">
+            </div>
+            <div class="filter-group filter-date">
+                <label>Đến ngày:</label>
+                <input type="date" id="dateToFilter">
+            </div>
+            <div class="filter-group filter-control">
+                <label>Số kết quả/trang:</label>
+                <select id="pageSizeSelector">
+                    <option value="10">10</option>
+                    <option value="20" selected>20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
+            <div class="filter-group filter-actions">
+                <button id="clearFiltersBtn" class="btn-filter-clear" title="Xóa bộ lọc">🗑️</button>
+                <button id="exportData" class="btn-filter-export" title="Xuất Excel">📊</button>
             </div>
         </div>
 
         <!-- Bulk Actions -->
         <div class="bulk-actions">
+            <div class="selection-mode-toggle">
+                <label>Chế độ chọn:</label>
+                <select id="selectionModeToggle">
+                    <option value="survey">📋 Toàn bộ khảo sát</option>
+                    <option value="model">📦 Model riêng lẻ</option>
+                </select>
+            </div>
             <button id="selectAllBtn" class="btn btn-secondary" type="button">
                 ☑️ Chọn tất cả
             </button>

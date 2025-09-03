@@ -24,17 +24,14 @@ const parseCSVFromBuffer = (buffer) => {
   return new Promise((resolve, reject) => {
     const results = [];
     const stream = require('stream');
-    
+
     // Strip UTF-8 BOM if present (0xEF, 0xBB, 0xBF)
     let cleanBuffer = buffer;
-    if (buffer.length >= 3 && 
-        buffer[0] === 0xEF && 
-        buffer[1] === 0xBB && 
-        buffer[2] === 0xBF) {
+    if (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
       cleanBuffer = buffer.slice(3);
       console.log('🔧 UTF-8 BOM detected and stripped from CSV file');
     }
-    
+
     const readable = new stream.Readable();
     readable.push(cleanBuffer);
     readable.push(null);
@@ -90,7 +87,7 @@ const uploadStores = async (req, res) => {
     for (const row of csvData) {
       lineCount++;
 
-      // Extract column values  
+      // Extract column values
       const storeIdValue = row.store_id;
       const storeCodeValue = row.store_code;
       const storeNameValue = row.store_name;

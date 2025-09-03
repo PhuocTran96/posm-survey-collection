@@ -11,6 +11,8 @@ class SurveyResultsApp {
     this.totalPages = 1;
     this.totalCount = 0;
     this.pagination = null;
+    this.selectionMode = 'survey'; // 'survey' or 'model'
+    this.selectedModels = new Set(); // Track selected individual models (format: "surveyId:modelIndex")
     this.init();
   }
 
@@ -193,6 +195,11 @@ class SurveyResultsApp {
       exportDataBtn.addEventListener('click', () => this.exportData());
     }
 
+    const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+    if (clearFiltersBtn) {
+      clearFiltersBtn.addEventListener('click', () => this.clearFilters());
+    }
+
     // Handle submittedBy filter change
     const submittedByFilter = document.getElementById('submittedByFilter');
     if (submittedByFilter) {
@@ -255,6 +262,12 @@ class SurveyResultsApp {
         this.currentPage = 1;
         this.loadResponses(1);
       });
+    }
+
+    // Selection mode toggle
+    const selectionModeToggle = document.getElementById('selectionModeToggle');
+    if (selectionModeToggle) {
+      selectionModeToggle.addEventListener('change', () => this.toggleSelectionMode());
     }
   }
 
@@ -484,7 +497,7 @@ class SurveyResultsApp {
                     </div>
                     <div class="accordion-content">
                         <div class="accordion-details">
-                            ${this.renderModelResponses(response.responses)}
+                            ${this.renderModelResponses(response.responses, response._id)}
                         </div>
                     </div>
                 </div>
@@ -494,13 +507,13 @@ class SurveyResultsApp {
     container.innerHTML = html;
   }
 
-  renderModelResponses(responses) {
+  renderModelResponses(responses, surveyId) {
     if (!responses || responses.length === 0) {
       return '<p class="no-data">Không có dữ liệu model</p>';
     }
 
     return responses
-      .map((modelResponse) => {
+      .map((modelResponse, modelIndex) => {
         const posmTags = modelResponse.allSelected
           ? '<span class="posm-tag all-selected">TẤT CẢ POSM</span>'
           : modelResponse.posmSelections
@@ -517,10 +530,31 @@ class SurveyResultsApp {
                 .join('')
             : '';
 
+        const modelKey = `${surveyId}:${modelIndex}`;
+        const isModelSelected = this.selectedModels.has(modelKey);
+        
+        // Show model selection controls only in model mode
+        const modelControls = this.selectionMode === 'model' ? `
+          <div class="model-controls">
+            <input type="checkbox" ${isModelSelected ? 'checked' : ''} 
+                   onchange="surveyResultsApp.toggleModelSelection('${surveyId}', ${modelIndex})"
+                   onclick="event.stopPropagation()"
+                   class="model-checkbox">
+            <button class="model-delete-btn" 
+                    onclick="event.stopPropagation(); surveyResultsApp.showDeleteModelDialog('${surveyId}', ${modelIndex}, '${this.escapeHtml(modelResponse.model)}')" 
+                    title="Xóa model này">
+              🗑️
+            </button>
+          </div>
+        ` : '';
+
         return `
-                <div class="model-response">
-                    <div class="model-title">
-                        ${modelResponse.model} (Số lượng: ${modelResponse.quantity || 1})
+                <div class="model-response ${isModelSelected ? 'selected' : ''}">
+                    <div class="model-header">
+                        <div class="model-title">
+                            ${modelResponse.model} (Số lượng: ${modelResponse.quantity || 1})
+                        </div>
+                        ${modelControls}
                     </div>
                     <div class="posm-selections">${posmTags}</div>
                     ${images ? `<div class="response-images" style="margin-top:10px;">${images}</div>` : ''}
@@ -624,18 +658,40 @@ class SurveyResultsApp {
     const selectAllBtn = document.getElementById('selectAllBtn');
     const isSelectingAll = selectAllBtn.textContent.includes('Chọn tất cả');
 
-    if (isSelectingAll) {
-      // Select all current page responses
-      this.responses.forEach((response) => {
-        this.selectedIds.add(response._id);
-      });
-      selectAllBtn.innerHTML = '❌ Bỏ chọn tất cả trang này';
-      selectAllBtn.title = `Đã chọn tất cả ${this.responses.length} khảo sát trên trang này`;
+    if (this.selectionMode === 'survey') {
+      if (isSelectingAll) {
+        // Select all current page responses
+        this.responses.forEach((response) => {
+          this.selectedIds.add(response._id);
+        });
+        selectAllBtn.innerHTML = '❌ Bỏ chọn tất cả trang này';
+        selectAllBtn.title = `Đã chọn tất cả ${this.responses.length} khảo sát trên trang này`;
+      } else {
+        // Deselect all
+        this.selectedIds.clear();
+        selectAllBtn.innerHTML = '☑️ Chọn tất cả trang này';
+        selectAllBtn.title = 'Chọn tất cả khảo sát trên trang hiện tại';
+      }
     } else {
-      // Deselect all
-      this.selectedIds.clear();
-      selectAllBtn.innerHTML = '☑️ Chọn tất cả trang này';
-      selectAllBtn.title = 'Chọn tất cả khảo sát trên trang hiện tại';
+      // Model selection mode
+      if (isSelectingAll) {
+        // Select all models on current page
+        this.responses.forEach((survey) => {
+          if (survey.responses) {
+            survey.responses.forEach((model, index) => {
+              this.selectedModels.add(`${survey._id}:${index}`);
+            });
+          }
+        });
+        selectAllBtn.innerHTML = '❌ Bỏ chọn tất cả trang này';
+        const totalModels = this.responses.reduce((sum, survey) => sum + (survey.responses?.length || 0), 0);
+        selectAllBtn.title = `Đã chọn tất cả ${totalModels} model trên trang này`;
+      } else {
+        // Deselect all models
+        this.selectedModels.clear();
+        selectAllBtn.innerHTML = '☑️ Chọn tất cả trang này';
+        selectAllBtn.title = 'Chọn tất cả model trên trang hiện tại';
+      }
     }
 
     this.renderResponses();
@@ -645,14 +701,26 @@ class SurveyResultsApp {
   updateBulkDeleteButton() {
     const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
     if (bulkDeleteBtn) {
-      const count = this.selectedIds.size;
-      bulkDeleteBtn.disabled = count === 0;
-      if (count === 0) {
-        bulkDeleteBtn.innerHTML = '🗑️ Xóa các khảo sát đã chọn';
-        bulkDeleteBtn.title = 'Chọn ít nhất một khảo sát để xóa';
+      if (this.selectionMode === 'survey') {
+        const count = this.selectedIds.size;
+        bulkDeleteBtn.disabled = count === 0;
+        if (count === 0) {
+          bulkDeleteBtn.innerHTML = '🗑️ Xóa các khảo sát đã chọn';
+          bulkDeleteBtn.title = 'Chọn ít nhất một khảo sát để xóa';
+        } else {
+          bulkDeleteBtn.innerHTML = `🗑️ Xóa ${count} khảo sát đã chọn`;
+          bulkDeleteBtn.title = `Xóa ${count} khảo sát đã chọn (hành động không thể hoàn tác)`;
+        }
       } else {
-        bulkDeleteBtn.innerHTML = `🗑️ Xóa ${count} khảo sát đã chọn`;
-        bulkDeleteBtn.title = `Xóa ${count} khảo sát đã chọn (hành động không thể hoàn tác)`;
+        const count = this.selectedModels.size;
+        bulkDeleteBtn.disabled = count === 0;
+        if (count === 0) {
+          bulkDeleteBtn.innerHTML = '🗑️ Xóa các model đã chọn';
+          bulkDeleteBtn.title = 'Chọn ít nhất một model để xóa';
+        } else {
+          bulkDeleteBtn.innerHTML = `🗑️ Xóa ${count} model đã chọn`;
+          bulkDeleteBtn.title = `Xóa ${count} model đã chọn (hành động không thể hoàn tác)`;
+        }
       }
     }
   }
@@ -719,10 +787,20 @@ class SurveyResultsApp {
   }
 
   async handleBulkDelete() {
-    if (this.selectedIds.size === 0) {
-      return;
+    if (this.selectionMode === 'survey') {
+      if (this.selectedIds.size === 0) {
+        return;
+      }
+      await this.handleBulkDeleteSurveys();
+    } else {
+      if (this.selectedModels.size === 0) {
+        return;
+      }
+      await this.handleBulkDeleteModels();
     }
+  }
 
+  async handleBulkDeleteSurveys() {
     // Show enhanced confirmation dialog
     if (!(await this.showBulkDeleteConfirmation())) {
       return;
@@ -766,6 +844,88 @@ class SurveyResultsApp {
     } catch (error) {
       console.error('Error bulk deleting responses:', error);
       this.showNotification(`❌ Lỗi khi xóa khảo sát: ${error.message}`, 'error');
+    } finally {
+      this.hideLoading();
+    }
+  }
+
+  async handleBulkDeleteModels() {
+    // Show enhanced confirmation dialog for models
+    if (!(await this.showBulkDeleteModelsConfirmation())) {
+      return;
+    }
+
+    try {
+      this.showLoading();
+      console.log(`🗑️ Starting bulk delete of ${this.selectedModels.size} models`);
+
+      // Convert selected models to deletion format
+      const deletions = Array.from(this.selectedModels).map(modelKey => {
+        const [surveyId, modelIndex] = modelKey.split(':');
+        return {
+          surveyId,
+          modelIndex: parseInt(modelIndex)
+        };
+      });
+
+      const response = await this.makeAuthenticatedRequest('/api/responses/models/bulk-delete', {
+        method: 'DELETE',
+        body: JSON.stringify({ deletions }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        // Update local data by removing deleted models
+        const successfulDeletions = result.results?.successful || [];
+        
+        // Group deletions by survey and sort by modelIndex descending for safe removal
+        const deletionsBySurvey = {};
+        successfulDeletions.forEach(deletion => {
+          if (!deletionsBySurvey[deletion.surveyId]) {
+            deletionsBySurvey[deletion.surveyId] = [];
+          }
+          deletionsBySurvey[deletion.surveyId].push(deletion.modelIndex);
+        });
+
+        // Remove models from local data (sort descending to avoid index issues)
+        Object.entries(deletionsBySurvey).forEach(([surveyId, indices]) => {
+          const survey = this.responses.find(r => r._id === surveyId);
+          if (survey && survey.responses) {
+            indices.sort((a, b) => b - a); // Descending order
+            indices.forEach(index => {
+              if (index < survey.responses.length) {
+                survey.responses.splice(index, 1);
+              }
+            });
+          }
+        });
+
+        // Clear model selections
+        this.selectedModels.clear();
+        this.updateBulkDeleteButton();
+        this.renderResponses();
+
+        // Show detailed success message
+        const successful = result.results?.successful?.length || 0;
+        const failed = result.results?.failed?.length || 0;
+        let message = `✅ Đã xóa ${successful} model thành công`;
+        
+        if (failed > 0) {
+          message += `\n❌ ${failed} model không thể xóa`;
+        }
+        
+        if (result.warnings && result.warnings.length > 0) {
+          message += '\n\n⚠️ Cảnh báo:\n' + result.warnings.join('\n');
+        }
+
+        this.showNotification(message, failed > 0 ? 'warning' : 'success');
+      } else {
+        throw new Error(result.message || 'Lỗi không xác định khi xóa model');
+      }
+    } catch (error) {
+      console.error('Error bulk deleting models:', error);
+      this.showNotification(`❌ Lỗi khi xóa model: ${error.message}`, 'error');
     } finally {
       this.hideLoading();
     }
@@ -892,6 +1052,50 @@ class SurveyResultsApp {
     XLSX.writeFile(workbook, filename);
   }
 
+  clearFilters() {
+    // Clear all filter inputs
+    const submittedByFilter = document.getElementById('submittedByFilter');
+    if (submittedByFilter) {
+      submittedByFilter.value = '';
+    }
+
+    const shopFilter = document.getElementById('shopFilter');
+    if (shopFilter) {
+      shopFilter.value = '';
+    }
+
+    const dateFromFilter = document.getElementById('dateFromFilter');
+    if (dateFromFilter) {
+      dateFromFilter.value = '';
+    }
+
+    const dateToFilter = document.getElementById('dateToFilter');
+    if (dateToFilter) {
+      dateToFilter.value = '';
+    }
+
+    // Reset page size to default if needed (optional)
+    const pageSizeSelector = document.getElementById('pageSizeSelector');
+    if (pageSizeSelector && pageSizeSelector.value !== '20') {
+      pageSizeSelector.value = '20';
+      this.itemsPerPage = 20;
+    }
+
+    // Hide shop dropdown if it's open
+    const shopDropdown = document.getElementById('shopDropdown');
+    if (shopDropdown) {
+      shopDropdown.classList.remove('show');
+      shopDropdown.innerHTML = '';
+    }
+
+    // Reset to first page and reload data
+    this.currentPage = 1;
+    this.loadResponses(1);
+
+    // Show notification
+    this.showNotification('✅ Đã xóa tất cả bộ lọc', 'success', 3000);
+  }
+
   // Enhanced confirmation dialog for bulk delete
   showBulkDeleteConfirmation() {
     return new Promise((resolve) => {
@@ -971,6 +1175,100 @@ class SurveyResultsApp {
     });
   }
 
+  // Enhanced confirmation dialog for bulk model delete
+  showBulkDeleteModelsConfirmation() {
+    return new Promise((resolve) => {
+      const selectedCount = this.selectedModels.size;
+      
+      // Get details of selected models
+      const selectedModelDetails = [];
+      this.selectedModels.forEach(modelKey => {
+        const [surveyId, modelIndex] = modelKey.split(':');
+        const survey = this.responses.find(r => r._id === surveyId);
+        if (survey && survey.responses && survey.responses[modelIndex]) {
+          const model = survey.responses[modelIndex];
+          selectedModelDetails.push({
+            surveyId,
+            modelIndex: parseInt(modelIndex),
+            modelName: model.model,
+            shopName: survey.shopName,
+            submittedBy: survey.submittedBy
+          });
+        }
+      });
+
+      let detailsHtml = '';
+      if (selectedModelDetails.length > 0) {
+        detailsHtml = selectedModelDetails
+          .slice(0, 5)
+          .map(detail =>
+            `<li><strong>${detail.modelName}</strong> từ ${detail.submittedBy || 'Unknown User'} - ${detail.shopName}</li>`
+          )
+          .join('');
+        if (selectedCount > 5) {
+          detailsHtml += `<li style="font-style: italic;">... và ${selectedCount - 5} model khác</li>`;
+        }
+      }
+
+      // Create enhanced confirmation dialog for model deletion
+      const dialogHtml = `
+        <div id="bulkDeleteModelsDialog" class="confirm-dialog" style="display: flex;">
+          <div class="confirm-content" style="max-width: 500px;">
+            <h3>🗑️ Xác nhận xóa model hàng loạt</h3>
+            <p>Bạn có chắc chắn muốn xóa <strong>${selectedCount} model</strong> đã chọn?</p>
+            ${
+              detailsHtml
+                ? `
+                <div style="margin: 15px 0;">
+                  <strong>Các model sẽ bị xóa:</strong>
+                  <ul style="max-height: 120px; overflow-y: auto; margin: 5px 0; padding-left: 20px;">
+                    ${detailsHtml}
+                  </ul>
+                </div>
+              `
+                : ''
+            }
+            <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 4px; margin: 10px 0;">
+              <strong>⚠️ Cảnh báo:</strong> Hành động này không thể hoàn tác. Tất cả model và hình ảnh liên quan sẽ bị xóa vĩnh viễn.
+            </div>
+            <div class="confirm-buttons">
+              <button id="btnConfirmBulkDeleteModels" class="btn-confirm" style="background: #dc3545;">Xóa ${selectedCount} model</button>
+              <button id="btnCancelBulkDeleteModels" class="btn-cancel">Hủy</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Remove existing dialog if any
+      const existingDialog = document.getElementById('bulkDeleteModelsDialog');
+      if (existingDialog) {
+        existingDialog.remove();
+      }
+
+      // Add dialog to body
+      document.body.insertAdjacentHTML('beforeend', dialogHtml);
+
+      // Add event listeners
+      document.getElementById('btnConfirmBulkDeleteModels').addEventListener('click', () => {
+        document.getElementById('bulkDeleteModelsDialog').remove();
+        resolve(true);
+      });
+
+      document.getElementById('btnCancelBulkDeleteModels').addEventListener('click', () => {
+        document.getElementById('bulkDeleteModelsDialog').remove();
+        resolve(false);
+      });
+
+      // Close on background click
+      document.getElementById('bulkDeleteModelsDialog').addEventListener('click', (e) => {
+        if (e.target.id === 'bulkDeleteModelsDialog') {
+          document.getElementById('bulkDeleteModelsDialog').remove();
+          resolve(false);
+        }
+      });
+    });
+  }
+
   // Enhanced notification system
   showNotification(message, type = 'info', duration = 5000) {
     // Remove existing notifications
@@ -1022,6 +1320,159 @@ class SurveyResultsApp {
           notification.remove();
         }
       }, duration);
+    }
+  }
+
+  // Selection mode management
+  toggleSelectionMode() {
+    const modeToggle = document.getElementById('selectionModeToggle');
+    if (modeToggle) {
+      this.selectionMode = modeToggle.value;
+      
+      // Clear selections when switching modes
+      this.selectedIds.clear();
+      this.selectedModels.clear();
+      
+      // Update UI
+      this.renderResponses();
+      this.updateBulkDeleteButton();
+      
+      console.log(`Selection mode changed to: ${this.selectionMode}`);
+    }
+  }
+
+  // Model selection management
+  toggleModelSelection(surveyId, modelIndex) {
+    const modelKey = `${surveyId}:${modelIndex}`;
+    if (this.selectedModels.has(modelKey)) {
+      this.selectedModels.delete(modelKey);
+    } else {
+      this.selectedModels.add(modelKey);
+    }
+    this.updateBulkDeleteButton();
+    // Re-render only this model to update selection state
+    this.renderResponses();
+  }
+
+  // Delete individual model dialog
+  showDeleteModelDialog(surveyId, modelIndex, modelName) {
+    const survey = this.responses.find(r => r._id === surveyId);
+    if (!survey) {
+      this.showNotification('Survey not found', 'error');
+      return;
+    }
+
+    if (survey.responses.length <= 1) {
+      this.showNotification('Cannot delete the last model from a survey. Delete the entire survey instead.', 'warning');
+      return;
+    }
+
+    this.showModelDeleteConfirmDialog(surveyId, modelIndex, modelName);
+  }
+
+  async showModelDeleteConfirmDialog(surveyId, modelIndex, modelName) {
+    return new Promise((resolve) => {
+      // Create enhanced confirmation dialog for model deletion
+      const dialogHtml = `
+        <div id="modelDeleteDialog" class="confirm-dialog" style="display: flex;">
+          <div class="confirm-content" style="max-width: 500px;">
+            <h3>🗑️ Xác nhận xóa model</h3>
+            <p>Bạn có chắc chắn muốn xóa model <strong>${this.escapeHtml(modelName)}</strong>?</p>
+            <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 4px; margin: 10px 0;">
+              <strong>⚠️ Cảnh báo:</strong> Hành động này không thể hoàn tác. Model và tất cả hình ảnh liên quan sẽ bị xóa vĩnh viễn.
+            </div>
+            <div class="confirm-buttons">
+              <button id="btnConfirmModelDelete" class="btn-confirm" style="background: #dc3545;">Xóa model</button>
+              <button id="btnCancelModelDelete" class="btn-cancel">Hủy</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Remove existing dialog if any
+      const existingDialog = document.getElementById('modelDeleteDialog');
+      if (existingDialog) {
+        existingDialog.remove();
+      }
+
+      // Add dialog to body
+      document.body.insertAdjacentHTML('beforeend', dialogHtml);
+
+      // Add event listeners
+      document.getElementById('btnConfirmModelDelete').addEventListener('click', () => {
+        document.getElementById('modelDeleteDialog').remove();
+        this.confirmDeleteModel(surveyId, modelIndex);
+        resolve(true);
+      });
+
+      document.getElementById('btnCancelModelDelete').addEventListener('click', () => {
+        document.getElementById('modelDeleteDialog').remove();
+        resolve(false);
+      });
+
+      // Close on background click
+      document.getElementById('modelDeleteDialog').addEventListener('click', (e) => {
+        if (e.target.id === 'modelDeleteDialog') {
+          document.getElementById('modelDeleteDialog').remove();
+          resolve(false);
+        }
+      });
+    });
+  }
+
+  async confirmDeleteModel(surveyId, modelIndex) {
+    try {
+      this.showLoading();
+      const response = await this.makeAuthenticatedRequest(
+        `/api/responses/${surveyId}/models/${modelIndex}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        
+        // Remove model from local data
+        const survey = this.responses.find(r => r._id === surveyId);
+        if (survey && survey.responses && survey.responses.length > modelIndex) {
+          survey.responses.splice(modelIndex, 1);
+        }
+
+        // Clear any model selections for this survey that might be affected
+        const affectedKeys = Array.from(this.selectedModels).filter(key => key.startsWith(surveyId + ':'));
+        affectedKeys.forEach(key => {
+          const keyIndex = parseInt(key.split(':')[1]);
+          if (keyIndex >= modelIndex) {
+            this.selectedModels.delete(key);
+            // If there are models after the deleted one, adjust their keys
+            if (keyIndex > modelIndex) {
+              const newKey = `${surveyId}:${keyIndex - 1}`;
+              if (!this.selectedModels.has(newKey)) {
+                this.selectedModels.add(newKey);
+              }
+            }
+          }
+        });
+
+        this.renderResponses();
+        this.updateBulkDeleteButton();
+        
+        let message = `Model "${result.data?.deletedModel || 'Unknown'}" deleted successfully`;
+        if (result.warnings && result.warnings.length > 0) {
+          message += '\n⚠️ ' + result.warnings.join('\n⚠️ ');
+        }
+        this.showNotification(message, result.warnings ? 'warning' : 'success');
+        
+      } else {
+        const errorResult = await response.json();
+        this.showNotification('Error: ' + (errorResult.message || 'Failed to delete model'), 'error');
+      }
+    } catch (error) {
+      console.error('Error deleting model:', error);
+      this.showNotification('Error deleting model: ' + error.message, 'error');
+    } finally {
+      this.hideLoading();
     }
   }
 

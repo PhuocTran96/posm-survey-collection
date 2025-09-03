@@ -278,7 +278,7 @@ const updateUser = async (req, res) => {
         // Get leader user to show their role in error message
         const leaderUser = await User.findOne({ username: user.leader, isActive: true });
         const leaderRole = leaderUser ? leaderUser.role : 'unknown';
-        
+
         // Auto-clear leader for roles that can exist without one
         if (['admin', 'TDL'].includes(role)) {
           console.log(`Auto-clearing leader for ${role} role change`);
@@ -286,11 +286,15 @@ const updateUser = async (req, res) => {
         } else {
           // For roles that need a leader, check if we should auto-clear
           // This happens when the current leader cannot manage the new role
-          console.log(`Role ${role} is incompatible with leader ${user.leader} (${leaderRole}). Clearing leader.`);
+          console.log(
+            `Role ${role} is incompatible with leader ${user.leader} (${leaderRole}). Clearing leader.`
+          );
           user.leader = null;
-          
+
           // Log this action for transparency
-          console.log(`Auto-cleared leader for user ${user.username} when changing role from ${user.role} to ${role}`);
+          console.log(
+            `Auto-cleared leader for user ${user.username} when changing role from ${user.role} to ${role}`
+          );
         }
       }
       user.role = role.trim();
@@ -888,30 +892,30 @@ const getPotentialLeaders = async (req, res) => {
     // Define role hierarchy - who can lead whom
     const roleHierarchy = {
       PRT: ['TDS', 'TDL', 'admin'],
-      TDS: ['TDL', 'admin'], 
+      TDS: ['TDL', 'admin'],
       user: ['TDS', 'TDL', 'admin'],
-      admin: [],  // Admins don't need leaders
-      TDL: []     // TDLs don't need leaders
+      admin: [], // Admins don't need leaders
+      TDL: [], // TDLs don't need leaders
     };
 
     const allowedLeaderRoles = roleHierarchy[role];
-    
+
     // If role doesn't need leaders, return empty array
     if (!allowedLeaderRoles || allowedLeaderRoles.length === 0) {
       return res.json({
         success: true,
         data: [],
-        message: `Role ${role} does not require a leader`
+        message: `Role ${role} does not require a leader`,
       });
     }
 
     // Fetch active users with the allowed leader roles
     const potentialLeaders = await User.find({
       role: { $in: allowedLeaderRoles },
-      isActive: true
+      isActive: true,
     })
-    .select('_id userid username loginid role')
-    .sort({ username: 1 });
+      .select('_id userid username loginid role')
+      .sort({ username: 1 });
 
     res.json({
       success: true,
@@ -919,8 +923,8 @@ const getPotentialLeaders = async (req, res) => {
       meta: {
         requestedRole: role,
         allowedLeaderRoles: allowedLeaderRoles,
-        count: potentialLeaders.length
-      }
+        count: potentialLeaders.length,
+      },
     });
   } catch (error) {
     console.error('Get potential leaders error:', error);

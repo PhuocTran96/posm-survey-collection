@@ -1178,7 +1178,7 @@
     border-radius: 10px;
     margin-bottom: 30px;
     display: flex;
-    gap: 20px;
+    gap: 10px;
     flex-wrap: wrap;
     align-items: center;
 }
@@ -1196,7 +1196,7 @@
     padding: 8px 12px;
     border: 1px solid #ddd;
     border-radius: 5px;
-    min-width: 150px;
+    min-width: 145px;
 }
 .responses-container {
     background: white;
@@ -1500,6 +1500,33 @@
 }
 
 /* Filter Layout Styles */
+.filters-unified {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+}
+
+.filters-unified .filter-group {
+    margin-bottom: 0;
+}
+
+.filters-unified .filter-main {
+    flex: 2 1 180px;
+}
+
+.filters-unified .filter-date {
+    flex: 1 1 150px;
+}
+
+.filters-unified .filter-control {
+    flex: 1 1 120px;
+}
+
+.filters-unified .filter-actions {
+    flex: 1 1 auto;
+    text-align: right;
+}
 .filter-row {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
@@ -1517,7 +1544,7 @@
 
 #shopFilter {
     width: 100%;
-    padding: 8px 12px;
+    padding: 9px 0px;
     border: 1px solid #ddd;
     border-radius: 4px;
     font-size: 14px;
@@ -4257,3 +4284,254 @@ body {
         padding: 15px;
     }
 } 
+
+/* Model selection functionality styles */
+.selection-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 16px;
+}
+
+.selection-mode-toggle label {
+    font-weight: 500;
+    color: #495057;
+    font-size: 0.9rem;
+}
+
+.selection-mode-toggle select {
+    padding: 6px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    background: white;
+    font-size: 0.85rem;
+    color: #495057;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.selection-mode-toggle select:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.selection-mode-toggle select:hover {
+    border-color: #adb5bd;
+}
+
+/* Model controls styling */
+.model-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.model-checkbox {
+    transform: scale(1.1);
+    cursor: pointer;
+}
+
+.model-delete-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.model-delete-btn:hover {
+    background: #c82333;
+    transform: scale(1.05);
+}
+
+.model-response.selected {
+    background: #e3f2fd !important;
+    border: 2px solid #2196f3;
+}
+
+.model-response.selected .model-title {
+    color: #1976d2;
+}
+
+/* Enhanced confirm dialog styles for model deletion */
+#modelDeleteDialog .confirm-content,
+#bulkDeleteModelsDialog .confirm-content {
+    max-width: 600px;
+    width: 90vw;
+}
+
+#modelDeleteDialog ul,
+#bulkDeleteModelsDialog ul {
+    max-height: 150px;
+    overflow-y: auto;
+    margin: 8px 0;
+    padding-left: 20px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    padding: 12px 20px;
+}
+
+#modelDeleteDialog li,
+#bulkDeleteModelsDialog li {
+    margin-bottom: 4px;
+    font-size: 0.9rem;
+}
+
+/* Unified Filter Layout Improvements */
+.filters-unified {
+    display: grid;
+    grid-template-columns: 1.6fr 1.6fr 1.2fr 1.2fr 1.3fr 0.8fr;
+    gap: 12px;
+    align-items: end;
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+}
+
+.filters-unified .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.filters-unified label {
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.85rem;
+    margin-bottom: 0;
+}
+
+.filters-unified select,
+.filters-unified input[type="date"] {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: white;
+    font-size: 0.9rem;
+    color: #374151;
+    transition: all 0.2s ease;
+}
+
+.filters-unified select:focus,
+.filters-unified input[type="date"]:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Compact Filter Action Buttons */
+.filter-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-filter-clear,
+.btn-filter-export {
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.btn-filter-clear {
+    background: #f3f4f6;
+    color: #6b7280;
+    border: 1px solid #d1d5db;
+}
+
+.btn-filter-clear:hover {
+    background: #e5e7eb;
+    color: #374151;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.btn-filter-export {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border: 1px solid #059669;
+}
+
+.btn-filter-export:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .filters-unified {
+        grid-template-columns: 1.5fr 1.5fr 1.15fr 1.15fr 1.25fr 0.75fr;
+        gap: 10px;
+    }
+}
+
+@media (max-width: 1024px) {
+    .filters-unified {
+        grid-template-columns: 1.4fr 1.4fr 1.1fr 1.1fr 1.2fr 0.7fr;
+        gap: 10px;
+        padding: 16px;
+    }
+    
+    .filters-unified select,
+    .filters-unified input[type="date"] {
+        font-size: 0.85rem;
+        padding: 6px 10px;
+    }
+}
+
+@media (max-width: 768px) {
+    .filters-unified {
+        grid-template-columns: 1fr;
+        gap: 16px;
+        padding: 16px;
+    }
+    
+    .filter-actions {
+        justify-content: center;
+        padding-top: 8px;
+        border-top: 1px solid #e5e7eb;
+        margin-top: 8px;
+    }
+    
+    .btn-filter-clear,
+    .btn-filter-export {
+        width: 44px;
+        height: 44px;
+        font-size: 18px;
+    }
+    
+    .filters-unified select,
+    .filters-unified input[type="date"] {
+        font-size: 16px; /* Prevent zoom on iOS */
+        padding: 10px 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .filters-unified {
+        padding: 12px;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    
+    .filter-actions {
+        gap: 12px;
+    }
+}

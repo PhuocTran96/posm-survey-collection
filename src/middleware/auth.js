@@ -88,7 +88,7 @@ const verifyToken = async (req, res, next) => {
     // Check for session timeout (60 minutes of inactivity)
     const now = Date.now();
     const lastActivity = decoded.lastActivity || decoded.iat * 1000; // Fallback to token issued time
-    
+
     if (now - lastActivity > SESSION_TIMEOUT) {
       return res.status(401).json({
         success: false,
@@ -277,12 +277,12 @@ const updateActivity = async (req, res, next) => {
     if (req.user && req.tokenData) {
       const now = Date.now();
       const lastActivity = req.tokenData.lastActivity || req.tokenData.iat * 1000;
-      
+
       // Update activity if more than 5 minutes have passed to avoid excessive token generation
       if (now - lastActivity > 5 * 60 * 1000) {
         // Generate new token with updated activity
         const newTokens = generateTokens(req.user);
-        
+
         // Set new token in response header for client to update
         res.setHeader('X-New-Access-Token', newTokens.accessToken);
       }
@@ -291,7 +291,7 @@ const updateActivity = async (req, res, next) => {
     console.error('Activity update error:', error);
     // Don't fail the request if activity update fails
   }
-  
+
   next();
 };
 

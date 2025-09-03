@@ -93,7 +93,10 @@ class AdminApp {
                     <span class="admin-user-name">${this.user.username}</span>
                     <span class="admin-user-role">ADMIN</span>
                 </div>
-                <button onclick="adminApp.logout()" class="admin-logout-btn">Đăng xuất</button>
+                <div class="admin-buttons">
+                    <a href="/change-password.html" class="admin-change-password-btn">🔐 Đổi mật khẩu</a>
+                    <button onclick="adminApp.logout()" class="admin-logout-btn">Đăng xuất</button>
+                </div>
             `;
 
       adminHeader.appendChild(userInfo);

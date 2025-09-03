@@ -15,6 +15,8 @@ class SurveyApp {
     this.shopSearchValue = '';
     this.shopSearchSelected = '';
     this.shopSearchDebounceTimer = null;
+    // Model search debounce timer
+    this.modelSearchDebounceTimer = null;
     this.init();
   }
 
@@ -1099,10 +1101,14 @@ class SurveyApp {
     this.shopSearchValue = '';
     this.shopSearchSelected = '';
 
-    // Clear debounce timer
+    // Clear debounce timers
     if (this.shopSearchDebounceTimer) {
       clearTimeout(this.shopSearchDebounceTimer);
       this.shopSearchDebounceTimer = null;
+    }
+    if (this.modelSearchDebounceTimer) {
+      clearTimeout(this.modelSearchDebounceTimer);
+      this.modelSearchDebounceTimer = null;
     }
 
     // Reset form elements
@@ -1204,15 +1210,35 @@ class SurveyApp {
     this.modelSearchValue = value;
     this.modelSearchSelected = '';
     document.getElementById('addModelBtn').disabled = true;
+    
     if (!value) {
       this.hideModelSuggestions();
       return;
     }
-    const res = await this.authenticatedFetch(
-      `/api/model-autocomplete?q=${encodeURIComponent(value)}`
-    );
-    const models = await res.json();
-    this.showModelSuggestions(models);
+
+    // Clear existing timer to prevent multiple API calls
+    if (this.modelSearchDebounceTimer) {
+      clearTimeout(this.modelSearchDebounceTimer);
+    }
+
+    // Debounce the API call by 300ms to prevent race conditions
+    this.modelSearchDebounceTimer = setTimeout(async () => {
+      try {
+        const res = await this.authenticatedFetch(
+          `/api/model-autocomplete?q=${encodeURIComponent(value)}`
+        );
+        if (res && res.ok) {
+          const models = await res.json();
+          this.showModelSuggestions(models);
+        } else {
+          console.error('Model search API call failed:', res?.status);
+          this.hideModelSuggestions();
+        }
+      } catch (error) {
+        console.error('Model search error:', error);
+        this.hideModelSuggestions();
+      }
+    }, 300);
   }
 
   showModelSuggestions(models) {

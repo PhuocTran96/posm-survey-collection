@@ -291,7 +291,7 @@ class SurveyResultsApp {
 
       const shopFilter = document.getElementById('shopFilter');
       if (shopFilter && shopFilter.value.trim()) {
-        params.append('shop', shopFilter.value.trim());
+        params.append('shopName', shopFilter.value.trim());
       }
 
       const dateFromFilter = document.getElementById('dateFromFilter');
@@ -785,7 +785,7 @@ class SurveyResultsApp {
 
       const shopFilter = document.getElementById('shopFilter');
       if (shopFilter && shopFilter.value.trim()) {
-        params.append('shop', shopFilter.value.trim());
+        params.append('shopName', shopFilter.value.trim());
       }
 
       const dateFromFilter = document.getElementById('dateFromFilter');

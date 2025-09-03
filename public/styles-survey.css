@@ -398,10 +398,141 @@ main {
     z-index: 1;
 }
 
-/* Compact selected models list */
+/* Horizontal scrolling selected models list */
 .compact-models-list {
     font-size: 0.85rem;
     margin-bottom: 12px;
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    scroll-behavior: smooth;
+    gap: 10px;
+    padding: 8px 0;
+    min-height: 50px; /* Fixed height to prevent content shifting */
+    max-height: 50px;
+    
+    /* Webkit scrollbar styling */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(79,172,254,0.4) transparent;
+}
+
+.compact-models-list::-webkit-scrollbar {
+    height: 6px;
+}
+
+.compact-models-list::-webkit-scrollbar-track {
+    background: rgba(79,172,254,0.1);
+    border-radius: 10px;
+}
+
+.compact-models-list::-webkit-scrollbar-thumb {
+    background: rgba(79,172,254,0.4);
+    border-radius: 10px;
+    transition: background 0.2s ease;
+}
+
+.compact-models-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(79,172,254,0.6);
+}
+
+/* Enhanced selected model items for horizontal layout */
+.compact-models-list .selected-model-item {
+    flex-shrink: 0; /* Prevent items from compressing */
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    position: relative;
+    margin-right: 0; /* Remove margin, using gap instead */
+    margin-bottom: 0;
+    padding: 8px 32px 8px 12px; /* Extra right padding for delete button */
+    background: #f1f3f4;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+    min-height: 34px;
+}
+
+.compact-models-list .selected-model-item:hover {
+    background: #e8eaed;
+    border-color: rgba(79,172,254,0.3);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* Empty state styling */
+.compact-models-list em {
+    color: #666;
+    font-style: italic;
+    padding: 12px 0;
+    text-align: center;
+    width: 100%;
+}
+
+/* Scroll indicators for better UX */
+.compact-models-list {
+    position: relative;
+}
+
+.compact-models-list::before,
+.compact-models-list::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 20px;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.compact-models-list::before {
+    left: 0;
+    background: linear-gradient(to right, rgba(248,249,250,0.8), transparent);
+}
+
+.compact-models-list::after {
+    right: 0;
+    background: linear-gradient(to left, rgba(248,249,250,0.8), transparent);
+}
+
+.compact-models-list.scroll-left::before,
+.compact-models-list.scroll-right::after {
+    opacity: 1;
+}
+
+/* Accessibility focus styles */
+.compact-models-list:focus {
+    outline: 2px solid #4facfe;
+    outline-offset: 2px;
+}
+
+.compact-models-list .selected-model-item .btn-icon-delete:focus {
+    outline: 2px solid #dc3545;
+    outline-offset: 2px;
+}
+
+/* Mobile optimizations for horizontal scrolling */
+@media (max-width: 768px) {
+    .compact-models-list {
+        padding: 6px 0;
+        gap: 8px;
+        min-height: 46px;
+        max-height: 46px;
+    }
+    
+    .compact-models-list .selected-model-item {
+        padding: 6px 28px 6px 10px;
+        font-size: 0.8rem;
+        min-height: 30px;
+    }
+    
+    /* Larger touch targets for mobile */
+    .compact-models-list::-webkit-scrollbar {
+        height: 8px;
+    }
 }
 
 /* Visual separator */

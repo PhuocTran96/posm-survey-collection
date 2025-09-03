@@ -624,6 +624,68 @@ class SurveyApp {
       infoDiv.style.display = 'none';
     }
   }
+  
+  // Update scroll indicators based on scroll position
+  updateScrollIndicators(listDiv) {
+    if (!listDiv) return;
+    
+    const canScrollLeft = listDiv.scrollLeft > 0;
+    const canScrollRight = listDiv.scrollLeft < listDiv.scrollWidth - listDiv.clientWidth;
+    
+    listDiv.classList.toggle('scroll-left', canScrollLeft);
+    listDiv.classList.toggle('scroll-right', canScrollRight);
+  }
+  
+  // Keyboard navigation for selected models list with horizontal scrolling
+  addSelectedModelsKeyboardNavigation() {
+    const listDiv = document.getElementById('selectedModelsList');
+    if (!listDiv) return;
+    
+    // Make the container focusable for keyboard navigation
+    listDiv.setAttribute('tabindex', '0');
+    listDiv.setAttribute('role', 'list');
+    listDiv.setAttribute('aria-label', 'Danh sách models đã chọn, sử dụng mũi tên để cuộn ngang');
+    
+    // Add scroll event listener for indicators
+    listDiv.addEventListener('scroll', () => {
+      this.updateScrollIndicators(listDiv);
+    });
+    
+    // Add keyboard event listener
+    listDiv.addEventListener('keydown', (e) => {
+      const scrollAmount = 100; // pixels to scroll
+      
+      switch (e.key) {
+        case 'ArrowLeft':
+          e.preventDefault();
+          listDiv.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          listDiv.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+          break;
+        case 'Home':
+          e.preventDefault();
+          listDiv.scrollTo({ left: 0, behavior: 'smooth' });
+          break;
+        case 'End':
+          e.preventDefault();
+          listDiv.scrollTo({ left: listDiv.scrollWidth, behavior: 'smooth' });
+          break;
+      }
+    });
+    
+    // Focus management for delete buttons
+    const deleteButtons = listDiv.querySelectorAll('.btn-icon-delete');
+    deleteButtons.forEach((btn) => {
+      btn.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          btn.click();
+        }
+      });
+    });
+  }
 
   async loadModelsAndPOSM() {
     if (!this.selectedShop) {
@@ -1408,21 +1470,44 @@ class SurveyApp {
     const container = document.getElementById('modelsContainer');
     container.innerHTML = '';
 
-    // Render visible list of all added models
+    // Render visible list of all added models with horizontal scrolling
     const listDiv = document.getElementById('selectedModelsList');
     if (this.selectedModels.length === 0) {
       listDiv.innerHTML = '<em>Chưa có model nào được chọn.</em>';
+      // Remove scroll indicators when empty
+      listDiv.classList.remove('scroll-left', 'scroll-right');
     } else {
-      listDiv.innerHTML = this.selectedModels
-        .map(
-          (model) => `
-                <span class="selected-model-item" style="display:inline-block;position:relative;margin-right:10px;margin-bottom:5px;padding:5px 10px;background:#f1f3f4;border-radius:5px;font-size:0.85rem;">
-                    <strong>${model}</strong>
-                    <button class="btn-icon-delete" data-model="${model}" title="Xóa model này">×</button>
+      const modelsHtml = this.selectedModels
+        .map((model) => {
+          // Sanitize model name to prevent XSS
+          const sanitizedModel = model.replace(/[<>&"]/g, function(match) {
+            switch(match) {
+              case '<': return '&lt;';
+              case '>': return '&gt;';
+              case '&': return '&amp;';
+              case '"': return '&quot;';
+              default: return match;
+            }
+          });
+          
+          return `
+                <span class="selected-model-item" data-model="${sanitizedModel}" title="Model: ${sanitizedModel}">
+                    <strong>${sanitizedModel}</strong>
+                    <button class="btn-icon-delete" data-model="${sanitizedModel}" title="Xóa model này" aria-label="Xóa model ${sanitizedModel}">×</button>
                 </span>
-            `
-        )
+            `;
+        })
         .join('');
+      
+      listDiv.innerHTML = modelsHtml;
+      
+      // Auto-scroll to the latest added model (rightmost) and setup scroll indicators
+      setTimeout(() => {
+        if (listDiv.scrollWidth > listDiv.clientWidth) {
+          listDiv.scrollLeft = listDiv.scrollWidth - listDiv.clientWidth;
+        }
+        this.updateScrollIndicators(listDiv);
+      }, 50);
     }
     // Render POSM selection for each model
     this.selectedModels.forEach((model) => {
@@ -1480,6 +1565,9 @@ class SurveyApp {
         this.renderSelectedModels();
       });
     });
+    
+    // Add keyboard navigation for selected models list
+    this.addSelectedModelsKeyboardNavigation();
     // Bind POSM checkboxes
     this.bindCheckboxEvents();
 

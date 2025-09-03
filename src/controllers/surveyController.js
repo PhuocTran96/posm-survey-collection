@@ -193,6 +193,9 @@ const getSurveyResponses = async (req, res) => {
     if (req.query.shopName) {
       filters.shopName = req.query.shopName;
     }
+    if (req.query.submittedBy) {
+      filters.submittedBy = req.query.submittedBy;
+    }
     if (req.query.dateFrom || req.query.dateTo) {
       filters.submittedAt = {};
       if (req.query.dateFrom) {

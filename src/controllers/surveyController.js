@@ -180,10 +180,14 @@ const getSurveyResponses = async (req, res) => {
 
     // Get pagination parameters from query
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
-    const skip = (page - 1) * limit;
+    const requestedLimit = parseInt(req.query.limit) || 20;
+    
+    // CRITICAL FIX: Detect export requests and bypass 100-record cap
+    const isExportRequest = requestedLimit >= 999999;
+    const limit = isExportRequest ? 999999 : Math.min(100, Math.max(1, requestedLimit));
+    const skip = isExportRequest ? 0 : (page - 1) * limit; // Don't skip records for exports
 
-    console.log(`📄 Pagination: page=${page}, limit=${limit}, skip=${skip}`);
+    console.log(`📄 Pagination: page=${page}, requestedLimit=${requestedLimit}, actualLimit=${limit}, skip=${skip}, isExport=${isExportRequest}`);
 
     // Build filter conditions from query parameters
     const filters = {};
@@ -196,36 +200,190 @@ const getSurveyResponses = async (req, res) => {
     if (req.query.submittedBy) {
       filters.submittedBy = req.query.submittedBy;
     }
+    // Enhanced date filtering with comprehensive debugging
     if (req.query.dateFrom || req.query.dateTo) {
-      filters.submittedAt = {};
+      console.log('📅 Backend Date Filtering Debug:', {
+        receivedDateFrom: req.query.dateFrom,
+        receivedDateTo: req.query.dateTo,
+        dateFromType: typeof req.query.dateFrom,
+        dateToType: typeof req.query.dateTo
+      });
+
+      // Parse dates with detailed logging
+      let dateFromParsed = null, dateToParsed = null;
       if (req.query.dateFrom) {
-        filters.submittedAt.$gte = new Date(req.query.dateFrom);
+        dateFromParsed = new Date(req.query.dateFrom);
+        console.log('📅 Parsing dateFrom:', {
+          input: req.query.dateFrom,
+          parsed: dateFromParsed,
+          isValid: !isNaN(dateFromParsed),
+          iso: dateFromParsed.toISOString(),
+          local: dateFromParsed.toLocaleString('vi-VN')
+        });
       }
+
       if (req.query.dateTo) {
-        const dateTo = new Date(req.query.dateTo);
-        dateTo.setHours(23, 59, 59, 999);
-        filters.submittedAt.$lte = dateTo;
+        dateToParsed = new Date(req.query.dateTo);
+        // CRITICAL FIX: Ensure end-of-day for "to" date filters
+        if (dateToParsed.getHours() === 0 && dateToParsed.getMinutes() === 0 && dateToParsed.getSeconds() === 0) {
+          dateToParsed.setHours(23, 59, 59, 999);
+        }
+        console.log('📅 Parsing dateTo:', {
+          input: req.query.dateTo,
+          parsed: dateToParsed,
+          isValid: !isNaN(dateToParsed),
+          iso: dateToParsed.toISOString(),
+          local: dateToParsed.toLocaleString('vi-VN'),
+          adjustedToEndOfDay: dateToParsed.getHours() === 23
+        });
+      }
+
+      // Build date filter - check both submittedAt and createdAt
+      const dateFilter = {};
+      if (dateFromParsed && !isNaN(dateFromParsed)) {
+        dateFilter.$gte = dateFromParsed;
+      }
+      if (dateToParsed && !isNaN(dateToParsed)) {
+        dateFilter.$lte = dateToParsed;
+      }
+
+      // Apply to both possible date fields
+      filters.$or = [
+        { submittedAt: dateFilter },
+        { createdAt: dateFilter }
+      ];
+
+      console.log('📅 Final Date Filter:', {
+        dateFilter: dateFilter,
+        orConditions: filters.$or
+      });
+    }
+
+    console.log('🔍 All Applied Filters:', JSON.stringify(filters, null, 2));
+
+    // Database debugging - get statistics
+    let totalDocuments = 0;
+    try {
+      totalDocuments = await SurveyResponse.countDocuments({});
+      console.log('📊 Database Statistics:', {
+        totalDocumentsInCollection: totalDocuments
+      });
+    } catch (error) {
+      console.warn('⚠️ Error getting total document count:', error.message);
+    }
+
+    // If date filters are applied, let's see what data exists in the date range
+    if (req.query.dateFrom || req.query.dateTo) {
+      // Build safe filter objects for statistics
+      const submittedAtFilter = {};
+      const createdAtFilter = {};
+      
+      if (req.query.dateFrom) {
+        const fromDate = new Date(req.query.dateFrom);
+        submittedAtFilter.$gte = fromDate;
+        createdAtFilter.$gte = fromDate;
+      } else {
+        submittedAtFilter.$gte = new Date('1970-01-01');
+        createdAtFilter.$gte = new Date('1970-01-01');
+      }
+      
+      if (req.query.dateTo) {
+        const toDate = new Date(req.query.dateTo);
+        // CRITICAL FIX: Apply same end-of-day logic for statistics
+        if (toDate.getHours() === 0 && toDate.getMinutes() === 0 && toDate.getSeconds() === 0) {
+          toDate.setHours(23, 59, 59, 999);
+        }
+        submittedAtFilter.$lte = toDate;
+        createdAtFilter.$lte = toDate;
+      } else {
+        submittedAtFilter.$lte = new Date();
+        createdAtFilter.$lte = new Date();
+      }
+
+      // Test individual date field queries with error handling
+      let submittedAtCount = 0;
+      let createdAtCount = 0;
+      
+      try {
+        submittedAtCount = await SurveyResponse.countDocuments({
+          submittedAt: submittedAtFilter
+        });
+      } catch (error) {
+        console.warn('⚠️ Error counting submittedAt documents:', error.message);
+      }
+      
+      try {
+        createdAtCount = await SurveyResponse.countDocuments({
+          createdAt: createdAtFilter
+        });
+      } catch (error) {
+        console.warn('⚠️ Error counting createdAt documents:', error.message);
+      }
+
+      console.log('📊 Date Range Statistics:', {
+        documentsWithSubmittedAtInRange: submittedAtCount,
+        documentsWithCreatedAtInRange: createdAtCount,
+        requestedDateRange: {
+          from: req.query.dateFrom ? new Date(req.query.dateFrom).toISOString() : null,
+          to: req.query.dateTo ? new Date(req.query.dateTo).toISOString() : null
+        }
+      });
+
+      // Sample a few documents to see their actual date field values
+      try {
+        const sampleDocs = await SurveyResponse.find({}).limit(3).lean();
+        console.log('📋 Sample Documents Date Fields:', sampleDocs.map(doc => ({
+          id: doc._id,
+          submittedAt: doc.submittedAt,
+          createdAt: doc.createdAt,
+          updatedAt: doc.updatedAt
+        })));
+      } catch (error) {
+        console.warn('⚠️ Error fetching sample documents:', error.message);
       }
     }
 
-    console.log('🔍 Applied filters:', filters);
-
     // Get total count for pagination metadata
     const totalCount = await SurveyResponse.countDocuments(filters);
+    console.log('🔢 Query Results Count:', {
+      matchingDocuments: totalCount,
+      appliedFilters: filters
+    });
 
-    // Get paginated responses
-    const responses = await SurveyResponse.find(filters)
-      .sort({ submittedAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
+    // Log export request details
+    if (isExportRequest) {
+      console.log('📤 EXPORT REQUEST DETECTED:', {
+        totalRecordsAvailable: totalCount,
+        willReturnAllRecords: true,
+        skipPagination: true,
+        requestedLimit: requestedLimit,
+        actualQueryLimit: limit
+      });
+    }
 
-    const totalPages = Math.ceil(totalCount / limit);
+    // Get responses - optimized for export requests
+    let query = SurveyResponse.find(filters).sort({ submittedAt: -1 });
+    
+    if (isExportRequest) {
+      // For exports: return ALL records, no pagination
+      query = query.lean();
+      console.log('📋 Executing UNLIMITED query for export...');
+    } else {
+      // For regular requests: use pagination
+      query = query.skip(skip).limit(limit).lean();
+    }
+    
+    const responses = await query;
 
-    console.log(`✅ Retrieved ${responses.length} of ${totalCount} total survey responses`);
-    console.log(
-      `📊 Pagination info: page ${page}/${totalPages}, showing ${responses.length} items`
-    );
+    const totalPages = isExportRequest ? 1 : Math.ceil(totalCount / limit);
+
+    if (isExportRequest) {
+      console.log(`✅ EXPORT COMPLETE: Retrieved ALL ${responses.length} of ${totalCount} total survey responses`);
+      console.log(`📤 Export success: ${responses.length} records ready for Excel generation`);
+    } else {
+      console.log(`✅ Retrieved ${responses.length} of ${totalCount} total survey responses`);
+      console.log(`📊 Pagination info: page ${page}/${totalPages}, showing ${responses.length} items`);
+    }
 
     if (responses.length > 0) {
       console.log('📋 Sample response structure:', {
@@ -233,7 +391,41 @@ const getSurveyResponses = async (req, res) => {
         leader: responses[0].leader,
         shopName: responses[0].shopName,
         responsesCount: responses[0].responses ? responses[0].responses.length : 0,
+        dateFields: {
+          submittedAt: responses[0].submittedAt,
+          createdAt: responses[0].createdAt,
+          updatedAt: responses[0].updatedAt
+        }
       });
+
+      // Show date range of returned results
+      if (req.query.dateFrom || req.query.dateTo) {
+        const dates = responses.map(r => ({
+          id: r._id,
+          submittedAt: r.submittedAt,
+          createdAt: r.createdAt,
+          shopName: r.shopName
+        })).slice(0, 5); // Show first 5
+        
+        console.log('📅 Date Fields of Returned Results (first 5):', dates);
+        
+        // Show date range summary
+        const submittedDates = responses.map(r => r.submittedAt).filter(Boolean).sort();
+        const createdDates = responses.map(r => r.createdAt).filter(Boolean).sort();
+        
+        console.log('📊 Date Range Summary of Results:', {
+          submittedAtRange: {
+            earliest: submittedDates[0],
+            latest: submittedDates[submittedDates.length - 1],
+            count: submittedDates.length
+          },
+          createdAtRange: {
+            earliest: createdDates[0],
+            latest: createdDates[createdDates.length - 1],
+            count: createdDates.length
+          }
+        });
+      }
     }
 
     // Return paginated response with metadata

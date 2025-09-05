@@ -286,6 +286,117 @@ class SurveyResultsApp {
     }
   }
 
+  showExportProgress(message) {
+    // Remove existing progress if any
+    const existingProgress = document.getElementById('exportProgress');
+    if (existingProgress) {
+      existingProgress.remove();
+    }
+
+    const progressHtml = `
+      <div id="exportProgress" class="export-progress" style="
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 10001; text-align: center; min-width: 300px;
+      ">
+        <div class="loading-spinner" style="margin: 0 auto 20px;"></div>
+        <div style="font-size: 16px; color: #333;">${message}</div>
+        <div style="font-size: 12px; color: #666; margin-top: 10px;">
+          Quá trình này có thể mất vài phút...
+        </div>
+      </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', progressHtml);
+  }
+
+  hideExportProgress() {
+    const progress = document.getElementById('exportProgress');
+    if (progress) {
+      progress.remove();
+    }
+  }
+
+  generateExportMetadata(responses, appliedFilters) {
+    const totalSurveys = responses.length;
+    const totalModels = responses.reduce((sum, r) => sum + (r.responses?.length || 0), 0);
+    const totalImages = responses.reduce((sum, r) => {
+      return sum + (r.responses?.reduce((imgSum, model) => 
+        imgSum + (model.images?.length || 0), 0) || 0);
+    }, 0);
+
+    const dateRange = this.getDateRange(responses);
+    
+    return [
+      ['THÔNG TIN XUẤT DỮ LIỆU'],
+      ['Thời gian xuất:', new Date().toLocaleString('vi-VN')],
+      ['Tổng số khảo sát:', totalSurveys],
+      ['Tổng số model:', totalModels], 
+      ['Tổng số ảnh:', totalImages],
+      ['Khoảng thời gian:', `${dateRange.from} - ${dateRange.to}`],
+      [''],
+      ['BỘ LỌC ÁP DỤNG:'],
+      ...Object.entries(appliedFilters).map(([key, value]) => [key + ':', value || 'Tất cả'])
+    ];
+  }
+
+  getDateRange(responses) {
+    if (responses.length === 0) return { from: 'N/A', to: 'N/A' };
+    
+    const dates = responses.map(r => new Date(r.createdAt || r.submittedAt)).sort((a, b) => a - b);
+    return {
+      from: dates[0].toLocaleDateString('vi-VN'),
+      to: dates[dates.length - 1].toLocaleDateString('vi-VN')
+    };
+  }
+
+  getCurrentFilters() {
+    // Since we're exporting ALL records, return appropriate filter labels
+    return {
+      'Loại xuất': 'TOÀN BỘ DỮ LIỆU',
+      'Người thực hiện': 'Tất cả',
+      'Tên shop': 'Tất cả', 
+      'Từ ngày': 'Tất cả thời gian',
+      'Đến ngày': 'Tất cả thời gian'
+    };
+  }
+
+  getFilterSummaryForFilename() {
+    // Since we're now exporting ALL records without any filters
+    return '_ALL-RECORDS';
+  }
+
+  validateDateFilters() {
+    const dateFrom = document.getElementById('dateFromFilter')?.value;
+    const dateTo = document.getElementById('dateToFilter')?.value;
+    
+    if (dateFrom && dateTo) {
+      const fromDate = new Date(dateFrom);
+      const toDate = new Date(dateTo);
+      
+      if (fromDate > toDate) {
+        this.showNotification('Ngày bắt đầu không thể lớn hơn ngày kết thúc', 'error');
+        return false;
+      }
+      
+      // Check if date range is too large (more than 1 year)
+      const daysDiff = (toDate - fromDate) / (1000 * 60 * 60 * 24);
+      if (daysDiff > 365) {
+        this.showNotification('Khoảng thời gian không được vượt quá 1 năm', 'warning');
+      }
+    }
+    
+    console.log('📅 Date Filter Validation:', {
+      dateFrom: dateFrom,
+      dateTo: dateTo,
+      fromParsed: dateFrom ? new Date(dateFrom).toISOString() : null,
+      toParsed: dateTo ? new Date(dateTo).toISOString() : null,
+      isValid: !(dateFrom && dateTo && new Date(dateFrom) > new Date(dateTo))
+    });
+    
+    return true;
+  }
+
   async loadResponses(page = 1) {
     try {
       this.showLoading();
@@ -933,73 +1044,88 @@ class SurveyResultsApp {
 
   async exportData() {
     try {
-      this.showLoading();
+      // EXPORT ALL RECORDS - Bypass all filtering completely
+      console.log('🌍 EXPORTING ALL RECORDS - No filters applied');
+      console.log('📊 This will export every record in the database');
 
-      // Build query parameters for export (same as current filters)
+      // Get estimated total record count for confirmation
+      const totalRecords = this.totalCount || 148;
+      
+      // Confirm exporting all records
+      const confirmExportAll = confirm(
+        `Bạn có chắc chắn muốn xuất TẤT CẢ dữ liệu khảo sát?\n\n` +
+        `Điều này sẽ xuất toàn bộ khoảng ${totalRecords} khảo sát trong cơ sở dữ liệu.\n\n` +
+        `Nhấn OK để tiếp tục hoặc Cancel để hủy.`
+      );
+
+      if (!confirmExportAll) {
+        console.log('❌ User cancelled complete export');
+        return;
+      }
+
+      this.showExportProgress('Đang chuẩn bị xuất TẤT CẢ dữ liệu...');
+
+      // Build empty parameters - NO FILTERING AT ALL
       const params = new URLSearchParams();
+      
+      // Explicitly log that we're not using any filters
+      console.log('📤 Export Parameters Being Sent:', {
+        allParams: 'NO FILTERS - EXPORTING ALL RECORDS',
+        fullUrl: `/api/responses?limit=999999`,
+        note: 'No date, user, or shop filters applied'
+      });
 
-      const submittedByFilter = document.getElementById('submittedByFilter');
-      if (submittedByFilter && submittedByFilter.value) {
-        params.append('submittedBy', submittedByFilter.value);
-      }
-
-      const shopFilter = document.getElementById('shopFilter');
-      if (shopFilter && shopFilter.value.trim()) {
-        params.append('shopName', shopFilter.value.trim());
-      }
-
-      const dateFromFilter = document.getElementById('dateFromFilter');
-      if (dateFromFilter && dateFromFilter.value) {
-        params.append('dateFrom', dateFromFilter.value);
-      }
-
-      const dateToFilter = document.getElementById('dateToFilter');
-      if (dateToFilter && dateToFilter.value) {
-        params.append('dateTo', dateToFilter.value);
-      }
-
-      // Fetch all data for export (no pagination)
-      params.append('limit', '10000');
-
-      const response = await this.makeAuthenticatedRequest(`/api/responses?${params}`);
+      // Get ALL data without any filtering
+      this.showExportProgress('Đang tải TOÀN BỘ dữ liệu từ server...');
+      
+      const response = await this.makeAuthenticatedRequest(`/api/responses?limit=999999`);
       if (!response.ok) {
-        throw new Error('Lỗi khi tải dữ liệu export');
+        const errorText = await response.text(); 
+        throw new Error(`Lỗi server: ${response.status} - ${errorText}`);
       }
 
+      this.showExportProgress('Đang xử lý tất cả dữ liệu...');
       const data = await response.json();
       const responses = data.data || data;
 
       if (!responses || responses.length === 0) {
-        alert('Không có dữ liệu để xuất');
+        this.hideExportProgress();
+        this.showNotification('Không có dữ liệu trong cơ sở dữ liệu', 'warning');
         return;
       }
 
+      this.showExportProgress(`Đang tạo file Excel cho TẤT CẢ ${responses.length} khảo sát...`);
       this.generateExcel(responses);
+      
+      this.showNotification(`✅ Đã xuất TẤT CẢ ${responses.length} khảo sát từ cơ sở dữ liệu thành công!`, 'success');
+      
     } catch (error) {
       console.error('Error exporting data:', error);
-      alert('Lỗi khi xuất dữ liệu: ' + error.message);
+      this.showNotification('❌ Lỗi khi xuất dữ liệu: ' + error.message, 'error');
     } finally {
-      this.hideLoading();
+      this.hideExportProgress();
     }
   }
 
   generateExcel(responses) {
     const workbook = XLSX.utils.book_new();
+    
+    // Create metadata worksheet
+    const metadataData = this.generateExportMetadata(responses, this.getCurrentFilters());
+    const metadataWorksheet = XLSX.utils.aoa_to_sheet(metadataData);
+    XLSX.utils.book_append_sheet(workbook, metadataWorksheet, 'Thông tin xuất');
+
+    // Create main data worksheet
     const worksheetData = [];
 
-    // Headers
-    worksheetData.push([
-      'Ngày khảo sát',
-      'TDL',
-      'Shop',
-      'Model',
-      'Số lượng',
-      'POSM',
-      'Tất cả POSM',
-      'Hình ảnh',
-      'User ID',
-      'Username',
-    ]);
+    // Enhanced headers with Vietnamese labels
+    const vietnameseHeaders = [
+      'Ngày khảo sát', 'TDL', 'Tên Shop', 'Tên Model', 'Số lượng',
+      'POSM', 'Chọn tất cả POSM', 'Số ảnh', 'Link ảnh', 
+      'User ID', 'Username', 'ID Khảo sát', 'Thời gian gửi'
+    ];
+
+    worksheetData.push(vietnameseHeaders);
 
     // Data rows
     responses.forEach((response) => {
@@ -1015,39 +1141,48 @@ class SurveyResultsApp {
 
           worksheetData.push([
             responseDate,
-            response.leader || 'Unknown User',
-            response.shopName,
-            modelResponse.model,
-            modelResponse.quantity || 1,
+            response.leader || 'N/A',
+            response.shopName || 'N/A', 
+            modelResponse.model || 'N/A',
+            modelResponse.quantity || 0,
             posmList,
             modelResponse.allSelected ? 'Có' : 'Không',
+            modelResponse.images ? modelResponse.images.length : 0,
             images,
-            response.submittedById || '',
-            response.submittedBy || '',
+            response.submittedById || 'N/A',
+            response.submittedBy || 'N/A',
+            response._id || 'N/A',
+            new Date(response.submittedAt || response.createdAt).toLocaleString('vi-VN')
           ]);
         });
       } else {
         worksheetData.push([
           responseDate,
-          response.submittedBy || 'Unknown User',
-          response.shopName,
-          '',
-          '',
-          '',
-          '',
-          '',
-          response.submittedById || '',
-          response.submittedBy || '',
+          response.leader || 'N/A',
+          response.shopName || 'N/A',
+          'N/A',
+          0,
+          'N/A',
+          'N/A',
+          0,
+          'N/A',
+          response.submittedById || 'N/A',
+          response.submittedBy || 'N/A',
+          response._id || 'N/A',
+          new Date(response.submittedAt || response.createdAt).toLocaleString('vi-VN')
         ]);
       }
     });
 
+    // Create main data worksheet  
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Kết quả khảo sát');
 
-    // Generate filename with current date
+    // Generate enhanced filename with filter info
+    const filterInfo = this.getFilterSummaryForFilename();
     const now = new Date();
-    const filename = `ket-qua-khao-sat-${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}.xlsx`;
+    const dateStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
+    const filename = `survey-results-${dateStr}${filterInfo}.xlsx`;
 
     XLSX.writeFile(workbook, filename);
   }

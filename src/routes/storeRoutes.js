@@ -40,6 +40,7 @@ router.use(updateActivity); // Update user activity on each request
 // GET routes
 router.get('/', storeController.getStores);
 router.get('/search', storeController.searchStores);
+router.get('/assigned', storeController.getAssignedStores);
 router.get('/stats', storeController.getStoreStats);
 router.get('/export', requireRole(['admin']), storeController.exportStoresToCSV);
 router.get('/:id', storeController.getStoreById);

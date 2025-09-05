@@ -80,6 +80,14 @@ const getStoreById = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Validate ObjectId format
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid store ID format',
+      });
+    }
+
     const store = await Store.findById(id);
 
     if (!store) {
@@ -544,6 +552,42 @@ const searchStores = async (req, res) => {
 };
 
 /**
+ * Get assigned stores for current user
+ */
+const getAssignedStores = async (req, res) => {
+  try {
+    const user = req.user;
+    const assignedStoreIds = user.assignedStores || [];
+
+    if (assignedStoreIds.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+      });
+    }
+
+    // Get actual Store documents that match user's assigned stores
+    const assignedStores = await Store.find({
+      _id: { $in: assignedStoreIds },
+      isActive: true
+    })
+      .select('store_id store_name channel region province')
+      .sort({ store_name: 1 });
+
+    res.json({
+      success: true,
+      data: assignedStores,
+    });
+  } catch (error) {
+    console.error('Get assigned stores error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get assigned stores',
+    });
+  }
+};
+
+/**
  * Get store statistics
  */
 const getStoreStats = async (req, res) => {
@@ -604,5 +648,6 @@ module.exports = {
   importStoresFromCSV,
   exportStoresToCSV,
   searchStores,
+  getAssignedStores,
   getStoreStats,
 };

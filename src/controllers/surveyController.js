@@ -181,13 +181,15 @@ const getSurveyResponses = async (req, res) => {
     // Get pagination parameters from query
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const requestedLimit = parseInt(req.query.limit) || 20;
-    
+
     // CRITICAL FIX: Detect export requests and bypass 100-record cap
     const isExportRequest = requestedLimit >= 999999;
     const limit = isExportRequest ? 999999 : Math.min(100, Math.max(1, requestedLimit));
     const skip = isExportRequest ? 0 : (page - 1) * limit; // Don't skip records for exports
 
-    console.log(`📄 Pagination: page=${page}, requestedLimit=${requestedLimit}, actualLimit=${limit}, skip=${skip}, isExport=${isExportRequest}`);
+    console.log(
+      `📄 Pagination: page=${page}, requestedLimit=${requestedLimit}, actualLimit=${limit}, skip=${skip}, isExport=${isExportRequest}`
+    );
 
     // Build filter conditions from query parameters
     const filters = {};
@@ -206,11 +208,12 @@ const getSurveyResponses = async (req, res) => {
         receivedDateFrom: req.query.dateFrom,
         receivedDateTo: req.query.dateTo,
         dateFromType: typeof req.query.dateFrom,
-        dateToType: typeof req.query.dateTo
+        dateToType: typeof req.query.dateTo,
       });
 
       // Parse dates with detailed logging
-      let dateFromParsed = null, dateToParsed = null;
+      let dateFromParsed = null,
+        dateToParsed = null;
       if (req.query.dateFrom) {
         dateFromParsed = new Date(req.query.dateFrom);
         console.log('📅 Parsing dateFrom:', {
@@ -218,14 +221,18 @@ const getSurveyResponses = async (req, res) => {
           parsed: dateFromParsed,
           isValid: !isNaN(dateFromParsed),
           iso: dateFromParsed.toISOString(),
-          local: dateFromParsed.toLocaleString('vi-VN')
+          local: dateFromParsed.toLocaleString('vi-VN'),
         });
       }
 
       if (req.query.dateTo) {
         dateToParsed = new Date(req.query.dateTo);
         // CRITICAL FIX: Ensure end-of-day for "to" date filters
-        if (dateToParsed.getHours() === 0 && dateToParsed.getMinutes() === 0 && dateToParsed.getSeconds() === 0) {
+        if (
+          dateToParsed.getHours() === 0 &&
+          dateToParsed.getMinutes() === 0 &&
+          dateToParsed.getSeconds() === 0
+        ) {
           dateToParsed.setHours(23, 59, 59, 999);
         }
         console.log('📅 Parsing dateTo:', {
@@ -234,7 +241,7 @@ const getSurveyResponses = async (req, res) => {
           isValid: !isNaN(dateToParsed),
           iso: dateToParsed.toISOString(),
           local: dateToParsed.toLocaleString('vi-VN'),
-          adjustedToEndOfDay: dateToParsed.getHours() === 23
+          adjustedToEndOfDay: dateToParsed.getHours() === 23,
         });
       }
 
@@ -248,14 +255,11 @@ const getSurveyResponses = async (req, res) => {
       }
 
       // Apply to both possible date fields
-      filters.$or = [
-        { submittedAt: dateFilter },
-        { createdAt: dateFilter }
-      ];
+      filters.$or = [{ submittedAt: dateFilter }, { createdAt: dateFilter }];
 
       console.log('📅 Final Date Filter:', {
         dateFilter: dateFilter,
-        orConditions: filters.$or
+        orConditions: filters.$or,
       });
     }
 
@@ -266,7 +270,7 @@ const getSurveyResponses = async (req, res) => {
     try {
       totalDocuments = await SurveyResponse.countDocuments({});
       console.log('📊 Database Statistics:', {
-        totalDocumentsInCollection: totalDocuments
+        totalDocumentsInCollection: totalDocuments,
       });
     } catch (error) {
       console.warn('⚠️ Error getting total document count:', error.message);
@@ -277,7 +281,7 @@ const getSurveyResponses = async (req, res) => {
       // Build safe filter objects for statistics
       const submittedAtFilter = {};
       const createdAtFilter = {};
-      
+
       if (req.query.dateFrom) {
         const fromDate = new Date(req.query.dateFrom);
         submittedAtFilter.$gte = fromDate;
@@ -286,7 +290,7 @@ const getSurveyResponses = async (req, res) => {
         submittedAtFilter.$gte = new Date('1970-01-01');
         createdAtFilter.$gte = new Date('1970-01-01');
       }
-      
+
       if (req.query.dateTo) {
         const toDate = new Date(req.query.dateTo);
         // CRITICAL FIX: Apply same end-of-day logic for statistics
@@ -303,18 +307,18 @@ const getSurveyResponses = async (req, res) => {
       // Test individual date field queries with error handling
       let submittedAtCount = 0;
       let createdAtCount = 0;
-      
+
       try {
         submittedAtCount = await SurveyResponse.countDocuments({
-          submittedAt: submittedAtFilter
+          submittedAt: submittedAtFilter,
         });
       } catch (error) {
         console.warn('⚠️ Error counting submittedAt documents:', error.message);
       }
-      
+
       try {
         createdAtCount = await SurveyResponse.countDocuments({
-          createdAt: createdAtFilter
+          createdAt: createdAtFilter,
         });
       } catch (error) {
         console.warn('⚠️ Error counting createdAt documents:', error.message);
@@ -325,19 +329,22 @@ const getSurveyResponses = async (req, res) => {
         documentsWithCreatedAtInRange: createdAtCount,
         requestedDateRange: {
           from: req.query.dateFrom ? new Date(req.query.dateFrom).toISOString() : null,
-          to: req.query.dateTo ? new Date(req.query.dateTo).toISOString() : null
-        }
+          to: req.query.dateTo ? new Date(req.query.dateTo).toISOString() : null,
+        },
       });
 
       // Sample a few documents to see their actual date field values
       try {
         const sampleDocs = await SurveyResponse.find({}).limit(3).lean();
-        console.log('📋 Sample Documents Date Fields:', sampleDocs.map(doc => ({
-          id: doc._id,
-          submittedAt: doc.submittedAt,
-          createdAt: doc.createdAt,
-          updatedAt: doc.updatedAt
-        })));
+        console.log(
+          '📋 Sample Documents Date Fields:',
+          sampleDocs.map((doc) => ({
+            id: doc._id,
+            submittedAt: doc.submittedAt,
+            createdAt: doc.createdAt,
+            updatedAt: doc.updatedAt,
+          }))
+        );
       } catch (error) {
         console.warn('⚠️ Error fetching sample documents:', error.message);
       }
@@ -347,7 +354,7 @@ const getSurveyResponses = async (req, res) => {
     const totalCount = await SurveyResponse.countDocuments(filters);
     console.log('🔢 Query Results Count:', {
       matchingDocuments: totalCount,
-      appliedFilters: filters
+      appliedFilters: filters,
     });
 
     // Log export request details
@@ -357,13 +364,13 @@ const getSurveyResponses = async (req, res) => {
         willReturnAllRecords: true,
         skipPagination: true,
         requestedLimit: requestedLimit,
-        actualQueryLimit: limit
+        actualQueryLimit: limit,
       });
     }
 
     // Get responses - optimized for export requests
     let query = SurveyResponse.find(filters).sort({ submittedAt: -1 });
-    
+
     if (isExportRequest) {
       // For exports: return ALL records, no pagination
       query = query.lean();
@@ -372,17 +379,21 @@ const getSurveyResponses = async (req, res) => {
       // For regular requests: use pagination
       query = query.skip(skip).limit(limit).lean();
     }
-    
+
     const responses = await query;
 
     const totalPages = isExportRequest ? 1 : Math.ceil(totalCount / limit);
 
     if (isExportRequest) {
-      console.log(`✅ EXPORT COMPLETE: Retrieved ALL ${responses.length} of ${totalCount} total survey responses`);
+      console.log(
+        `✅ EXPORT COMPLETE: Retrieved ALL ${responses.length} of ${totalCount} total survey responses`
+      );
       console.log(`📤 Export success: ${responses.length} records ready for Excel generation`);
     } else {
       console.log(`✅ Retrieved ${responses.length} of ${totalCount} total survey responses`);
-      console.log(`📊 Pagination info: page ${page}/${totalPages}, showing ${responses.length} items`);
+      console.log(
+        `📊 Pagination info: page ${page}/${totalPages}, showing ${responses.length} items`
+      );
     }
 
     if (responses.length > 0) {
@@ -394,36 +405,44 @@ const getSurveyResponses = async (req, res) => {
         dateFields: {
           submittedAt: responses[0].submittedAt,
           createdAt: responses[0].createdAt,
-          updatedAt: responses[0].updatedAt
-        }
+          updatedAt: responses[0].updatedAt,
+        },
       });
 
       // Show date range of returned results
       if (req.query.dateFrom || req.query.dateTo) {
-        const dates = responses.map(r => ({
-          id: r._id,
-          submittedAt: r.submittedAt,
-          createdAt: r.createdAt,
-          shopName: r.shopName
-        })).slice(0, 5); // Show first 5
-        
+        const dates = responses
+          .map((r) => ({
+            id: r._id,
+            submittedAt: r.submittedAt,
+            createdAt: r.createdAt,
+            shopName: r.shopName,
+          }))
+          .slice(0, 5); // Show first 5
+
         console.log('📅 Date Fields of Returned Results (first 5):', dates);
-        
+
         // Show date range summary
-        const submittedDates = responses.map(r => r.submittedAt).filter(Boolean).sort();
-        const createdDates = responses.map(r => r.createdAt).filter(Boolean).sort();
-        
+        const submittedDates = responses
+          .map((r) => r.submittedAt)
+          .filter(Boolean)
+          .sort();
+        const createdDates = responses
+          .map((r) => r.createdAt)
+          .filter(Boolean)
+          .sort();
+
         console.log('📊 Date Range Summary of Results:', {
           submittedAtRange: {
             earliest: submittedDates[0],
             latest: submittedDates[submittedDates.length - 1],
-            count: submittedDates.length
+            count: submittedDates.length,
           },
           createdAtRange: {
             earliest: createdDates[0],
             latest: createdDates[createdDates.length - 1],
-            count: createdDates.length
-          }
+            count: createdDates.length,
+          },
         });
       }
     }

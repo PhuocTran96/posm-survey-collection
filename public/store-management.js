@@ -31,7 +31,6 @@ class StoreManagement {
     this.loadStoreStats();
     this.loadStores();
     this.loadFilterOptions();
-    this.setupAuthUI();
   }
 
   async checkAuthentication() {
@@ -83,58 +82,6 @@ class StoreManagement {
   redirectToAdminLogin(reason) {
     console.log('Redirecting to admin login:', reason);
     if (!window.location.pathname.includes('admin-login.html')) {
-      window.location.replace('/admin-login.html');
-    }
-  }
-
-  setupAuthUI() {
-    // Add user info to the admin header
-    const adminHeader = document.querySelector('.nav-brand h1');
-    if (adminHeader && this.user) {
-      const userInfo = document.createElement('div');
-      userInfo.style.cssText =
-        'font-size: 12px; color: #64748b; font-weight: normal; margin-top: 4px;';
-      userInfo.textContent = `Logged in as: ${this.user.username} (${this.user.role})`;
-      adminHeader.appendChild(userInfo);
-    }
-
-    // Add Change Password and logout buttons
-    const navMenu = document.querySelector('.nav-menu');
-    if (navMenu) {
-      // Add Change Password link
-      const changePasswordBtn = document.createElement('a');
-      changePasswordBtn.href = '/change-password.html';
-      changePasswordBtn.className = 'nav-item';
-      changePasswordBtn.innerHTML = '🔐 Đổi mật khẩu';
-      changePasswordBtn.style.cssText = 'color: #0ea5e9; border: 1px solid #0ea5e9;';
-      navMenu.appendChild(changePasswordBtn);
-
-      // Add logout button
-      const logoutBtn = document.createElement('a');
-      logoutBtn.href = '#';
-      logoutBtn.className = 'nav-item logout';
-      logoutBtn.innerHTML = '🚪 Đăng xuất';
-      logoutBtn.style.cssText = 'color: #dc2626; border: 1px solid #dc2626;';
-      logoutBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        await this.logout();
-      });
-      navMenu.appendChild(logoutBtn);
-    }
-  }
-
-  async logout() {
-    try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.token}`,
-        },
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      localStorage.clear();
       window.location.replace('/admin-login.html');
     }
   }
@@ -1031,4 +978,6 @@ class StoreManagement {
 }
 
 // Initialize store management
-const storeManager = new StoreManagement();
+document.addEventListener('DOMContentLoaded', () => {
+  const storeManager = new StoreManagement();
+});

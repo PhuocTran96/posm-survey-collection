@@ -38,18 +38,21 @@ uploads/            # Temporary file uploads
 ## Installation
 
 1. Clone the repository:
+
 ```bash
 git clone <repository-url>
 cd posm-survey-collection
 ```
 
 2. Install dependencies:
+
 ```bash
 npm install
 ```
 
 3. Set up environment variables:
-Create a `.env` file with the following variables:
+   Create a `.env` file with the following variables:
+
 ```env
 PORT=3000
 MONGODB_URI=mongodb://localhost:27017/posm-surveys
@@ -62,16 +65,19 @@ AWS_REGION=your_aws_region
 ## Usage
 
 ### Development
+
 ```bash
 npm run dev
 ```
 
 ### Production
+
 ```bash
 npm start
 ```
 
 ### Data Management
+
 ```bash
 # Upload POSM data from CSV
 npm run upload-posm
@@ -86,6 +92,7 @@ npm run upload-posm-upsert
 ## API Endpoints
 
 ### Survey Routes
+
 - `GET /api/surveys` - Get all surveys
 - `POST /api/surveys` - Create new survey
 - `GET /api/surveys/:id` - Get specific survey
@@ -93,11 +100,13 @@ npm run upload-posm-upsert
 - `DELETE /api/surveys/:id` - Delete survey
 
 ### Admin Routes
+
 - `GET /api/admin/dashboard` - Admin dashboard data
 - `GET /api/admin/stores` - Get all stores
 - `POST /api/admin/stores` - Create store
 
 ### Upload Routes
+
 - `POST /api/upload/image` - Upload image files
 - `POST /api/upload/csv` - Upload CSV data
 

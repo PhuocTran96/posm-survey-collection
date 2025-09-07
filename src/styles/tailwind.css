@@ -1,0 +1,253 @@
+/* Tailwind CSS optimized for POSM Matrix */
+/* Only including the classes we actually use */
+
+/* Reset and base styles */
+* {
+  box-sizing: border-box;
+}
+
+/* Flexbox utilities */
+.flex { display: flex; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.space-x-1 > * + * { margin-left: 0.25rem; }
+.space-x-2 > * + * { margin-left: 0.5rem; }
+.space-x-4 > * + * { margin-left: 1rem; }
+
+/* Grid utilities */
+.grid { display: grid; }
+.grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.gap-3 { gap: 0.75rem; }
+.gap-4 { gap: 1rem; }
+
+/* Responsive grid for mobile */
+@media (max-width: 767px) {
+  .sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Layout */
+.relative { position: relative; }
+.absolute { position: absolute; }
+.bottom-0 { bottom: 0px; }
+.left-0 { left: 0px; }
+.right-0 { right: 0px; }
+
+/* Sizing */
+.h-1 { height: 0.25rem; }
+.h-4 { height: 1rem; }
+.h-8 { height: 2rem; }
+.h-32 { height: 8rem; }
+.h-64 { height: 16rem; }
+.h-full { height: 100%; }
+.w-4 { width: 1rem; }
+.w-8 { width: 2rem; }
+.min-w-16 { min-width: 4rem; }
+.min-h-96 { min-height: 24rem; }
+
+/* Spacing */
+.p-3 { padding: 0.75rem; }
+.p-4 { padding: 1rem; }
+.px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+.px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
+.px-10 { padding-left: 2.5rem; padding-right: 2.5rem; }
+.py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+.py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.pl-10 { padding-left: 2.5rem; }
+.pr-4 { padding-right: 1rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-4 { margin-bottom: 1rem; }
+.ml-3 { margin-left: 0.75rem; }
+.mr-2 { margin-right: 0.5rem; }
+.mt-2 { margin-top: 0.5rem; }
+.mt-3 { margin-top: 0.75rem; }
+.mt-4 { margin-top: 1rem; }
+.mx-auto { margin-left: auto; margin-right: auto; }
+
+/* Typography */
+.text-xs { font-size: 0.75rem; line-height: 1rem; }
+.text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+.text-2xl { font-size: 1.5rem; line-height: 2rem; }
+.font-medium { font-weight: 500; }
+.font-bold { font-weight: 700; }
+.text-center { text-align: center; }
+
+/* Colors */
+.text-white { color: rgb(255 255 255); }
+.text-gray-400 { color: rgb(156 163 175); }
+.text-gray-600 { color: rgb(75 85 99); }
+.text-gray-700 { color: rgb(55 65 81); }
+.text-gray-800 { color: rgb(31 41 55); }
+.text-gray-900 { color: rgb(17 24 39); }
+.text-blue-600 { color: rgb(37 99 235); }
+.text-green-600 { color: rgb(22 163 74); }
+.text-red-800 { color: rgb(153 27 27); }
+.text-yellow-800 { color: rgb(146 64 14); }
+
+/* Backgrounds */
+.bg-white { background-color: rgb(255 255 255); }
+.bg-gray-50 { background-color: rgb(249 250 251); }
+.bg-gray-300 { background-color: rgb(209 213 219); }
+.bg-gray-600 { background-color: rgb(75 85 99); }
+.bg-gray-700 { background-color: rgb(55 65 81); }
+.bg-blue-600 { background-color: rgb(37 99 235); }
+.bg-blue-700 { background-color: rgb(29 78 216); }
+.bg-green-500 { background-color: rgb(34 197 94); }
+.bg-orange-500 { background-color: rgb(249 115 22); }
+.bg-red-50 { background-color: rgb(254 242 242); }
+.bg-red-100 { background-color: rgb(254 226 226); }
+.bg-red-200 { background-color: rgb(254 202 202); }
+.bg-red-500 { background-color: rgb(239 68 68); }
+.bg-yellow-50 { background-color: rgb(254 252 232); }
+.bg-yellow-200 { background-color: rgb(254 240 138); }
+.bg-black { background-color: rgb(0 0 0); }
+
+/* Opacity */
+.bg-opacity-20 { --tw-bg-opacity: 0.2; }
+.bg-opacity-50 { --tw-bg-opacity: 0.5; }
+
+/* Borders */
+.border { border-width: 1px; }
+.border-gray-300 { border-color: rgb(209 213 219); }
+.border-red-200 { border-color: rgb(254 202 202); }
+.border-yellow-200 { border-color: rgb(254 240 138); }
+.rounded { border-radius: 0.25rem; }
+.rounded-lg { border-radius: 0.5rem; }
+.rounded-b { border-bottom-right-radius: 0.25rem; border-bottom-left-radius: 0.25rem; }
+
+/* Shadows */
+.shadow-sm { 
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+/* Focus states */
+.focus\:ring-2:focus { --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color); --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color); box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000); }
+.focus\:ring-blue-500:focus { --tw-ring-color: rgb(59 130 246); }
+.focus\:border-blue-500:focus { border-color: rgb(59 130 246); }
+
+/* Hover states */
+.hover\:bg-gray-50:hover { background-color: rgb(249 250 251); }
+.hover\:bg-gray-200:hover { background-color: rgb(229 231 235); }
+.hover\:bg-blue-700:hover { background-color: rgb(29 78 216); }
+.hover\:bg-gray-700:hover { background-color: rgb(55 65 81); }
+
+/* Transitions */
+.transition-all { transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); }
+.duration-300 { transition-duration: 300ms; }
+
+/* Animation */
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Disabled states */
+.disabled\:opacity-50:disabled { opacity: 0.5; }
+.disabled\:cursor-not-allowed:disabled { cursor: not-allowed; }
+
+/* Z-index utilities */
+.z-10 { z-index: 10; }
+
+/* Pointer events */
+.pointer-events-none { pointer-events: none; }
+
+/* Width utilities */
+.w-full { width: 100%; }
+
+/* Additional positioning */
+.top-2\.5 { top: 0.625rem; }
+.top-1\/2 { top: 50%; }
+.left-3 { left: 0.75rem; }
+
+/* Transform utilities for perfect centering */
+.transform { transform: var(--tw-transform); }
+.-translate-y-1\/2 { 
+  --tw-translate-y: -50%; 
+  transform: translateY(var(--tw-translate-y));
+}
+
+/* Flexbox centering utilities */
+.justify-start { justify-content: flex-start; }
+
+/* Custom component styles for POSM Matrix */
+.posm-matrix-container {
+  min-height: 400px;
+}
+
+.status-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 500;
+  text-align: center;
+  position: relative;
+  min-width: 4rem;
+}
+
+.status-complete {
+  background-color: rgb(34 197 94);
+  color: rgb(255 255 255);
+}
+
+.status-partial {
+  background-color: rgb(249 115 22);
+  color: rgb(255 255 255);
+}
+
+.status-none {
+  background-color: rgb(239 68 68);
+  color: rgb(255 255 255);
+}
+
+.status-not-applicable {
+  background-color: rgb(209 213 219);
+  color: rgb(75 85 99);
+}
+
+.progress-bar-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 0.25rem;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-bottom-right-radius: 0.25rem;
+  border-bottom-left-radius: 0.25rem;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.5);
+  border-bottom-right-radius: 0.25rem;
+  border-bottom-left-radius: 0.25rem;
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Ensure AG-Grid styles work well */
+.ag-theme-alpine {
+  font-family: inherit;
+}
+
+.ag-theme-alpine .ag-header {
+  background: #f8fafc;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.ag-theme-alpine .ag-row {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.ag-theme-alpine .ag-row:hover {
+  background: #f9fafb;
+}

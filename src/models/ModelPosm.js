@@ -14,6 +14,11 @@ const modelPosmSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    category: {
+      type: String,
+      required: false,
+      default: null,
+    },
   },
   {
     timestamps: true,

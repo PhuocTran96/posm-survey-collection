@@ -143,13 +143,14 @@ class SurveyApp {
   async loadAndDisplayAllStores() {
     try {
       console.log('🏪 Loading all assigned stores for user');
-      
+
       // Show loading state
       const storeListContainer = document.getElementById('storeList');
       if (storeListContainer) {
-        storeListContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">Loading stores...</div>';
+        storeListContainer.innerHTML =
+          '<div style="padding: 20px; text-align: center; color: #666;">Loading stores...</div>';
       }
-      
+
       // First try to get stores from user data
       if (this.assignedStores && this.assignedStores.length > 0) {
         console.log('✅ Using stores from user data:', this.assignedStores.length);
@@ -198,18 +199,21 @@ class SurveyApp {
   // Display the store list with radio buttons
   displayStoreList(stores) {
     const storeListContainer = document.getElementById('storeList');
-    
+
     if (!storeListContainer) {
       console.error('❌ storeList element not found');
       return;
     }
 
     if (!stores || stores.length === 0) {
-      storeListContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">No stores assigned</div>';
+      storeListContainer.innerHTML =
+        '<div style="padding: 20px; text-align: center; color: #666;">No stores assigned</div>';
       return;
     }
 
-    const html = stores.map(store => `
+    const html = stores
+      .map(
+        (store) => `
       <div class="store-item" data-store-id="${store._id || store.id}">
         <input type="radio" 
                name="storeSelection" 
@@ -221,32 +225,32 @@ class SurveyApp {
           <div class="store-id">${this.escapeHtml(store.store_id)}</div>
         </div>
       </div>
-    `).join('');
-    
+    `
+      )
+      .join('');
+
     storeListContainer.innerHTML = html;
     console.log('✅ Displayed', stores.length, 'stores in list');
   }
 
   // Handle store selection via radio button
   selectStore(storeId) {
-    const selectedStore = this.assignedStores.find(store => 
-      (store._id || store.id) === storeId
-    );
-    
+    const selectedStore = this.assignedStores.find((store) => (store._id || store.id) === storeId);
+
     if (selectedStore) {
       console.log('🏪 Selected store:', selectedStore.store_name);
       this.selectedShop = selectedStore;
       this.shopSearchSelected = JSON.stringify(selectedStore);
-      
+
       // Update search input to show selected store
       const shopInput = document.getElementById('shopSearchInput');
       if (shopInput) {
         shopInput.value = `${selectedStore.store_name} (${selectedStore.store_id})`;
       }
-      
+
       // Show selected shop info
       this.showSelectedShopInfo(selectedStore);
-      
+
       // Enable continue button
       const nextBtn = document.getElementById('nextToStep2');
       if (nextBtn) {
@@ -258,11 +262,11 @@ class SurveyApp {
   // Filter store list based on search input
   filterStoreList(query) {
     const storeItems = document.querySelectorAll('.store-item');
-    
-    storeItems.forEach(item => {
+
+    storeItems.forEach((item) => {
       const storeName = item.querySelector('.store-name').textContent.toLowerCase();
       const storeId = item.querySelector('.store-id').textContent.toLowerCase();
-      
+
       const matches = storeName.includes(query) || storeId.includes(query);
       item.style.display = matches ? 'flex' : 'none';
     });
@@ -328,8 +332,11 @@ class SurveyApp {
 
       // Handle different types of authentication failures
       if (response.status === 401) {
-        const errorData = await response.clone().json().catch(() => ({}));
-        
+        const errorData = await response
+          .clone()
+          .json()
+          .catch(() => ({}));
+
         if (errorData.code === 'SESSION_TIMEOUT') {
           // Session timeout - redirect to login immediately
           this.clearAuthData();
@@ -338,7 +345,7 @@ class SurveyApp {
         } else if (retryCount === 0) {
           // Token expired, try to refresh token once
           console.log('Token expired, attempting refresh...');
-          
+
           const refreshSuccess = await this.refreshToken();
           if (refreshSuccess) {
             // Retry the original request with new token
@@ -437,10 +444,11 @@ class SurveyApp {
     const modelInput = document.getElementById('modelSearchInput');
     const suggestionsBox = document.getElementById('modelSuggestions');
     const addModelBtn = document.getElementById('addModelBtn');
-    
+
     if (modelInput) modelInput.addEventListener('input', (e) => this.onModelInput(e));
     if (modelInput) modelInput.addEventListener('keydown', (e) => this.onModelInputKeydown(e));
-    if (suggestionsBox) suggestionsBox.addEventListener('mousedown', (e) => this.onModelSuggestionClick(e));
+    if (suggestionsBox)
+      suggestionsBox.addEventListener('mousedown', (e) => this.onModelSuggestionClick(e));
     if (addModelBtn) addModelBtn.addEventListener('click', () => this.onAddModel());
   }
 
@@ -462,7 +470,7 @@ class SurveyApp {
   async onShopInput(e) {
     const value = e.target.value.trim().toLowerCase();
     this.shopSearchValue = value;
-    
+
     // If user clears the input, reset selection
     if (!value) {
       this.shopSearchSelected = '';
@@ -471,11 +479,11 @@ class SurveyApp {
         nextBtn.disabled = true;
       }
       this.hideSelectedShopInfo();
-      
+
       // Clear any radio button selections
       const radioButtons = document.querySelectorAll('input[name="storeSelection"]');
-      radioButtons.forEach(radio => radio.checked = false);
-      
+      radioButtons.forEach((radio) => (radio.checked = false));
+
       // Show all stores
       this.filterStoreList('');
       return;
@@ -624,37 +632,37 @@ class SurveyApp {
       infoDiv.style.display = 'none';
     }
   }
-  
+
   // Update scroll indicators based on scroll position
   updateScrollIndicators(listDiv) {
     if (!listDiv) return;
-    
+
     const canScrollLeft = listDiv.scrollLeft > 0;
     const canScrollRight = listDiv.scrollLeft < listDiv.scrollWidth - listDiv.clientWidth;
-    
+
     listDiv.classList.toggle('scroll-left', canScrollLeft);
     listDiv.classList.toggle('scroll-right', canScrollRight);
   }
-  
+
   // Keyboard navigation for selected models list with horizontal scrolling
   addSelectedModelsKeyboardNavigation() {
     const listDiv = document.getElementById('selectedModelsList');
     if (!listDiv) return;
-    
+
     // Make the container focusable for keyboard navigation
     listDiv.setAttribute('tabindex', '0');
     listDiv.setAttribute('role', 'list');
     listDiv.setAttribute('aria-label', 'Danh sách models đã chọn, sử dụng mũi tên để cuộn ngang');
-    
+
     // Add scroll event listener for indicators
     listDiv.addEventListener('scroll', () => {
       this.updateScrollIndicators(listDiv);
     });
-    
+
     // Add keyboard event listener
     listDiv.addEventListener('keydown', (e) => {
       const scrollAmount = 100; // pixels to scroll
-      
+
       switch (e.key) {
         case 'ArrowLeft':
           e.preventDefault();
@@ -674,7 +682,7 @@ class SurveyApp {
           break;
       }
     });
-    
+
     // Focus management for delete buttons
     const deleteButtons = listDiv.querySelectorAll('.btn-icon-delete');
     deleteButtons.forEach((btn) => {
@@ -1272,7 +1280,7 @@ class SurveyApp {
     this.modelSearchValue = value;
     this.modelSearchSelected = '';
     document.getElementById('addModelBtn').disabled = true;
-    
+
     if (!value) {
       this.hideModelSuggestions();
       return;
@@ -1422,7 +1430,9 @@ class SurveyApp {
               console.log('✅ POSM data loaded from general list for model:', model);
             } else {
               console.error('❌ No POSM data found for model:', model, 'Response:', modelData);
-              alert(`Không tìm thấy POSM cho model "${model}". Model sẽ bị loại bỏ khỏi danh sách.`);
+              alert(
+                `Không tìm thấy POSM cho model "${model}". Model sẽ bị loại bỏ khỏi danh sách.`
+              );
               // Remove the model from selected list
               this.selectedModels = this.selectedModels.filter((m) => m !== model);
               console.log('❌ Model removed due to no POSM data');
@@ -1480,16 +1490,21 @@ class SurveyApp {
       const modelsHtml = this.selectedModels
         .map((model) => {
           // Sanitize model name to prevent XSS
-          const sanitizedModel = model.replace(/[<>&"]/g, function(match) {
-            switch(match) {
-              case '<': return '&lt;';
-              case '>': return '&gt;';
-              case '&': return '&amp;';
-              case '"': return '&quot;';
-              default: return match;
+          const sanitizedModel = model.replace(/[<>&"]/g, function (match) {
+            switch (match) {
+              case '<':
+                return '&lt;';
+              case '>':
+                return '&gt;';
+              case '&':
+                return '&amp;';
+              case '"':
+                return '&quot;';
+              default:
+                return match;
             }
           });
-          
+
           return `
                 <span class="selected-model-item" data-model="${sanitizedModel}" title="Model: ${sanitizedModel}">
                     <strong>${sanitizedModel}</strong>
@@ -1498,9 +1513,9 @@ class SurveyApp {
             `;
         })
         .join('');
-      
+
       listDiv.innerHTML = modelsHtml;
-      
+
       // Auto-scroll to the latest added model (rightmost) and setup scroll indicators
       setTimeout(() => {
         if (listDiv.scrollWidth > listDiv.clientWidth) {
@@ -1565,7 +1580,7 @@ class SurveyApp {
         this.renderSelectedModels();
       });
     });
-    
+
     // Add keyboard navigation for selected models list
     this.addSelectedModelsKeyboardNavigation();
     // Bind POSM checkboxes
@@ -1608,7 +1623,7 @@ class StickyElements {
   setupStickyElements() {
     // Clear existing elements to prevent duplicates
     this.stickyElements = [];
-    
+
     // Try new combined header first, fallback to legacy elements
     const combinedHeader = document.querySelector('.combined-sticky-header');
     if (combinedHeader) {
@@ -1616,34 +1631,34 @@ class StickyElements {
         element: combinedHeader,
         originalTop: null,
         isSticky: false,
-        className: 'combined-sticky-header'
+        className: 'combined-sticky-header',
       });
       console.log('📋 Using combined sticky header');
     } else {
       // Fallback to legacy separate elements
       const selectedInfo = document.querySelector('.selected-info');
       const stickySearch = document.querySelector('.sticky-search-section');
-      
+
       if (selectedInfo) {
         this.stickyElements.push({
           element: selectedInfo,
           originalTop: null,
           isSticky: false,
-          className: 'selected-info'
+          className: 'selected-info',
         });
       }
-      
+
       if (stickySearch) {
         this.stickyElements.push({
           element: stickySearch,
           originalTop: null,
           isSticky: false,
-          className: 'sticky-search-section'
+          className: 'sticky-search-section',
         });
       }
       console.log('📋 Using legacy separate sticky elements');
     }
-    
+
     console.log('📋 Setup sticky elements:', this.stickyElements.length);
   }
 
@@ -1651,23 +1666,23 @@ class StickyElements {
     if (this.isEnabled) return;
     this.isEnabled = true;
     console.log('🔧 Enabling sticky behavior for', this.stickyElements.length, 'elements');
-    
+
     // Reset elements
-    this.stickyElements.forEach(item => {
+    this.stickyElements.forEach((item) => {
       item.originalTop = item.element.offsetTop;
       item.isSticky = false;
       console.log(`  📍 Element ${item.className} originalTop:`, item.originalTop);
     });
-    
+
     this.handleScroll();
   }
 
   disable() {
     if (!this.isEnabled) return;
     this.isEnabled = false;
-    
+
     // Reset all elements to normal positioning
-    this.stickyElements.forEach(item => {
+    this.stickyElements.forEach((item) => {
       if (item.isSticky) {
         item.element.style.position = '';
         item.element.style.top = '';
@@ -1684,7 +1699,7 @@ class StickyElements {
 
   bindScrollListener() {
     let ticking = false;
-    
+
     const scrollHandler = () => {
       if (!ticking && this.isEnabled) {
         requestAnimationFrame(() => {
@@ -1694,22 +1709,22 @@ class StickyElements {
         ticking = true;
       }
     };
-    
+
     window.addEventListener('scroll', scrollHandler, { passive: true });
   }
 
   handleScroll() {
     if (!this.isEnabled) return;
-    
+
     const scrollY = window.pageYOffset;
-    
-    this.stickyElements.forEach(item => {
+
+    this.stickyElements.forEach((item) => {
       if (item.originalTop === null) {
         item.originalTop = item.element.offsetTop;
       }
-      
+
       const shouldStick = scrollY >= item.originalTop;
-      
+
       if (shouldStick && !item.isSticky) {
         // Make sticky
         console.log(`🔗 Making ${item.className} sticky`);
@@ -1717,13 +1732,13 @@ class StickyElements {
         item.element.style.position = 'fixed';
         item.element.style.top = '0px';
         item.element.style.left = rect.left + 'px';
-        item.element.style.right = (window.innerWidth - rect.right) + 'px';
+        item.element.style.right = window.innerWidth - rect.right + 'px';
         item.element.style.width = rect.width + 'px';
-        
+
         // Fix: Remove negative margins that cause alignment shift
         item.element.style.marginLeft = '0';
         item.element.style.marginRight = '0';
-        
+
         // Set z-index based on element type
         if (item.className === 'combined-sticky-header') {
           item.element.style.zIndex = '200';
@@ -1752,7 +1767,7 @@ class StickyElements {
 
   refresh() {
     // Recalculate positions
-    this.stickyElements.forEach(item => {
+    this.stickyElements.forEach((item) => {
       if (!item.isSticky) {
         item.originalTop = item.element.offsetTop;
       }
@@ -1770,7 +1785,7 @@ document.addEventListener('DOMContentLoaded', () => {
   stickyManager = new StickyElements();
   window.stickyManager = stickyManager; // Make it globally accessible
   stickyManager.init();
-  
+
   // Enable sticky behavior when step 2 becomes active
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
@@ -1790,10 +1805,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
-  
+
   // Observe step changes
   const steps = document.querySelectorAll('.step');
-  steps.forEach(step => {
+  steps.forEach((step) => {
     observer.observe(step, { attributes: true });
   });
 });

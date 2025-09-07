@@ -1,117 +1,125 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Redirecting - Menu</title>
     <style>
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: #f1f5f9;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
+      body {
+        font-family:
+          'Inter',
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        background: #f1f5f9;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        margin: 0;
+      }
+      .redirect-container {
+        text-align: center;
+        background: white;
+        padding: 40px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        max-width: 500px;
+      }
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #2563eb;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
         }
-        .redirect-container {
-            text-align: center;
-            background: white;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            max-width: 500px;
+        100% {
+          transform: rotate(360deg);
         }
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #2563eb;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        h1 {
-            color: #2563eb;
-            margin-bottom: 10px;
-        }
-        p {
-            color: #64748b;
-            margin-bottom: 20px;
-        }
-        .redirect-links {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-        .redirect-links a {
-            padding: 12px 24px;
-            background: #2563eb;
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-        .redirect-links a:hover {
-            background: #1d4ed8;
-            transform: translateY(-2px);
-        }
-        .redirect-links a.secondary {
-            background: #64748b;
-        }
-        .redirect-links a.secondary:hover {
-            background: #475569;
-        }
+      }
+      h1 {
+        color: #2563eb;
+        margin-bottom: 10px;
+      }
+      p {
+        color: #64748b;
+        margin-bottom: 20px;
+      }
+      .redirect-links {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .redirect-links a {
+        padding: 12px 24px;
+        background: #2563eb;
+        color: white;
+        text-decoration: none;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+      }
+      .redirect-links a:hover {
+        background: #1d4ed8;
+        transform: translateY(-2px);
+      }
+      .redirect-links a.secondary {
+        background: #64748b;
+      }
+      .redirect-links a.secondary:hover {
+        background: #475569;
+      }
     </style>
     <script src="auth-utils.js"></script>
     <script>
-        // Wait for auth manager to be available
-        document.addEventListener('DOMContentLoaded', () => {
-            if (window.authManager) {
-                window.authManager.init();
-            }
-            
-            // Check if user is authenticated admin and redirect accordingly
-            const user = JSON.parse(localStorage.getItem('user') || '{}');
-            const token = localStorage.getItem('accessToken');
-            
-            console.log('Admin.html redirect - User:', user, 'Token exists:', !!token);
-            
-            if (token && user.role === 'admin') {
-                // Redirect to survey results (main admin page)
-                console.log('Redirecting admin to survey-results.html');
-                window.location.replace('survey-results.html');
-            } else if (token && user.role) {
-                // Non-admin user, redirect to user page
-                console.log('Non-admin user, redirecting to main page');
-                window.location.replace('/');
-            } else {
-                // No valid token, redirect to admin login
-                console.log('No valid token, redirecting to admin login');
-                window.location.replace('admin-login.html');
-            }
-        });
-    </script>
-</head>
-<body>
-    <div class="redirect-container">
-        <div class="spinner"></div>
-        <h1>📊 Menu</h1>
-        <p>Hệ thống admin đã được tách thành hai trang riêng biệt:</p>
-        <div class="redirect-links">
-            <a href="survey-results.html">📋 Kết quả khảo sát</a>
-            <a href="data-upload.html" class="secondary">📤 Quản lý dữ liệu</a>
-        </div>
-        <p style="margin-top: 20px; font-size: 0.9rem;">
-            Đang tự động chuyển đến trang Kết quả khảo sát trong 3 giây...
-        </p>
+      // Wait for auth manager to be available
+      document.addEventListener('DOMContentLoaded', () => {
+        if (window.authManager) {
+          window.authManager.init();
+        }
 
+        // Check if user is authenticated admin and redirect accordingly
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const token = localStorage.getItem('accessToken');
+
+        console.log('Admin.html redirect - User:', user, 'Token exists:', !!token);
+
+        if (token && user.role === 'admin') {
+          // Redirect to survey results (main admin page)
+          console.log('Redirecting admin to survey-results.html');
+          window.location.replace('survey-results.html');
+        } else if (token && user.role) {
+          // Non-admin user, redirect to user page
+          console.log('Non-admin user, redirecting to main page');
+          window.location.replace('/');
+        } else {
+          // No valid token, redirect to admin login
+          console.log('No valid token, redirecting to admin login');
+          window.location.replace('admin-login.html');
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <div class="redirect-container">
+      <div class="spinner"></div>
+      <h1>📊 Menu</h1>
+      <p>Hệ thống admin đã được tách thành hai trang riêng biệt:</p>
+      <div class="redirect-links">
+        <a href="survey-results.html">📋 Kết quả khảo sát</a>
+        <a href="data-upload.html" class="secondary">📤 Quản lý dữ liệu</a>
+      </div>
+      <p style="margin-top: 20px; font-size: 0.9rem">
+        Đang tự động chuyển đến trang Kết quả khảo sát trong 3 giây...
+      </p>
     </div>
-</body>
+  </body>
 </html>

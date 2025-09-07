@@ -569,7 +569,7 @@ const getAssignedStores = async (req, res) => {
     // Get actual Store documents that match user's assigned stores
     const assignedStores = await Store.find({
       _id: { $in: assignedStoreIds },
-      isActive: true
+      isActive: true,
     })
       .select('store_id store_name channel region province')
       .sort({ store_name: 1 });

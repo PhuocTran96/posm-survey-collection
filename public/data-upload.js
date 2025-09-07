@@ -304,6 +304,14 @@ class DataUploadApp {
         this.loadUploadStats();
       });
     }
+
+    // Export POSM button
+    const exportPosmBtn = document.getElementById('exportPosmBtn');
+    if (exportPosmBtn) {
+      exportPosmBtn.addEventListener('click', () => {
+        this.handleExportPOSM();
+      });
+    }
   }
 
   async handleUpload(type) {
@@ -410,6 +418,90 @@ class DataUploadApp {
       uploadBtn.classList.remove('loading');
       uploadBtn.disabled = false;
     }
+  }
+
+  async handleExportPOSM() {
+    const exportBtn = document.getElementById('exportPosmBtn');
+    const btnText = exportBtn.querySelector('.btn-text');
+    const btnLoading = exportBtn.querySelector('.btn-loading');
+
+    try {
+      // Show loading state
+      exportBtn.disabled = true;
+      btnText.style.display = 'none';
+      btnLoading.style.display = 'inline-flex';
+
+      const response = await this.authenticatedFetch('/api/data-upload/export/posm');
+
+      if (!response) {
+        throw new Error('Authentication failed');
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Export failed');
+      }
+
+      // Create download link
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'posm_export.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      // Show success notification
+      this.showNotification('✅ POSM data exported successfully!', 'success');
+
+    } catch (error) {
+      console.error('Export error:', error);
+      this.showNotification('❌ Export failed: ' + error.message, 'error');
+    } finally {
+      // Hide loading state
+      exportBtn.disabled = false;
+      btnText.style.display = 'inline';
+      btnLoading.style.display = 'none';
+    }
+  }
+
+  showNotification(message, type) {
+    // Create notification element if it doesn't exist
+    let notification = document.getElementById('notification');
+    if (!notification) {
+      notification = document.createElement('div');
+      notification.id = 'notification';
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 16px;
+        border-radius: 6px;
+        color: white;
+        font-weight: 500;
+        z-index: 1000;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      `;
+      document.body.appendChild(notification);
+    }
+
+    // Set message and style based on type
+    notification.textContent = message;
+    notification.style.backgroundColor = type === 'success' ? '#22c55e' : '#ef4444';
+    notification.style.opacity = '1';
+
+    // Hide after 3 seconds
+    setTimeout(() => {
+      notification.style.opacity = '0';
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 300);
+    }, 3000);
   }
 
   showUploadResult(type, status, result) {

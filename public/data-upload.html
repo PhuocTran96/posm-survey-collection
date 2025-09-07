@@ -1,207 +1,210 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Data Upload - Menu</title>
-    <link rel="stylesheet" href="styles-admin.css">
-</head>
-<body>
+    <link rel="stylesheet" href="styles-admin.css" />
+  </head>
+  <body>
     <div class="admin-container">
-        <!-- Navigation -->
-        <nav class="admin-nav">
-            <div class="nav-brand">
-                <h1>📊 Menu</h1>
-            </div>
-            <div class="nav-menu">
-                <a href="survey-results.html" class="nav-item">
-                    📋 Kết quả khảo sát
-                </a>
-                <a href="data-upload.html" class="nav-item active">
-                    📤 Quản lý dữ liệu
-                </a>
-                <a href="user-management.html" class="nav-item">
-                    👥 Quản lý người dùng
-                </a>
-                <a href="store-management.html" class="nav-item">
-                    🏪 Quản lý cửa hàng
-                </a>
-                <a href="display-management.html" class="nav-item">
-                    🖥️ Quản lý Display
-                </a>
-            </div>
-            <div class="nav-mobile-toggle" id="navMobileToggle">
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
-        </nav>
+      <!-- Navigation -->
+      <nav class="admin-nav">
+        <div class="nav-brand">
+          <h1>📊 Menu</h1>
+        </div>
+        <div class="nav-menu">
+          <a href="survey-results.html" class="nav-item" title="Kết quả khảo sát"> 📋 </a>
+          <a href="data-upload.html" class="nav-item active" title="Quản lý dữ liệu"> 📤 </a>
+          <a href="user-management.html" class="nav-item" title="Quản lý người dùng"> 👥 </a>
+          <a href="store-management.html" class="nav-item" title="Quản lý cửa hàng"> 🏪 </a>
+          <a href="display-management.html" class="nav-item" title="Quản lý Display"> 🖥️ </a>
+          <a href="#" id="logout-btn" class="nav-item logout-btn" title="Đăng xuất"> 🚪 </a>
+        </div>
+        <div class="nav-mobile-toggle" id="navMobileToggle">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </nav>
 
-        <!-- Page Header -->
-        <div class="page-header">
-            <div class="page-header-content">
-                <h1>📤 Quản lý dữ liệu hệ thống</h1>
-                <p>Upload và quản lý dữ liệu Store, Model và POSM</p>
-            </div>
+      <!-- Page Header -->
+      <div class="page-header">
+        <div class="page-header-content">
+          <h1>📤 Quản lý dữ liệu hệ thống</h1>
+          <p>Upload và quản lý dữ liệu Store, Model và POSM</p>
+        </div>
+      </div>
+
+      <!-- Upload Section -->
+      <div class="upload-section">
+        <!-- Upload Tabs -->
+        <div class="upload-tabs">
+          <button class="upload-tab active" data-tab="stores">🏪 Stores</button>
+          <button class="upload-tab" data-tab="posm">📦 POSM</button>
+          <button class="upload-tab" data-tab="stats">📊 Thống kê</button>
         </div>
 
-        <!-- Upload Section -->
-        <div class="upload-section">
-            <!-- Upload Tabs -->
-            <div class="upload-tabs">
-                <button class="upload-tab active" data-tab="stores">🏪 Stores</button>
-                <button class="upload-tab" data-tab="posm">📦 POSM</button>
-                <button class="upload-tab" data-tab="stats">📊 Thống kê</button>
+        <!-- Stores Upload Panel -->
+        <div class="upload-panel active" id="storesPanel">
+          <div class="upload-card">
+            <div class="upload-card-header">
+              <h3>🏪 Upload Stores Data</h3>
+              <p>Upload file CSV chứa thông tin Store (Name, Province, Leader)</p>
             </div>
 
-            <!-- Stores Upload Panel -->
-            <div class="upload-panel active" id="storesPanel">
-                <div class="upload-card">
-                    <div class="upload-card-header">
-                        <h3>🏪 Upload Stores Data</h3>
-                        <p>Upload file CSV chứa thông tin Store (Name, Province, Leader)</p>
-                    </div>
-                    
-                    <form id="storesUploadForm" class="upload-form">
-                        <div class="upload-file-area">
-                            <div class="file-drop-zone" id="storesDropZone">
-                                <div class="file-drop-content">
-                                    <div class="file-icon">📄</div>
-                                    <p><strong>Kéo thả file CSV vào đây</strong></p>
-                                    <p>hoặc <span class="file-browse-link">chọn file</span></p>
-                                    <small>Chỉ chấp nhận file .csv (tối đa 10MB)</small>
-                                </div>
-                                <input type="file" id="storesFileInput" accept=".csv" style="display: none;">
-                            </div>
-                            <div class="selected-file" id="storesSelectedFile" style="display: none;">
-                                <span class="file-name"></span>
-                                <button type="button" class="file-remove">×</button>
-                            </div>
-                        </div>
-                        
-                        <div class="upload-options">
-                            <div class="option-group">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="storesClearExisting" name="clearExisting">
-                                    <span class="checkmark"></span>
-                                    Xóa tất cả dữ liệu cũ trước khi upload
-                                </label>
-                            </div>
-                            <div class="option-group">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="storesSkipDuplicates" name="skipDuplicates" checked>
-                                    <span class="checkmark"></span>
-                                    Bỏ qua các bản ghi trùng lặp
-                                </label>
-                            </div>
-                        </div>
-                        
-                        <div class="upload-actions">
-                            <button type="submit" class="btn btn-primary upload-btn" disabled>
-                                <span class="btn-text">📤 Upload Stores</span>
-                                <span class="btn-loading" style="display: none;">
-                                    <span class="spinner"></span> Đang upload...
-                                </span>
-                            </button>
-                        </div>
-                    </form>
-                    
-                    <div class="upload-result" id="storesResult" style="display: none;"></div>
+            <form id="storesUploadForm" class="upload-form">
+              <div class="upload-file-area">
+                <div class="file-drop-zone" id="storesDropZone">
+                  <div class="file-drop-content">
+                    <div class="file-icon">📄</div>
+                    <p><strong>Kéo thả file CSV vào đây</strong></p>
+                    <p>hoặc <span class="file-browse-link">chọn file</span></p>
+                    <small>Chỉ chấp nhận file .csv (tối đa 10MB)</small>
+                  </div>
+                  <input type="file" id="storesFileInput" accept=".csv" style="display: none" />
                 </div>
-            </div>
+                <div class="selected-file" id="storesSelectedFile" style="display: none">
+                  <span class="file-name"></span>
+                  <button type="button" class="file-remove">×</button>
+                </div>
+              </div>
 
-            <!-- POSM Upload Panel -->
-            <div class="upload-panel" id="posmPanel">
-                <div class="upload-card">
-                    <div class="upload-card-header">
-                        <h3>📦 Upload POSM Data</h3>
-                        <p>Upload file CSV chứa thông tin Model và POSM (model, posm, posm_name)</p>
-                    </div>
-                    
-                    <form id="posmUploadForm" class="upload-form">
-                        <div class="upload-file-area">
-                            <div class="file-drop-zone" id="posmDropZone">
-                                <div class="file-drop-content">
-                                    <div class="file-icon">📄</div>
-                                    <p><strong>Kéo thả file CSV vào đây</strong></p>
-                                    <p>hoặc <span class="file-browse-link">chọn file</span></p>
-                                    <small>Chỉ chấp nhận file .csv (tối đa 10MB)</small>
-                                </div>
-                                <input type="file" id="posmFileInput" accept=".csv" style="display: none;">
-                            </div>
-                            <div class="selected-file" id="posmSelectedFile" style="display: none;">
-                                <span class="file-name"></span>
-                                <button type="button" class="file-remove">×</button>
-                            </div>
-                        </div>
-                        
-                        <div class="upload-options">
-                            <div class="option-group">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="posmClearExisting" name="clearExisting">
-                                    <span class="checkmark"></span>
-                                    Xóa tất cả dữ liệu cũ trước khi upload
-                                </label>
-                            </div>
-                            <div class="option-group">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="posmSkipDuplicates" name="skipDuplicates" checked>
-                                    <span class="checkmark"></span>
-                                    Bỏ qua các bản ghi trùng lặp
-                                </label>
-                            </div>
-                            <div class="option-group">
-                                <label for="posmUpdateMode">Chế độ cập nhật:</label>
-                                <select id="posmUpdateMode" name="updateMode">
-                                    <option value="upsert">Upsert (Thêm mới hoặc cập nhật)</option>
-                                    <option value="insert">Chỉ thêm mới</option>
-                                    <option value="update">Chỉ cập nhật</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div class="upload-actions">
-                            <button type="submit" class="btn btn-primary upload-btn" disabled>
-                                <span class="btn-text">📦 Upload POSM</span>
-                                <span class="btn-loading" style="display: none;">
-                                    <span class="spinner"></span> Đang upload...
-                                </span>
-                            </button>
-                        </div>
-                    </form>
-                    
-                    <div class="upload-result" id="posmResult" style="display: none;"></div>
+              <div class="upload-options">
+                <div class="option-group">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="storesClearExisting" name="clearExisting" />
+                    <span class="checkmark"></span>
+                    Xóa tất cả dữ liệu cũ trước khi upload
+                  </label>
                 </div>
-            </div>
+                <div class="option-group">
+                  <label class="checkbox-label">
+                    <input
+                      type="checkbox"
+                      id="storesSkipDuplicates"
+                      name="skipDuplicates"
+                      checked
+                    />
+                    <span class="checkmark"></span>
+                    Bỏ qua các bản ghi trùng lặp
+                  </label>
+                </div>
+              </div>
 
-            <!-- Statistics Panel -->
-            <div class="upload-panel" id="statsPanel">
-                <div class="upload-card">
-                    <div class="upload-card-header">
-                        <h3>📊 Thống kê dữ liệu</h3>
-                        <p>Xem thông tin tổng quan về dữ liệu đã upload</p>
-                    </div>
-                    
-                    <div class="upload-stats" id="uploadStats">
-                        <!-- Stats will be loaded here -->
-                    </div>
-                    
-                    <div class="upload-actions">
-                        <button type="button" class="btn btn-secondary" id="refreshStats">
-                            🔄 Làm mới thống kê
-                        </button>
-                    </div>
-                </div>
-            </div>
+              <div class="upload-actions">
+                <button type="submit" class="btn btn-primary upload-btn" disabled>
+                  <span class="btn-text">📤 Upload Stores</span>
+                  <span class="btn-loading" style="display: none">
+                    <span class="spinner"></span> Đang upload...
+                  </span>
+                </button>
+              </div>
+            </form>
+
+            <div class="upload-result" id="storesResult" style="display: none"></div>
+          </div>
         </div>
 
-        <!-- Loading overlay -->
-        <div id="loadingOverlay" class="loading-overlay">
-            <div class="loading-spinner"></div>
-            <p>Đang tải dữ liệu...</p>
+        <!-- POSM Upload Panel -->
+        <div class="upload-panel" id="posmPanel">
+          <div class="upload-card">
+            <div class="upload-card-header">
+              <h3>📦 Upload POSM Data</h3>
+              <p>Upload file CSV chứa thông tin Model và POSM (model, posm, posm_name, category [optional])</p>
+            </div>
+
+            <form id="posmUploadForm" class="upload-form">
+              <div class="upload-file-area">
+                <div class="file-drop-zone" id="posmDropZone">
+                  <div class="file-drop-content">
+                    <div class="file-icon">📄</div>
+                    <p><strong>Kéo thả file CSV vào đây</strong></p>
+                    <p>hoặc <span class="file-browse-link">chọn file</span></p>
+                    <small>Chỉ chấp nhận file .csv (tối đa 10MB)</small>
+                  </div>
+                  <input type="file" id="posmFileInput" accept=".csv" style="display: none" />
+                </div>
+                <div class="selected-file" id="posmSelectedFile" style="display: none">
+                  <span class="file-name"></span>
+                  <button type="button" class="file-remove">×</button>
+                </div>
+              </div>
+
+              <div class="upload-options">
+                <div class="option-group">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="posmClearExisting" name="clearExisting" />
+                    <span class="checkmark"></span>
+                    Xóa tất cả dữ liệu cũ trước khi upload
+                  </label>
+                </div>
+                <div class="option-group">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="posmSkipDuplicates" name="skipDuplicates" checked />
+                    <span class="checkmark"></span>
+                    Bỏ qua các bản ghi trùng lặp
+                  </label>
+                </div>
+                <div class="option-group">
+                  <label for="posmUpdateMode">Chế độ cập nhật:</label>
+                  <select id="posmUpdateMode" name="updateMode">
+                    <option value="upsert">Upsert (Thêm mới hoặc cập nhật)</option>
+                    <option value="insert">Chỉ thêm mới</option>
+                    <option value="update">Chỉ cập nhật</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="upload-actions">
+                <button type="submit" class="btn btn-primary upload-btn" disabled>
+                  <span class="btn-text">📦 Upload POSM</span>
+                  <span class="btn-loading" style="display: none">
+                    <span class="spinner"></span> Đang upload...
+                  </span>
+                </button>
+                <button type="button" class="btn btn-secondary export-btn" id="exportPosmBtn">
+                  <span class="btn-text">📥 Export POSM Data</span>
+                  <span class="btn-loading" style="display: none">
+                    <span class="spinner"></span> Đang export...
+                  </span>
+                </button>
+              </div>
+            </form>
+
+            <div class="upload-result" id="posmResult" style="display: none"></div>
+          </div>
         </div>
+
+        <!-- Statistics Panel -->
+        <div class="upload-panel" id="statsPanel">
+          <div class="upload-card">
+            <div class="upload-card-header">
+              <h3>📊 Thống kê dữ liệu</h3>
+              <p>Xem thông tin tổng quan về dữ liệu đã upload</p>
+            </div>
+
+            <div class="upload-stats" id="uploadStats">
+              <!-- Stats will be loaded here -->
+            </div>
+
+            <div class="upload-actions">
+              <button type="button" class="btn btn-secondary" id="refreshStats">
+                🔄 Làm mới thống kê
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading overlay -->
+      <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p>Đang tải dữ liệu...</p>
+      </div>
     </div>
 
     <script src="data-upload.js"></script>
-</body>
+    <script src="admin.js"></script>
+  </body>
 </html>

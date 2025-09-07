@@ -94,7 +94,6 @@ class SurveyHistoryApp {
     this.setupDateFilter();
 
     // Logout button
-    document.getElementById('logoutBtn').addEventListener('click', logout);
 
     // Modal close on outside click
     document.getElementById('surveyDetailModal').addEventListener('click', (e) => {
@@ -1116,7 +1115,7 @@ class SurveyHistoryApp {
       dropdown.style.display = 'none';
       button.classList.remove('active');
       this.hideCustomDateInputs();
-      
+
       // Restore overflow constraints when hiding dropdown
       if (filtersContent && filtersContent.classList.contains('expanded')) {
         filtersContent.style.overflowY = 'visible';
@@ -1583,11 +1582,6 @@ function clearFilters() {
   app.filters.storeName = '';
   app.currentPage = 1;
   app.loadSurveyHistory(true);
-}
-
-function logout() {
-  localStorage.clear();
-  window.location.href = '/login.html';
 }
 
 function closeSurveyDetailModal() {

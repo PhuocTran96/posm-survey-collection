@@ -1,389 +1,438 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Admin Dashboard - Menu</title>
-    <link rel="stylesheet" href="styles-admin.css">
+    <link rel="stylesheet" href="styles-admin.css" />
     <style>
-        .admin-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px 0;
-            margin-bottom: 30px;
-        }
+      .admin-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px 0;
+        margin-bottom: 30px;
+      }
 
+      .admin-header-content {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .admin-title {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0;
+      }
+
+      .admin-user-info {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+      }
+
+      .user-avatar {
+        width: 40px;
+        height: 40px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+      }
+
+      .user-details {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .user-name {
+        font-weight: 600;
+      }
+
+      .user-role {
+        font-size: 12px;
+        opacity: 0.8;
+      }
+
+      .logout-btn {
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      .logout-btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      .admin-content {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 20px;
+      }
+
+      .nav-tabs {
+        display: flex;
+        border-bottom: 2px solid #e2e8f0;
+        margin-bottom: 30px;
+        overflow-x: auto;
+      }
+
+      .nav-tab {
+        padding: 12px 24px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 16px;
+        color: #64748b;
+        border-bottom: 3px solid transparent;
+        transition: all 0.3s ease;
+        white-space: nowrap;
+      }
+
+      .nav-tab.active {
+        color: #667eea;
+        border-bottom-color: #667eea;
+        font-weight: 600;
+      }
+
+      .nav-tab:hover {
+        color: #667eea;
+        background: rgba(102, 126, 234, 0.05);
+      }
+
+      .tab-content {
+        display: none;
+      }
+
+      .tab-content.active {
+        display: block;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+      }
+
+      .stat-card {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        border-left: 4px solid #667eea;
+      }
+
+      .stat-number {
+        font-size: 24px;
+        font-weight: bold;
+        color: #667eea;
+        margin-bottom: 5px;
+      }
+
+      .stat-label {
+        color: #64748b;
+        font-size: 12px;
+      }
+
+      .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 30px;
+      }
+
+      .quick-action-btn {
+        padding: 20px;
+        background: white;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        color: #334155;
+      }
+
+      .quick-action-btn:hover {
+        border-color: #667eea;
+        background: rgba(102, 126, 234, 0.05);
+        transform: translateY(-2px);
+      }
+
+      .quick-action-icon {
+        font-size: 24px;
+        margin-bottom: 8px;
+      }
+
+      .quick-action-title {
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+
+      .quick-action-desc {
+        font-size: 12px;
+        color: #64748b;
+      }
+
+      .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+      }
+
+      .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        z-index: 10000;
+        animation: slideIn 0.3s ease;
+      }
+
+      .notification.success {
+        background: #10b981;
+      }
+
+      .notification.error {
+        background: #ef4444;
+      }
+
+      @keyframes slideIn {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+
+      @media (max-width: 768px) {
         .admin-header-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .admin-title {
-            font-size: 20px;
-            font-weight: 600;
-            margin: 0;
+          flex-direction: column;
+          gap: 15px;
+          text-align: center;
         }
 
         .admin-user-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-        }
-
-        .user-details {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .user-name {
-            font-weight: 600;
-        }
-
-        .user-role {
-            font-size: 12px;
-            opacity: 0.8;
-        }
-
-        .logout-btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .logout-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        .admin-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
+          justify-content: center;
         }
 
         .nav-tabs {
-            display: flex;
-            border-bottom: 2px solid #e2e8f0;
-            margin-bottom: 30px;
-            overflow-x: auto;
-        }
-
-        .nav-tab {
-            padding: 12px 24px;
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 16px;
-            color: #64748b;
-            border-bottom: 3px solid transparent;
-            transition: all 0.3s ease;
-            white-space: nowrap;
-        }
-
-        .nav-tab.active {
-            color: #667eea;
-            border-bottom-color: #667eea;
-            font-weight: 600;
-        }
-
-        .nav-tab:hover {
-            color: #667eea;
-            background: rgba(102, 126, 234, 0.05);
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
+          justify-content: flex-start;
         }
 
         .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .stat-card {
-            background: white;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            border-left: 4px solid #667eea;
-        }
-
-        .stat-number {
-            font-size: 24px;
-            font-weight: bold;
-            color: #667eea;
-            margin-bottom: 5px;
-        }
-
-        .stat-label {
-            color: #64748b;
-            font-size: 12px;
+          grid-template-columns: 1fr;
         }
 
         .quick-actions {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 30px;
+          grid-template-columns: 1fr;
         }
-
-        .quick-action-btn {
-            padding: 20px;
-            background: white;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            cursor: pointer;
-            text-align: center;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            color: #334155;
-        }
-
-        .quick-action-btn:hover {
-            border-color: #667eea;
-            background: rgba(102, 126, 234, 0.05);
-            transform: translateY(-2px);
-        }
-
-        .quick-action-icon {
-            font-size: 24px;
-            margin-bottom: 8px;
-        }
-
-        .quick-action-title {
-            font-weight: 600;
-            margin-bottom: 4px;
-        }
-
-        .quick-action-desc {
-            font-size: 12px;
-            color: #64748b;
-        }
-
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-        }
-
-        .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 20px;
-            border-radius: 8px;
-            color: white;
-            font-weight: 500;
-            z-index: 10000;
-            animation: slideIn 0.3s ease;
-        }
-
-        .notification.success {
-            background: #10b981;
-        }
-
-        .notification.error {
-            background: #ef4444;
-        }
-
-        @keyframes slideIn {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .admin-header-content {
-                flex-direction: column;
-                gap: 15px;
-                text-align: center;
-            }
-
-            .admin-user-info {
-                justify-content: center;
-            }
-
-            .nav-tabs {
-                justify-content: flex-start;
-            }
-
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .quick-actions {
-                grid-template-columns: 1fr;
-            }
-        }
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <!-- Admin Header -->
     <div class="admin-header">
-        <div class="admin-header-content">
-            <h1 class="admin-title">🔐 Admin Dashboard</h1>
-            <div class="admin-user-info">
-                <div class="user-avatar" id="userAvatar">A</div>
-                <div class="user-details">
-                    <div class="user-name" id="userName">Loading...</div>
-                    <div class="user-role" id="userRole">Administrator</div>
-                </div>
-                <button class="logout-btn" onclick="logout()">Đăng xuất</button>
-            </div>
+      <div class="admin-header-content">
+        <h1 class="admin-title">🔐 Admin Dashboard</h1>
+        <div class="admin-user-info">
+          <div class="user-avatar" id="userAvatar">A</div>
+          <div class="user-details">
+            <div class="user-name" id="userName">Loading...</div>
+            <div class="user-role" id="userRole">Administrator</div>
+          </div>
+          <a href="#" id="logout-btn" class="btn-icon" title="Đăng xuất">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="feather feather-log-out"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </a>
         </div>
+      </div>
     </div>
 
     <!-- Admin Content -->
     <div class="admin-content">
-        <!-- Navigation Tabs -->
-        <div class="nav-tabs">
-            <button class="nav-tab active" onclick="switchTab('dashboard')">📊 Tổng quan</button>
-            <button class="nav-tab" onclick="switchTab('users')">👥 Quản lý người dùng</button>
-            <button class="nav-tab" onclick="switchTab('displays')">🖥️ Quản lý Display</button>
-            <button class="nav-tab" onclick="switchTab('survey-results')">📋 Kết quả khảo sát</button>
-            <button class="nav-tab" onclick="switchTab('data-upload')">📤 Quản lý dữ liệu</button>
+      <!-- Navigation Tabs -->
+      <div class="nav-tabs">
+        <button class="nav-tab active" onclick="switchTab('dashboard')">📊 Tổng quan</button>
+        <button class="nav-tab" onclick="switchTab('users')">👥 Quản lý người dùng</button>
+        <button class="nav-tab" onclick="switchTab('displays')">🖥️ Quản lý Display</button>
+        <button class="nav-tab" onclick="switchTab('survey-results')">📋 Kết quả khảo sát</button>
+        <button class="nav-tab" onclick="switchTab('data-upload')">📤 Quản lý dữ liệu</button>
+        <button class="nav-tab" onclick="switchTab('progress-dashboard')">
+          📈 Progress Dashboard
+        </button>
+      </div>
+
+      <!-- Dashboard Tab -->
+      <div id="dashboard" class="tab-content active">
+        <div class="stats-grid" id="statsGrid">
+          <!-- Stats will be loaded here -->
         </div>
 
-        <!-- Dashboard Tab -->
-        <div id="dashboard" class="tab-content active">
-            <div class="stats-grid" id="statsGrid">
-                <!-- Stats will be loaded here -->
-            </div>
-            
-            <h3 style="margin-bottom: 20px; font-size: 16px;">🚀 Thao tác nhanh</h3>
-            <div class="quick-actions">
-                <a href="#" class="quick-action-btn" onclick="switchTab('users')">
-                    <div class="quick-action-icon">👥</div>
-                    <div class="quick-action-title">Quản lý người dùng</div>
-                    <div class="quick-action-desc">Thêm, sửa, xóa tài khoản</div>
-                </a>
-                <a href="#" class="quick-action-btn" onclick="switchTab('displays')">
-                    <div class="quick-action-icon">🖥️</div>
-                    <div class="quick-action-title">Quản lý Display</div>
-                    <div class="quick-action-desc">Quản lý trạng thái display</div>
-                </a>
-                <a href="#" class="quick-action-btn" onclick="switchTab('survey-results')">
-                    <div class="quick-action-icon">📋</div>
-                    <div class="quick-action-title">Xem kết quả khảo sát</div>
-                    <div class="quick-action-desc">Phân tích dữ liệu khảo sát</div>
-                </a>
-                <a href="#" class="quick-action-btn" onclick="importUsers()">
-                    <div class="quick-action-icon">📥</div>
-                    <div class="quick-action-title">Import người dùng</div>
-                    <div class="quick-action-desc">Nhập danh sách từ CSV</div>
-                </a>
-                <a href="#" class="quick-action-btn" onclick="exportUsers()">
-                    <div class="quick-action-icon">📤</div>
-                    <div class="quick-action-title">Export người dùng</div>
-                    <div class="quick-action-desc">Xuất danh sách ra Excel</div>
-                </a>
-            </div>
+        <h3 style="margin-bottom: 20px; font-size: 16px">🚀 Thao tác nhanh</h3>
+        <div class="quick-actions">
+          <a href="#" class="quick-action-btn" onclick="switchTab('users')">
+            <div class="quick-action-icon">👥</div>
+            <div class="quick-action-title">Quản lý người dùng</div>
+            <div class="quick-action-desc">Thêm, sửa, xóa tài khoản</div>
+          </a>
+          <a href="#" class="quick-action-btn" onclick="switchTab('displays')">
+            <div class="quick-action-icon">🖥️</div>
+            <div class="quick-action-title">Quản lý Display</div>
+            <div class="quick-action-desc">Quản lý trạng thái display</div>
+          </a>
+          <a href="#" class="quick-action-btn" onclick="switchTab('survey-results')">
+            <div class="quick-action-icon">📋</div>
+            <div class="quick-action-title">Xem kết quả khảo sát</div>
+            <div class="quick-action-desc">Phân tích dữ liệu khảo sát</div>
+          </a>
+          <a href="#" class="quick-action-btn" onclick="importUsers()">
+            <div class="quick-action-icon">📥</div>
+            <div class="quick-action-title">Import người dùng</div>
+            <div class="quick-action-desc">Nhập danh sách từ CSV</div>
+          </a>
+          <a href="#" class="quick-action-btn" onclick="exportUsers()">
+            <div class="quick-action-icon">📤</div>
+            <div class="quick-action-title">Export người dùng</div>
+            <div class="quick-action-desc">Xuất danh sách ra Excel</div>
+          </a>
         </div>
+      </div>
 
-        <!-- Users Tab -->
-        <div id="users" class="tab-content">
-            <div id="userManagementContainer">
-                <!-- User management will be loaded here -->
-                <div style="text-align: center; padding: 40px;">
-                    <div class="loading-spinner" style="margin: 0 auto 20px;"></div>
-                    <p>Đang tải quản lý người dùng...</p>
-                </div>
-            </div>
+      <!-- Users Tab -->
+      <div id="users" class="tab-content">
+        <div id="userManagementContainer">
+          <!-- User management will be loaded here -->
+          <div style="text-align: center; padding: 40px">
+            <div class="loading-spinner" style="margin: 0 auto 20px"></div>
+            <p>Đang tải quản lý người dùng...</p>
+          </div>
         </div>
+      </div>
 
-        <!-- Display Management Tab -->
-        <div id="displays" class="tab-content">
-            <div id="displayManagementContainer">
-                <!-- Display management will be loaded here -->
-                <div style="text-align: center; padding: 40px;">
-                    <div class="loading-spinner" style="margin: 0 auto 20px;"></div>
-                    <p>Đang tải quản lý display...</p>
-                </div>
-            </div>
+      <!-- Display Management Tab -->
+      <div id="displays" class="tab-content">
+        <div id="displayManagementContainer">
+          <!-- Display management will be loaded here -->
+          <div style="text-align: center; padding: 40px">
+            <div class="loading-spinner" style="margin: 0 auto 20px"></div>
+            <p>Đang tải quản lý display...</p>
+          </div>
         </div>
+      </div>
 
-        <!-- Survey Results Tab -->
-        <div id="survey-results" class="tab-content">
-            <div style="text-align: center; padding: 40px;">
-                <p>Chuyển hướng đến trang kết quả khảo sát...</p>
-                <a href="survey-results.html" class="quick-action-btn" style="display: inline-block; margin-top: 20px;">
-                    <div class="quick-action-icon">📋</div>
-                    <div class="quick-action-title">Xem kết quả khảo sát</div>
-                </a>
-            </div>
+      <!-- Survey Results Tab -->
+      <div id="survey-results" class="tab-content">
+        <div style="text-align: center; padding: 40px">
+          <p>Chuyển hướng đến trang kết quả khảo sát...</p>
+          <a
+            href="survey-results.html"
+            class="quick-action-btn"
+            style="display: inline-block; margin-top: 20px"
+          >
+            <div class="quick-action-icon">📋</div>
+            <div class="quick-action-title">Xem kết quả khảo sát</div>
+          </a>
         </div>
+      </div>
 
-        <!-- Data Upload Tab -->
-        <div id="data-upload" class="tab-content">
-            <div style="text-align: center; padding: 40px;">
-                <p>Chuyển hướng đến trang quản lý dữ liệu...</p>
-                <a href="data-upload.html" class="quick-action-btn" style="display: inline-block; margin-top: 20px;">
-                    <div class="quick-action-icon">📤</div>
-                    <div class="quick-action-title">Quản lý dữ liệu</div>
-                </a>
-            </div>
+      <!-- Data Upload Tab -->
+      <div id="data-upload" class="tab-content">
+        <div style="text-align: center; padding: 40px">
+          <p>Chuyển hướng đến trang quản lý dữ liệu...</p>
+          <a
+            href="data-upload.html"
+            class="quick-action-btn"
+            style="display: inline-block; margin-top: 20px"
+          >
+            <div class="quick-action-icon">📤</div>
+            <div class="quick-action-title">Quản lý dữ liệu</div>
+          </a>
         </div>
+      </div>
 
+      <!-- Progress Dashboard Tab -->
+      <div id="progress-dashboard" class="tab-content">
+        <div style="text-align: center; padding: 40px">
+          <p>Chuyển hướng đến Progress Dashboard...</p>
+          <a
+            href="progress-dashboard.html"
+            class="quick-action-btn"
+            style="display: inline-block; margin-top: 20px"
+          >
+            <div class="quick-action-icon">📈</div>
+            <div class="quick-action-title">POSM Progress Dashboard</div>
+          </a>
+          <div style="margin-top: 20px; color: #64748b; font-size: 14px">
+            <p>Theo dõi tiến độ xác minh Display thông qua khảo sát POSM</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Loading overlay -->
     <div id="loadingOverlay" class="loading-overlay">
-        <div class="loading-spinner"></div>
+      <div class="loading-spinner"></div>
     </div>
 
     <!-- Import Users Modal (hidden file input) -->
-    <input type="file" id="csvFileInput" accept=".csv,.xlsx,.xls" style="display: none;">
+    <input type="file" id="csvFileInput" accept=".csv,.xlsx,.xls" style="display: none" />
 
     <script src="admin-dashboard.js"></script>
-</body>
+  </body>
 </html>

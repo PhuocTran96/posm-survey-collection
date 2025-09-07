@@ -37,7 +37,6 @@ class UserManagementApp {
     this.initializePagination();
     this.loadUsers();
     this.initNavigation();
-    this.setupAuthUI();
   }
 
   initializePagination() {
@@ -112,59 +111,6 @@ class UserManagementApp {
     console.log('Redirecting to admin login:', reason);
     if (!window.location.pathname.includes('admin-login.html')) {
       window.location.replace('/admin-login.html');
-    }
-  }
-
-  setupAuthUI() {
-    // Add user info to the admin header
-    const adminHeader = document.querySelector('.nav-brand h1');
-    if (adminHeader && this.user) {
-      const userInfo = document.createElement('div');
-      userInfo.style.cssText =
-        'font-size: 12px; color: #64748b; font-weight: normal; margin-top: 4px;';
-      userInfo.textContent = `Logged in as: ${this.user.username} (${this.user.role})`;
-      adminHeader.appendChild(userInfo);
-    }
-
-    // Add Change Password and logout buttons
-    const navMenu = document.querySelector('.nav-menu');
-    if (navMenu) {
-      // Add Change Password link
-      const changePasswordBtn = document.createElement('a');
-      changePasswordBtn.href = '/change-password.html';
-      changePasswordBtn.className = 'nav-item';
-      changePasswordBtn.innerHTML = '🔐 Đổi mật khẩu';
-      changePasswordBtn.style.cssText = 'color: #0ea5e9; border: 1px solid #0ea5e9;';
-      navMenu.appendChild(changePasswordBtn);
-
-      // Add logout button
-      const logoutBtn = document.createElement('a');
-      logoutBtn.href = '#';
-      logoutBtn.className = 'nav-item logout';
-      logoutBtn.innerHTML = '🚪 Đăng xuất';
-      logoutBtn.style.cssText = 'color: #dc2626; border: 1px solid #dc2626;';
-      logoutBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        if (confirm('Bạn có chắc chắn muốn đăng xuất?')) {
-          try {
-            const token = localStorage.getItem('accessToken');
-            if (token) {
-              await fetch('/api/auth/logout', {
-                method: 'POST',
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
-              });
-            }
-          } catch (error) {
-            console.error('Logout error:', error);
-          } finally {
-            localStorage.clear();
-            window.location.replace('/admin-login.html');
-          }
-        }
-      });
-      navMenu.appendChild(logoutBtn);
     }
   }
 
@@ -1201,7 +1147,7 @@ class UserManagementApp {
   async fetchPotentialLeaders(role) {
     try {
       console.log('🚀 Fetching potential leaders for role:', role);
-      
+
       if (!role) {
         console.warn('⚠️ No role provided to fetchPotentialLeaders');
         return [];
@@ -1211,12 +1157,12 @@ class UserManagementApp {
 
       if (response && response.ok) {
         const result = await response.json();
-        
+
         if (result.success) {
           console.log('✅ Successfully fetched potential leaders:', {
             role: role,
             count: result.data.length,
-            leaders: result.data.map(u => `${u.username} (${u.role})`)
+            leaders: result.data.map((u) => `${u.username} (${u.role})`),
           });
           return result.data;
         } else {
@@ -1253,7 +1199,9 @@ class UserManagementApp {
         // Return in legacy format for existing code compatibility
         return {
           assignedLeaders,
-          potentialLeaders: users.filter(user => ['admin', 'TDS', 'TDL'].includes(user.role) && user.isActive),
+          potentialLeaders: users.filter(
+            (user) => ['admin', 'TDS', 'TDL'].includes(user.role) && user.isActive
+          ),
           allLeaderNames: assignedLeaders.sort(),
           allUsers: users,
         };
@@ -1352,11 +1300,10 @@ class UserManagementApp {
       }
 
       console.log(`✅ Loaded ${sortedLeaders.length} potential leaders for ${currentRole}`);
-
     } catch (error) {
       console.error('❌ Error loading leaders dropdown:', error);
       this.showNotification('Lỗi khi tải danh sách Leader: ' + error.message, 'error');
-      
+
       // Fallback: show empty dropdown
       const leaderSelect = document.getElementById('leader');
       if (leaderSelect) {

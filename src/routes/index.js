@@ -8,6 +8,7 @@ const authRoutes = require('./authRoutes');
 const userRoutes = require('./userRoutes');
 const storeRoutes = require('./storeRoutes');
 const displayRoutes = require('./displayRoutes');
+const progressRoutes = require('./progressRoutes');
 
 const router = express.Router();
 
@@ -22,6 +23,9 @@ router.use('/api/stores', storeRoutes);
 
 // Display management routes
 router.use('/api/displays', displayRoutes);
+
+// Progress tracking routes
+router.use('/api/progress', progressRoutes);
 
 // Survey history routes
 router.use('/api/survey-history', surveyHistoryRoutes);

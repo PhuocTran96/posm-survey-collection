@@ -4,6 +4,7 @@ const {
   upload,
   uploadStores,
   uploadPOSM,
+  exportPOSM,
   getUploadStats,
 } = require('../controllers/dataUploadController');
 const { verifyToken, requireAdmin } = require('../middleware/auth');
@@ -17,6 +18,9 @@ router.post('/stores', upload.single('csvFile'), uploadStores);
 
 // Upload POSM data from CSV
 router.post('/posm', upload.single('csvFile'), uploadPOSM);
+
+// Export POSM data to CSV
+router.get('/export/posm', exportPOSM);
 
 // Get upload statistics
 router.get('/stats', getUploadStats);

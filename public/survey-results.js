@@ -26,7 +26,6 @@ class SurveyResultsApp {
     this.bindEvents();
     this.loadResponses();
     this.initNavigation();
-    this.setupAuthUI();
   }
 
   async checkAuthentication() {
@@ -78,59 +77,6 @@ class SurveyResultsApp {
     console.log('Redirecting to admin login:', reason);
     if (!window.location.pathname.includes('admin-login.html')) {
       window.location.replace('/admin-login.html');
-    }
-  }
-
-  setupAuthUI() {
-    // Add user info to the admin header
-    const adminHeader = document.querySelector('.nav-brand h1');
-    if (adminHeader && this.user) {
-      const userInfo = document.createElement('div');
-      userInfo.style.cssText =
-        'font-size: 12px; color: #64748b; font-weight: normal; margin-top: 4px;';
-      userInfo.textContent = `Logged in as: ${this.user.username} (${this.user.role})`;
-      adminHeader.appendChild(userInfo);
-    }
-
-    // Add Change Password and logout buttons
-    const navMenu = document.querySelector('.nav-menu');
-    if (navMenu) {
-      // Add Change Password link
-      const changePasswordBtn = document.createElement('a');
-      changePasswordBtn.href = '/change-password.html';
-      changePasswordBtn.className = 'nav-item';
-      changePasswordBtn.innerHTML = '🔐 Đổi mật khẩu';
-      changePasswordBtn.style.cssText = 'color: #0ea5e9; border: 1px solid #0ea5e9;';
-      navMenu.appendChild(changePasswordBtn);
-
-      // Add logout button
-      const logoutBtn = document.createElement('a');
-      logoutBtn.href = '#';
-      logoutBtn.className = 'nav-item logout';
-      logoutBtn.innerHTML = '🚪 Đăng xuất';
-      logoutBtn.style.cssText = 'color: #dc2626; border: 1px solid #dc2626;';
-      logoutBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        if (confirm('Bạn có chắc chắn muốn đăng xuất?')) {
-          try {
-            const token = localStorage.getItem('accessToken');
-            if (token) {
-              await fetch('/api/auth/logout', {
-                method: 'POST',
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
-              });
-            }
-          } catch (error) {
-            console.error('Logout error:', error);
-          } finally {
-            localStorage.clear();
-            window.location.replace('/admin-login.html');
-          }
-        }
-      });
-      navMenu.appendChild(logoutBtn);
     }
   }
 
@@ -306,7 +252,7 @@ class SurveyResultsApp {
         </div>
       </div>
     `;
-    
+
     document.body.insertAdjacentHTML('beforeend', progressHtml);
   }
 
@@ -321,32 +267,35 @@ class SurveyResultsApp {
     const totalSurveys = responses.length;
     const totalModels = responses.reduce((sum, r) => sum + (r.responses?.length || 0), 0);
     const totalImages = responses.reduce((sum, r) => {
-      return sum + (r.responses?.reduce((imgSum, model) => 
-        imgSum + (model.images?.length || 0), 0) || 0);
+      return (
+        sum + (r.responses?.reduce((imgSum, model) => imgSum + (model.images?.length || 0), 0) || 0)
+      );
     }, 0);
 
     const dateRange = this.getDateRange(responses);
-    
+
     return [
       ['THÔNG TIN XUẤT DỮ LIỆU'],
       ['Thời gian xuất:', new Date().toLocaleString('vi-VN')],
       ['Tổng số khảo sát:', totalSurveys],
-      ['Tổng số model:', totalModels], 
+      ['Tổng số model:', totalModels],
       ['Tổng số ảnh:', totalImages],
       ['Khoảng thời gian:', `${dateRange.from} - ${dateRange.to}`],
       [''],
       ['BỘ LỌC ÁP DỤNG:'],
-      ...Object.entries(appliedFilters).map(([key, value]) => [key + ':', value || 'Tất cả'])
+      ...Object.entries(appliedFilters).map(([key, value]) => [key + ':', value || 'Tất cả']),
     ];
   }
 
   getDateRange(responses) {
     if (responses.length === 0) return { from: 'N/A', to: 'N/A' };
-    
-    const dates = responses.map(r => new Date(r.createdAt || r.submittedAt)).sort((a, b) => a - b);
+
+    const dates = responses
+      .map((r) => new Date(r.createdAt || r.submittedAt))
+      .sort((a, b) => a - b);
     return {
       from: dates[0].toLocaleDateString('vi-VN'),
-      to: dates[dates.length - 1].toLocaleDateString('vi-VN')
+      to: dates[dates.length - 1].toLocaleDateString('vi-VN'),
     };
   }
 
@@ -355,9 +304,9 @@ class SurveyResultsApp {
     return {
       'Loại xuất': 'TOÀN BỘ DỮ LIỆU',
       'Người thực hiện': 'Tất cả',
-      'Tên shop': 'Tất cả', 
+      'Tên shop': 'Tất cả',
       'Từ ngày': 'Tất cả thời gian',
-      'Đến ngày': 'Tất cả thời gian'
+      'Đến ngày': 'Tất cả thời gian',
     };
   }
 
@@ -369,31 +318,31 @@ class SurveyResultsApp {
   validateDateFilters() {
     const dateFrom = document.getElementById('dateFromFilter')?.value;
     const dateTo = document.getElementById('dateToFilter')?.value;
-    
+
     if (dateFrom && dateTo) {
       const fromDate = new Date(dateFrom);
       const toDate = new Date(dateTo);
-      
+
       if (fromDate > toDate) {
         this.showNotification('Ngày bắt đầu không thể lớn hơn ngày kết thúc', 'error');
         return false;
       }
-      
+
       // Check if date range is too large (more than 1 year)
       const daysDiff = (toDate - fromDate) / (1000 * 60 * 60 * 24);
       if (daysDiff > 365) {
         this.showNotification('Khoảng thời gian không được vượt quá 1 năm', 'warning');
       }
     }
-    
+
     console.log('📅 Date Filter Validation:', {
       dateFrom: dateFrom,
       dateTo: dateTo,
       fromParsed: dateFrom ? new Date(dateFrom).toISOString() : null,
       toParsed: dateTo ? new Date(dateTo).toISOString() : null,
-      isValid: !(dateFrom && dateTo && new Date(dateFrom) > new Date(dateTo))
+      isValid: !(dateFrom && dateTo && new Date(dateFrom) > new Date(dateTo)),
     });
-    
+
     return true;
   }
 
@@ -643,9 +592,11 @@ class SurveyResultsApp {
 
         const modelKey = `${surveyId}:${modelIndex}`;
         const isModelSelected = this.selectedModels.has(modelKey);
-        
+
         // Show model selection controls only in model mode
-        const modelControls = this.selectionMode === 'model' ? `
+        const modelControls =
+          this.selectionMode === 'model'
+            ? `
           <div class="model-controls">
             <input type="checkbox" ${isModelSelected ? 'checked' : ''} 
                    onchange="surveyResultsApp.toggleModelSelection('${surveyId}', ${modelIndex})"
@@ -657,7 +608,8 @@ class SurveyResultsApp {
               🗑️
             </button>
           </div>
-        ` : '';
+        `
+            : '';
 
         return `
                 <div class="model-response ${isModelSelected ? 'selected' : ''}">
@@ -795,7 +747,10 @@ class SurveyResultsApp {
           }
         });
         selectAllBtn.innerHTML = '❌ Bỏ chọn tất cả trang này';
-        const totalModels = this.responses.reduce((sum, survey) => sum + (survey.responses?.length || 0), 0);
+        const totalModels = this.responses.reduce(
+          (sum, survey) => sum + (survey.responses?.length || 0),
+          0
+        );
         selectAllBtn.title = `Đã chọn tất cả ${totalModels} model trên trang này`;
       } else {
         // Deselect all models
@@ -971,11 +926,11 @@ class SurveyResultsApp {
       console.log(`🗑️ Starting bulk delete of ${this.selectedModels.size} models`);
 
       // Convert selected models to deletion format
-      const deletions = Array.from(this.selectedModels).map(modelKey => {
+      const deletions = Array.from(this.selectedModels).map((modelKey) => {
         const [surveyId, modelIndex] = modelKey.split(':');
         return {
           surveyId,
-          modelIndex: parseInt(modelIndex)
+          modelIndex: parseInt(modelIndex),
         };
       });
 
@@ -989,10 +944,10 @@ class SurveyResultsApp {
       if (response.ok && result.success) {
         // Update local data by removing deleted models
         const successfulDeletions = result.results?.successful || [];
-        
+
         // Group deletions by survey and sort by modelIndex descending for safe removal
         const deletionsBySurvey = {};
-        successfulDeletions.forEach(deletion => {
+        successfulDeletions.forEach((deletion) => {
           if (!deletionsBySurvey[deletion.surveyId]) {
             deletionsBySurvey[deletion.surveyId] = [];
           }
@@ -1001,10 +956,10 @@ class SurveyResultsApp {
 
         // Remove models from local data (sort descending to avoid index issues)
         Object.entries(deletionsBySurvey).forEach(([surveyId, indices]) => {
-          const survey = this.responses.find(r => r._id === surveyId);
+          const survey = this.responses.find((r) => r._id === surveyId);
           if (survey && survey.responses) {
             indices.sort((a, b) => b - a); // Descending order
-            indices.forEach(index => {
+            indices.forEach((index) => {
               if (index < survey.responses.length) {
                 survey.responses.splice(index, 1);
               }
@@ -1021,11 +976,11 @@ class SurveyResultsApp {
         const successful = result.results?.successful?.length || 0;
         const failed = result.results?.failed?.length || 0;
         let message = `✅ Đã xóa ${successful} model thành công`;
-        
+
         if (failed > 0) {
           message += `\n❌ ${failed} model không thể xóa`;
         }
-        
+
         if (result.warnings && result.warnings.length > 0) {
           message += '\n\n⚠️ Cảnh báo:\n' + result.warnings.join('\n');
         }
@@ -1050,12 +1005,12 @@ class SurveyResultsApp {
 
       // Get estimated total record count for confirmation
       const totalRecords = this.totalCount || 148;
-      
+
       // Confirm exporting all records
       const confirmExportAll = confirm(
         `Bạn có chắc chắn muốn xuất TẤT CẢ dữ liệu khảo sát?\n\n` +
-        `Điều này sẽ xuất toàn bộ khoảng ${totalRecords} khảo sát trong cơ sở dữ liệu.\n\n` +
-        `Nhấn OK để tiếp tục hoặc Cancel để hủy.`
+          `Điều này sẽ xuất toàn bộ khoảng ${totalRecords} khảo sát trong cơ sở dữ liệu.\n\n` +
+          `Nhấn OK để tiếp tục hoặc Cancel để hủy.`
       );
 
       if (!confirmExportAll) {
@@ -1067,20 +1022,20 @@ class SurveyResultsApp {
 
       // Build empty parameters - NO FILTERING AT ALL
       const params = new URLSearchParams();
-      
+
       // Explicitly log that we're not using any filters
       console.log('📤 Export Parameters Being Sent:', {
         allParams: 'NO FILTERS - EXPORTING ALL RECORDS',
         fullUrl: `/api/responses?limit=999999`,
-        note: 'No date, user, or shop filters applied'
+        note: 'No date, user, or shop filters applied',
       });
 
       // Get ALL data without any filtering
       this.showExportProgress('Đang tải TOÀN BỘ dữ liệu từ server...');
-      
+
       const response = await this.makeAuthenticatedRequest(`/api/responses?limit=999999`);
       if (!response.ok) {
-        const errorText = await response.text(); 
+        const errorText = await response.text();
         throw new Error(`Lỗi server: ${response.status} - ${errorText}`);
       }
 
@@ -1096,9 +1051,11 @@ class SurveyResultsApp {
 
       this.showExportProgress(`Đang tạo file Excel cho TẤT CẢ ${responses.length} khảo sát...`);
       this.generateExcel(responses);
-      
-      this.showNotification(`✅ Đã xuất TẤT CẢ ${responses.length} khảo sát từ cơ sở dữ liệu thành công!`, 'success');
-      
+
+      this.showNotification(
+        `✅ Đã xuất TẤT CẢ ${responses.length} khảo sát từ cơ sở dữ liệu thành công!`,
+        'success'
+      );
     } catch (error) {
       console.error('Error exporting data:', error);
       this.showNotification('❌ Lỗi khi xuất dữ liệu: ' + error.message, 'error');
@@ -1109,7 +1066,7 @@ class SurveyResultsApp {
 
   generateExcel(responses) {
     const workbook = XLSX.utils.book_new();
-    
+
     // Create metadata worksheet
     const metadataData = this.generateExportMetadata(responses, this.getCurrentFilters());
     const metadataWorksheet = XLSX.utils.aoa_to_sheet(metadataData);
@@ -1120,9 +1077,19 @@ class SurveyResultsApp {
 
     // Enhanced headers with Vietnamese labels
     const vietnameseHeaders = [
-      'Ngày khảo sát', 'TDL', 'Tên Shop', 'Tên Model', 'Số lượng',
-      'POSM', 'Chọn tất cả POSM', 'Số ảnh', 'Link ảnh', 
-      'User ID', 'Username', 'ID Khảo sát', 'Thời gian gửi'
+      'Ngày khảo sát',
+      'TDL',
+      'Tên Shop',
+      'Tên Model',
+      'Số lượng',
+      'POSM',
+      'Chọn tất cả POSM',
+      'Số ảnh',
+      'Link ảnh',
+      'User ID',
+      'Username',
+      'ID Khảo sát',
+      'Thời gian gửi',
     ];
 
     worksheetData.push(vietnameseHeaders);
@@ -1142,7 +1109,7 @@ class SurveyResultsApp {
           worksheetData.push([
             responseDate,
             response.leader || 'N/A',
-            response.shopName || 'N/A', 
+            response.shopName || 'N/A',
             modelResponse.model || 'N/A',
             modelResponse.quantity || 0,
             posmList,
@@ -1152,7 +1119,7 @@ class SurveyResultsApp {
             response.submittedById || 'N/A',
             response.submittedBy || 'N/A',
             response._id || 'N/A',
-            new Date(response.submittedAt || response.createdAt).toLocaleString('vi-VN')
+            new Date(response.submittedAt || response.createdAt).toLocaleString('vi-VN'),
           ]);
         });
       } else {
@@ -1169,12 +1136,12 @@ class SurveyResultsApp {
           response.submittedById || 'N/A',
           response.submittedBy || 'N/A',
           response._id || 'N/A',
-          new Date(response.submittedAt || response.createdAt).toLocaleString('vi-VN')
+          new Date(response.submittedAt || response.createdAt).toLocaleString('vi-VN'),
         ]);
       }
     });
 
-    // Create main data worksheet  
+    // Create main data worksheet
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Kết quả khảo sát');
 
@@ -1314,12 +1281,12 @@ class SurveyResultsApp {
   showBulkDeleteModelsConfirmation() {
     return new Promise((resolve) => {
       const selectedCount = this.selectedModels.size;
-      
+
       // Get details of selected models
       const selectedModelDetails = [];
-      this.selectedModels.forEach(modelKey => {
+      this.selectedModels.forEach((modelKey) => {
         const [surveyId, modelIndex] = modelKey.split(':');
-        const survey = this.responses.find(r => r._id === surveyId);
+        const survey = this.responses.find((r) => r._id === surveyId);
         if (survey && survey.responses && survey.responses[modelIndex]) {
           const model = survey.responses[modelIndex];
           selectedModelDetails.push({
@@ -1327,7 +1294,7 @@ class SurveyResultsApp {
             modelIndex: parseInt(modelIndex),
             modelName: model.model,
             shopName: survey.shopName,
-            submittedBy: survey.submittedBy
+            submittedBy: survey.submittedBy,
           });
         }
       });
@@ -1336,8 +1303,9 @@ class SurveyResultsApp {
       if (selectedModelDetails.length > 0) {
         detailsHtml = selectedModelDetails
           .slice(0, 5)
-          .map(detail =>
-            `<li><strong>${detail.modelName}</strong> từ ${detail.submittedBy || 'Unknown User'} - ${detail.shopName}</li>`
+          .map(
+            (detail) =>
+              `<li><strong>${detail.modelName}</strong> từ ${detail.submittedBy || 'Unknown User'} - ${detail.shopName}</li>`
           )
           .join('');
         if (selectedCount > 5) {
@@ -1463,15 +1431,15 @@ class SurveyResultsApp {
     const modeToggle = document.getElementById('selectionModeToggle');
     if (modeToggle) {
       this.selectionMode = modeToggle.value;
-      
+
       // Clear selections when switching modes
       this.selectedIds.clear();
       this.selectedModels.clear();
-      
+
       // Update UI
       this.renderResponses();
       this.updateBulkDeleteButton();
-      
+
       console.log(`Selection mode changed to: ${this.selectionMode}`);
     }
   }
@@ -1491,14 +1459,17 @@ class SurveyResultsApp {
 
   // Delete individual model dialog
   showDeleteModelDialog(surveyId, modelIndex, modelName) {
-    const survey = this.responses.find(r => r._id === surveyId);
+    const survey = this.responses.find((r) => r._id === surveyId);
     if (!survey) {
       this.showNotification('Survey not found', 'error');
       return;
     }
 
     if (survey.responses.length <= 1) {
-      this.showNotification('Cannot delete the last model from a survey. Delete the entire survey instead.', 'warning');
+      this.showNotification(
+        'Cannot delete the last model from a survey. Delete the entire survey instead.',
+        'warning'
+      );
       return;
     }
 
@@ -1567,16 +1538,18 @@ class SurveyResultsApp {
 
       if (response.ok) {
         const result = await response.json();
-        
+
         // Remove model from local data
-        const survey = this.responses.find(r => r._id === surveyId);
+        const survey = this.responses.find((r) => r._id === surveyId);
         if (survey && survey.responses && survey.responses.length > modelIndex) {
           survey.responses.splice(modelIndex, 1);
         }
 
         // Clear any model selections for this survey that might be affected
-        const affectedKeys = Array.from(this.selectedModels).filter(key => key.startsWith(surveyId + ':'));
-        affectedKeys.forEach(key => {
+        const affectedKeys = Array.from(this.selectedModels).filter((key) =>
+          key.startsWith(surveyId + ':')
+        );
+        affectedKeys.forEach((key) => {
           const keyIndex = parseInt(key.split(':')[1]);
           if (keyIndex >= modelIndex) {
             this.selectedModels.delete(key);
@@ -1592,16 +1565,18 @@ class SurveyResultsApp {
 
         this.renderResponses();
         this.updateBulkDeleteButton();
-        
+
         let message = `Model "${result.data?.deletedModel || 'Unknown'}" deleted successfully`;
         if (result.warnings && result.warnings.length > 0) {
           message += '\n⚠️ ' + result.warnings.join('\n⚠️ ');
         }
         this.showNotification(message, result.warnings ? 'warning' : 'success');
-        
       } else {
         const errorResult = await response.json();
-        this.showNotification('Error: ' + (errorResult.message || 'Failed to delete model'), 'error');
+        this.showNotification(
+          'Error: ' + (errorResult.message || 'Failed to delete model'),
+          'error'
+        );
       }
     } catch (error) {
       console.error('Error deleting model:', error);
@@ -1821,7 +1796,8 @@ class SurveyResultsApp {
 
   generateEditableResponses(responses) {
     return responses
-      .map((response, index) => `
+      .map(
+        (response, index) => `
         <div class="editable-response" data-index="${index}" data-response-index="${index}">
             <div class="model-header">
                 <h5>📦 Model ${index + 1}:</h5>
@@ -1865,7 +1841,8 @@ class SurveyResultsApp {
                           rows="3">${this.escapeHtml(response.notes || '')}</textarea>
             </div>
         </div>
-      `)
+      `
+      )
       .join('');
   }
 
@@ -1913,9 +1890,12 @@ class SurveyResultsApp {
         return this.generateDefaultPosmCheckboxes([], responseIndex);
       }
 
-      const response = await this.makeAuthenticatedRequest(`/api/model-posm/${encodeURIComponent(modelName)}`, {
-        method: 'GET',
-      });
+      const response = await this.makeAuthenticatedRequest(
+        `/api/model-posm/${encodeURIComponent(modelName)}`,
+        {
+          method: 'GET',
+        }
+      );
 
       if (response.ok) {
         const result = await response.json();
@@ -1938,13 +1918,14 @@ class SurveyResultsApp {
 
     return `
       <div class="posm-checkboxes">
-          ${availablePosmItems.map((item) => {
-            const isSelected = selectedPosmItems.some(
-              (p) =>
-                (p.posmCode === item.posmCode || p.code === item.posmCode) &&
-                (p.selected || p.isSelected !== false)
-            );
-            return `
+          ${availablePosmItems
+            .map((item) => {
+              const isSelected = selectedPosmItems.some(
+                (p) =>
+                  (p.posmCode === item.posmCode || p.code === item.posmCode) &&
+                  (p.selected || p.isSelected !== false)
+              );
+              return `
               <div class="posm-checkbox">
                   <input type="checkbox" 
                          name="responses[${responseIndex}][posmSelections]" 
@@ -1953,7 +1934,8 @@ class SurveyResultsApp {
                   <span>${item.posmName}</span>
               </div>
             `;
-          }).join('')}
+            })
+            .join('')}
       </div>
     `;
   }
@@ -1965,12 +1947,14 @@ class SurveyResultsApp {
       { posmCode: 'BANNER', posmName: 'Banner' },
       { posmCode: 'POSTER', posmName: 'Poster' },
     ];
-    
+
     return this.generateDynamicPosmCheckboxes(defaultItems, selectedPosmItems, responseIndex);
   }
 
   async handleModelChange(responseIndex, modelName) {
-    const posmContainer = document.querySelector(`[data-response-index="${responseIndex}"] .posm-container`);
+    const posmContainer = document.querySelector(
+      `[data-response-index="${responseIndex}"] .posm-container`
+    );
     if (posmContainer) {
       posmContainer.innerHTML = '<div class="loading">Đang tải POSM...</div>';
       const posmHtml = await this.loadPosmForModel(modelName, responseIndex);
@@ -1984,20 +1968,24 @@ class SurveyResultsApp {
     setTimeout(() => {
       this.loadAndUpdatePosmForResponse(modelName, selectedPosmItems, responseIndex);
     }, 100);
-    
+
     return '<div class="loading">Đang tải POSM...</div>';
   }
 
   async loadAndUpdatePosmForResponse(modelName, selectedPosmItems, responseIndex) {
     try {
       const posmHtml = await this.loadPosmForModel(modelName, responseIndex);
-      const container = document.querySelector(`[data-response-index="${responseIndex}"] .posm-container`);
+      const container = document.querySelector(
+        `[data-response-index="${responseIndex}"] .posm-container`
+      );
       if (container) {
         container.innerHTML = posmHtml;
-        
+
         // Restore selected items
-        selectedPosmItems.forEach(selected => {
-          const checkbox = container.querySelector(`input[value="${selected.posmCode || selected.code}"]`);
+        selectedPosmItems.forEach((selected) => {
+          const checkbox = container.querySelector(
+            `input[value="${selected.posmCode || selected.code}"]`
+          );
           if (checkbox) {
             checkbox.checked = true;
           }

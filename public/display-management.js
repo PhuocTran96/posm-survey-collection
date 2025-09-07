@@ -22,36 +22,9 @@ class DisplayManagement {
       return; // User will be redirected to login
     }
 
-    this.addLogoutButton();
     this.bindEvents();
     this.initializePagination();
     this.loadDisplays();
-  }
-
-  addLogoutButton() {
-    // Add Change Password and logout buttons
-    const navMenu = document.querySelector('.nav-menu');
-    if (navMenu) {
-      // Add Change Password link
-      const changePasswordBtn = document.createElement('a');
-      changePasswordBtn.href = '/change-password.html';
-      changePasswordBtn.className = 'nav-item';
-      changePasswordBtn.innerHTML = '🔐 Đổi mật khẩu';
-      changePasswordBtn.style.cssText = 'color: #0ea5e9; border: 1px solid #0ea5e9;';
-      navMenu.appendChild(changePasswordBtn);
-
-      // Add logout button
-      const logoutBtn = document.createElement('a');
-      logoutBtn.href = '#';
-      logoutBtn.className = 'nav-item logout';
-      logoutBtn.innerHTML = '🚪 Đăng xuất';
-      logoutBtn.style.cssText = 'color: #dc2626; border: 1px solid #dc2626;';
-      logoutBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        await this.logout();
-      });
-      navMenu.appendChild(logoutBtn);
-    }
   }
 
   initializePagination() {
@@ -1041,23 +1014,6 @@ class DisplayManagement {
           notification.remove();
         }
       }, duration);
-    }
-  }
-
-  async logout() {
-    try {
-      const token = localStorage.getItem('accessToken');
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      localStorage.clear();
-      window.location.replace('/admin-login.html');
     }
   }
 }

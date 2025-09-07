@@ -1,657 +1,523 @@
-# Enhancement Proposal - 2025-09-03
+# Enhancement Proposal - 2025-09-07
 
 ## Summary
-Redesign the Survey Results filter interface to consolidate all filter controls into a single row layout with improved button styling for better user experience and cleaner visual presentation.
+Replace the existing "Deployment trend" timeline section in the progress dashboard with a new POSM deployment matrix component. This component will display a comprehensive grid showing completion status for each store-POSM model combination, utilizing React, AG-Grid, and Tailwind CSS for a modern, interactive experience.
 
 ## Motivation
-The current filter layout spans two rows with inconsistent spacing and button styling that takes up unnecessary vertical space. Users need a more compact, professional interface that:
-- Reduces screen real estate usage for filters
-- Provides cleaner visual hierarchy
-- Maintains excellent mobile responsiveness
-- Follows modern UI design principles
-- Improves overall user workflow efficiency
-
-## Current Issues Identified
-1. **Layout Inefficiency**: Date filters are separated on a second row, creating unnecessary vertical space
-2. **Button Inconsistency**: Export button uses text + icon, taking up excessive space
-3. **Visual Clutter**: Clear filters button is too prominent for a secondary action
-4. **CSS Conflicts**: Conflicting display properties (grid vs flex) in filter styles
-5. **Mobile Layout**: Current responsive design could be optimized for better mobile UX
+The current timeline chart provides limited insight into POSM deployment status. A matrix view offers several advantages:
+- **Granular visibility**: See exactly which POSMs are missing at which stores
+- **Actionable insights**: Quickly identify stores needing attention
+- **Scalable display**: Handle large datasets with pagination and filtering  
+- **Visual clarity**: Color-coded cells provide instant status recognition
+- **Interactive features**: Sorting, filtering, and drill-down capabilities
 
 ## Design Proposal
 
-### 1. HTML Structure Changes
-**Current Structure (Lines 54-97 in survey-results.html):**
-```html
-<div class="filters">
-    <div class="filter-row">
-        <div class="filter-group"><!-- Submitted By --></div>
-        <div class="filter-group"><!-- Shop --></div>
-    </div>
-    <div class="filter-row">
-        <div class="filter-group"><!-- From Date --></div>
-        <div class="filter-group"><!-- To Date --></div>
-        <div class="filter-group"><!-- Page Size --></div>
-        <div class="filter-group"><!-- Clear Button --></div>
-        <div class="filter-group"><!-- Export Button --></div>
-    </div>
-</div>
+### 1. Technical Architecture Plan
+
+**Frontend Architecture:**
+- **React Component Structure**: Self-contained React application bundled into the existing vanilla JS environment
+- **Build Process**: Webpack configuration for JSX transpilation and dependency bundling
+- **Integration Pattern**: Component "island" approach - React component embedded in existing HTML page
+- **State Management**: Local React state with API integration
+
+**Backend Architecture:**
+- **New API Endpoint**: `/api/progress/posm-matrix` 
+- **Data Processing**: Server-side pivot logic to transform relational data into matrix format
+- **Caching Strategy**: Consider Redis caching for large matrix queries
+- **Response Format**: JSON with structured matrix data and metadata
+
+### 2. Data Structure Requirements for API
+
+**API Request Format:**
+```javascript
+GET /api/progress/posm-matrix
+Query Parameters:
+- page: number (default: 1)
+- limit: number (default: 50, max: 100)  
+- storeFilter: string (optional store name filter)
+- modelFilter: string (optional model filter)
+- statusFilter: string (optional: 'all', 'incomplete', 'complete')
+- sortBy: string (default: 'storeName')
+- sortOrder: string (default: 'asc')
 ```
 
-**Proposed New Structure:**
-```html
-<div class="filters">
-    <div class="filter-row-unified">
-        <div class="filter-group filter-main">
-            <label>Submitted By:</label>
-            <select id="submittedByFilter">
-                <option value="">T¥t c£ ng°Ýi dùng</option>
-            </select>
-        </div>
-        <div class="filter-group filter-main">
-            <label>Shop:</label>
-            <div class="autocomplete-wrapper">
-                <input type="text" id="shopFilter" placeholder="Tìm ki¿m shop..." autocomplete="off">
-                <div id="shopDropdown" class="autocomplete-dropdown"></div>
-            </div>
-        </div>
-        <div class="filter-group filter-date">
-            <label>Të ngày:</label>
-            <input type="date" id="dateFromFilter">
-        </div>
-        <div class="filter-group filter-date">
-            <label>¿n ngày:</label>
-            <input type="date" id="dateToFilter">
-        </div>
-        <div class="filter-group filter-controls">
-            <label>SÑ k¿t qu£/trang:</label>
-            <select id="pageSizeSelector">
-                <option value="10">10</option>
-                <option value="20" selected>20</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-            </select>
-        </div>
-        <div class="filter-group filter-actions">
-            <label>&nbsp;</label>
-            <div class="filter-action-buttons">
-                <button id="clearFiltersBtn" class="btn-flat-small" title="Xóa bÙ lÍc">
-                    <span class="btn-icon-text">=Ñ</span>
-                </button>
-                <button id="exportData" class="btn-excel-icon" title="Xu¥t Excel">
-                    <span class="excel-icon">=Ê</span>
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-```
-
-### 2. CSS Specifications
-
-**Core Filter Layout:**
-```css
-/* Enhanced Filters Layout */
-.filters {
-    background: white;
-    border-radius: 16px;
-    padding: 24px;
-    margin-bottom: 24px;
-    box-shadow: var(--card-shadow);
-    border: 1px solid var(--neutral-border);
-}
-
-.filter-row-unified {
-    display: grid;
-    grid-template-columns: 2fr 2fr 1.5fr 1.5fr 1.5fr 1fr;
-    gap: 20px;
-    align-items: end;
-}
-
-.filter-group {
-    display: flex;
-    flex-direction: column;
-    min-width: 0; /* Allow flex items to shrink */
-}
-
-.filter-group label {
-    font-weight: 600;
-    color: var(--neutral-text);
-    margin-bottom: 8px;
-    font-size: 0.9rem;
-    white-space: nowrap;
-}
-
-.filter-group select,
-.filter-group input {
-    padding: 10px 12px;
-    border: 2px solid var(--neutral-border);
-    border-radius: 8px;
-    font-size: 0.95rem;
-    transition: all 0.3s ease;
-    width: 100%;
-}
-
-.filter-group select:focus,
-.filter-group input:focus {
-    outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-```
-
-**Enhanced Button Styling:**
-```css
-/* Filter Action Buttons */
-.filter-action-buttons {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-}
-
-/* Flat Small Clear Button */
-.btn-flat-small {
-    background: transparent;
-    border: 1px solid var(--neutral-border);
-    border-radius: 6px;
-    padding: 8px 10px;
-    color: var(--neutral-text);
-    cursor: pointer;
-    font-size: 0.85rem;
-    transition: all 0.2s ease;
-    min-width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.btn-flat-small:hover {
-    background: #f8f9fa;
-    border-color: var(--neutral-text);
-    color: var(--neutral-dark);
-    transform: none;
-}
-
-/* Compact Excel Icon Button */
-.btn-excel-icon {
-    background: var(--success);
-    border: none;
-    border-radius: 6px;
-    padding: 8px 10px;
-    color: white;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    min-width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
-}
-
-.btn-excel-icon:hover {
-    background: #218838;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
-}
-
-.excel-icon {
-    font-size: 16px;
-    line-height: 1;
-}
-
-.btn-icon-text {
-    font-size: 14px;
-    line-height: 1;
-}
-```
-
-**Responsive Design:**
-```css
-/* Tablet Breakpoint (769px - 1024px) */
-@media (max-width: 1024px) {
-    .filter-row-unified {
-        grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto;
-        gap: 16px;
+**API Response Structure:**
+```javascript
+{
+  "success": true,
+  "data": {
+    "matrix": [
+      {
+        "storeId": "ST001",
+        "storeName": "Store Alpha",
+        "region": "North",
+        "posmCompletions": {
+          "MODEL_A": {
+            "POSM_001": { "status": "complete", "completed": 3, "required": 3 },
+            "POSM_002": { "status": "partial", "completed": 1, "required": 2 },
+            "POSM_003": { "status": "none", "completed": 0, "required": 1 }
+          },
+          "MODEL_B": {
+            "POSM_004": { "status": "not_applicable", "completed": 0, "required": 0 }
+          }
+        },
+        "overallCompletion": 66.7
+      }
+    ],
+    "metadata": {
+      "models": ["MODEL_A", "MODEL_B", "MODEL_C"],
+      "posmTypes": ["POSM_001", "POSM_002", "POSM_003", "POSM_004"],
+      "statusCounts": {
+        "complete": 45,
+        "partial": 23, 
+        "none": 12,
+        "not_applicable": 8
+      }
+    },
+    "pagination": {
+      "currentPage": 1,
+      "totalPages": 5,
+      "totalStores": 150,
+      "limit": 50
     }
-    
-    .filter-group label {
-        font-size: 0.85rem;
+  }
+}
+```
+
+### 3. React Component Structure Breakdown
+
+**Component Hierarchy:**
+```
+POSMMatrixContainer
+â”œâ”€â”€ POSMMatrixHeader
+â”‚   â”œâ”€â”€ FilterControls
+â”‚   â”œâ”€â”€ ViewToggle
+â”‚   â””â”€â”€ ExportButton
+â”œâ”€â”€ POSMMatrixGrid (AG-Grid)
+â”‚   â”œâ”€â”€ StoreColumn
+â”‚   â”œâ”€â”€ POSMModelColumns[]
+â”‚   â””â”€â”€ CompletionCells[]
+â”œâ”€â”€ MatrixLegend
+â””â”€â”€ MatrixPagination
+```
+
+**Individual Component Responsibilities:**
+
+**POSMMatrixContainer:**
+```javascript
+const POSMMatrixContainer = () => {
+  const [matrixData, setMatrixData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({});
+  const [pagination, setPagination] = useState({});
+  
+  // API integration, state management, error handling
+  return <div className="posm-matrix-container">...</div>;
+};
+```
+
+**FilterControls:**
+```javascript
+const FilterControls = ({ onFilterChange, currentFilters }) => {
+  // Store name search, model filter dropdown, status filter
+  return (
+    <div className="flex gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
+      <SearchInput placeholder="Filter stores..." />
+      <ModelSelect options={models} />
+      <StatusSelect options={statusOptions} />
+      <ResetButton />
+    </div>
+  );
+};
+```
+
+### 4. AG-Grid Configuration Specifics
+
+**Grid Definition:**
+```javascript
+const columnDefs = [
+  {
+    headerName: "Store",
+    field: "storeName", 
+    pinned: "left",
+    width: 200,
+    cellRenderer: "storeNameRenderer",
+    sortable: true,
+    filter: "agTextColumnFilter"
+  },
+  {
+    headerName: "Region",
+    field: "region",
+    width: 120,
+    sortable: true,
+    filter: "agSetColumnFilter"
+  },
+  ...dynamicPOSMColumns, // Generated based on model-POSM combinations
+  {
+    headerName: "Overall %", 
+    field: "overallCompletion",
+    width: 100,
+    cellRenderer: "percentageRenderer",
+    sortable: true,
+    type: "numericColumn"
+  }
+];
+
+// Dynamic POSM columns generation
+const generatePOSMColumns = (models, posmTypes) => {
+  return models.flatMap(model => 
+    posmTypes.map(posm => ({
+      headerName: `${model}-${posm}`,
+      field: `posmCompletions.${model}.${posm}`,
+      width: 120,
+      cellRenderer: "posmStatusRenderer",
+      cellClass: "posm-cell",
+      sortable: false,
+      filter: false
+    }))
+  );
+};
+```
+
+**Custom Cell Renderers:**
+```javascript
+const POSMStatusRenderer = (params) => {
+  const { status, completed, required } = params.value || {};
+  
+  const getStatusConfig = (status) => {
+    switch (status) {
+      case 'complete': return { color: 'green', text: 'Done', bgClass: 'bg-green-100' };
+      case 'partial': return { color: 'orange', text: `${completed}/${required}`, bgClass: 'bg-orange-100' };
+      case 'none': return { color: 'red', text: `0/${required}`, bgClass: 'bg-red-100' };
+      default: return { color: 'gray', text: 'â€“', bgClass: 'bg-gray-100' };
     }
-    
-    .filter-group select,
-    .filter-group input {
-        padding: 8px 10px;
-        font-size: 0.9rem;
-    }
+  };
+  
+  const config = getStatusConfig(status);
+  
+  return (
+    <div className={`posm-status-cell ${config.bgClass} p-1 rounded text-center`}>
+      <span className={`font-semibold text-${config.color}-700`}>
+        {config.text}
+      </span>
+      {status === 'partial' && (
+        <div className="w-full bg-gray-200 rounded-full h-1 mt-1">
+          <div 
+            className="bg-orange-500 h-1 rounded-full"
+            style={{ width: `${(completed / required) * 100}%` }}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+```
+
+### 5. Tailwind CSS Styling Approach
+
+**Color Coding System:**
+```css
+/* Status color classes */
+.status-complete { @apply bg-green-100 text-green-800 border-green-200; }
+.status-partial { @apply bg-orange-100 text-orange-800 border-orange-200; }
+.status-none { @apply bg-red-100 text-red-800 border-red-200; }
+.status-na { @apply bg-gray-100 text-gray-600 border-gray-200; }
+
+/* Progress bar styles */
+.progress-bar-complete { @apply bg-green-500; }
+.progress-bar-partial { @apply bg-orange-500; }
+.progress-bar-none { @apply bg-red-500; }
+
+/* Grid styling */
+.posm-matrix-grid {
+  @apply border border-gray-200 rounded-lg shadow-sm;
 }
 
-/* Mobile Breakpoint (max-width: 768px) */
+.posm-cell {
+  @apply p-2 text-center border-r border-gray-200 min-h-[60px] flex items-center justify-center;
+}
+
+/* Responsive design */
 @media (max-width: 768px) {
-    .filters {
-        padding: 16px;
-        border-radius: 12px;
-    }
-    
-    .filter-row-unified {
-        grid-template-columns: 1fr;
-        gap: 12px;
-    }
-    
-    .filter-group {
-        margin-bottom: 8px;
-    }
-    
-    .filter-group label {
-        margin-bottom: 6px;
-        font-size: 0.9rem;
-    }
-    
-    .filter-group select,
-    .filter-group input {
-        font-size: 16px; /* Prevent iOS zoom */
-        padding: 12px 16px;
-    }
-    
-    .filter-action-buttons {
-        justify-content: center;
-        gap: 16px;
-        margin-top: 8px;
-    }
-    
-    .btn-flat-small,
-    .btn-excel-icon {
-        min-width: 44px; /* Better touch target */
-        height: 44px;
-        padding: 12px;
-    }
-    
-    .excel-icon,
-    .btn-icon-text {
-        font-size: 18px; /* Larger for mobile */
-    }
-}
-
-/* Small Mobile Breakpoint (max-width: 480px) */
-@media (max-width: 480px) {
-    .filter-row-unified {
-        gap: 8px;
-    }
-    
-    .filters {
-        margin-left: -10px;
-        margin-right: -10px;
-        border-radius: 0;
-    }
-    
-    .filter-action-buttons {
-        flex-direction: row;
-        justify-content: space-evenly;
-    }
-    
-    .btn-flat-small,
-    .btn-excel-icon {
-        flex: 1;
-        max-width: 60px;
-    }
+  .posm-matrix-container {
+    @apply overflow-x-auto;
+  }
+  
+  .posm-cell {
+    @apply min-w-[100px] text-xs;
+  }
 }
 ```
 
-### 3. Implementation Strategy
+**Legend Component:**
+```javascript
+const MatrixLegend = () => (
+  <div className="flex gap-4 p-4 bg-white border rounded-lg mb-4">
+    <div className="flex items-center gap-2">
+      <div className="w-4 h-4 bg-green-100 border border-green-200 rounded"></div>
+      <span className="text-sm text-gray-700">Complete</span>
+    </div>
+    <div className="flex items-center gap-2">
+      <div className="w-4 h-4 bg-orange-100 border border-orange-200 rounded"></div>
+      <span className="text-sm text-gray-700">Partial</span>
+    </div>
+    <div className="flex items-center gap-2">
+      <div className="w-4 h-4 bg-red-100 border border-red-200 rounded"></div>
+      <span className="text-sm text-gray-700">Not Started</span>
+    </div>
+    <div className="flex items-center gap-2">
+      <div className="w-4 h-4 bg-gray-100 border border-gray-200 rounded"></div>
+      <span className="text-sm text-gray-700">Not Applicable</span>
+    </div>
+  </div>
+);
+```
 
-**Phase 1: HTML Structure Update**
-1. Consolidate filter-row divs into single filter-row-unified
-2. Reorder filter groups to place date filters after main filters
-3. Create dedicated filter-action-buttons wrapper
-4. Update button IDs and classes
+### 6. API Endpoint Design
 
-**Phase 2: CSS Implementation**
-1. Remove conflicting CSS rules (grid vs flex conflicts)
-2. Implement new grid-based layout system
-3. Add new button style classes
-4. Update responsive breakpoints
+**Backend Controller Method:**
+```javascript
+// src/controllers/progressController.js
+const getPOSMMatrix = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 50,
+      storeFilter,
+      modelFilter, 
+      statusFilter = 'all',
+      sortBy = 'storeName',
+      sortOrder = 'asc'
+    } = req.query;
 
-**Phase 3: JavaScript Adjustments**
-1. Verify existing event listeners still work with new structure
-2. Test autocomplete functionality with new layout
-3. Ensure export and clear functionality remains intact
+    // 1. Get all displays with store and model information
+    const displays = await Display.find({ is_displayed: true })
+      .populate('store_id')
+      .lean();
 
-### 4. Design Specifications
+    // 2. Get all surveys with POSM completion data
+    const surveys = await SurveyResponse.find()
+      .select('leader shopName responses createdAt')
+      .lean();
 
-**Visual Hierarchy:**
-- Main filters (Submitted By, Shop): 2fr width each for prominence
-- Date filters: 1.5fr width each for secondary importance
-- Page size selector: 1.5fr width for functionality
-- Action buttons: 1fr width for minimal footprint
+    // 3. Get model-POSM mappings
+    const modelPosms = await ModelPosm.find().lean();
 
-**Spacing & Alignment:**
-- 20px gap between filter groups on desktop
-- 16px gap on tablet
-- 12px gap on mobile
-- Consistent 8px margin for labels
-- Aligned bottom alignment for all filter controls
+    // 4. Generate matrix data
+    const matrixData = await generateMatrixData(displays, surveys, modelPosms, {
+      storeFilter,
+      modelFilter,
+      statusFilter
+    });
 
-**Button Design:**
-- Clear button: Flat, minimal, 36px height, subtle hover
-- Excel button: Green, icon-only, 36px height, prominent hover with lift effect
-- Mobile: 44px height for better touch targets
+    // 5. Apply sorting and pagination
+    const sortedData = applySorting(matrixData, sortBy, sortOrder);
+    const paginatedData = applyPagination(sortedData, page, limit);
 
-### 5. Accessibility Considerations
-- Maintain proper label associations
-- Ensure adequate color contrast ratios
-- Provide proper tooltips for icon-only buttons
-- Maintain keyboard navigation support
-- Support screen readers with semantic markup
+    // 6. Generate metadata
+    const metadata = {
+      models: [...new Set(modelPosms.map(mp => mp.model))],
+      posmTypes: [...new Set(modelPosms.map(mp => mp.posm))],
+      statusCounts: calculateStatusCounts(matrixData)
+    };
 
-### 6. Browser Compatibility
-- CSS Grid support (IE11+, all modern browsers)
-- Flexbox fallbacks where needed
-- Progressive enhancement for older browsers
-- Touch-friendly interface for mobile devices
+    res.json({
+      success: true,
+      data: {
+        matrix: paginatedData.data,
+        metadata,
+        pagination: paginatedData.pagination
+      }
+    });
+
+  } catch (error) {
+    console.error('POSM Matrix error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate POSM matrix'
+    });
+  }
+};
+
+// Helper function to generate matrix data
+async function generateMatrixData(displays, surveys, modelPosms, filters) {
+  const storeMap = new Map();
+
+  // Group displays by store
+  displays.forEach(display => {
+    if (!storeMap.has(display.store_id)) {
+      storeMap.set(display.store_id, {
+        storeId: display.store_id,
+        storeName: display.store_name,
+        region: display.region,
+        models: new Set(),
+        posmCompletions: {}
+      });
+    }
+    storeMap.get(display.store_id).models.add(display.model);
+  });
+
+  // Process each store
+  const matrixData = [];
+  for (const [storeId, storeData] of storeMap) {
+    const posmCompletions = {};
+    
+    // For each model at this store
+    storeData.models.forEach(model => {
+      posmCompletions[model] = {};
+      
+      // Get required POSMs for this model
+      const requiredPosms = modelPosms.filter(mp => mp.model === model);
+      
+      requiredPosms.forEach(mp => {
+        // Find completion status from surveys
+        const completionStatus = findPosmCompletion(storeId, model, mp.posm, surveys);
+        posmCompletions[model][mp.posm] = completionStatus;
+      });
+    });
+
+    // Calculate overall completion
+    const overallCompletion = calculateOverallCompletion(posmCompletions);
+
+    matrixData.push({
+      ...storeData,
+      models: Array.from(storeData.models),
+      posmCompletions,
+      overallCompletion
+    });
+  }
+
+  return matrixData;
+}
+```
+
+### 7. Integration Approach with Existing Progress Dashboard
+
+**Step 1: Replace Timeline Section in HTML**
+```html
+<!-- Replace the existing timeline section (lines 587-598) with: -->
+<div class="posm-matrix-section">
+  <div class="section-header" style="background: none; border: none; padding: 0; margin-bottom: 20px">
+    <div class="section-title">POSM Deployment Matrix</div>
+    <div class="section-subtitle">Interactive view of POSM completion by store and model</div>
+  </div>
+  <div id="posmMatrixRoot"></div>
+</div>
+```
+
+**Step 2: Add React Dependencies**
+```html
+<!-- Add before closing </body> tag -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/ag-grid-react@31/dist/ag-grid-react.min.js"></script>
+<script src="https://unpkg.com/ag-grid-community@31/dist/ag-grid-community.min.js"></script>
+<script src="posm-matrix-bundle.js"></script>
+```
+
+**Step 3: Integration Script**
+```javascript
+// Add to progress-dashboard.js initialization
+async init() {
+  // ... existing code ...
+  
+  // Initialize POSM Matrix after other components
+  this.initPOSMMatrix();
+}
+
+initPOSMMatrix() {
+  // Mount React component
+  const matrixContainer = document.getElementById('posmMatrixRoot');
+  if (matrixContainer && typeof POSMMatrixComponent !== 'undefined') {
+    ReactDOM.render(
+      React.createElement(POSMMatrixComponent, {
+        apiToken: this.getAuthToken(),
+        onError: (error) => this.showNotification(error, 'error')
+      }),
+      matrixContainer
+    );
+  }
+}
+```
+
+### 8. Step-by-Step Implementation Order
+
+**Phase 1: Backend API Development (Days 1-2)**
+1. Create new API endpoint in progressController.js
+   - Implement `getPOSMMatrix` function
+   - Add matrix data generation logic
+   - Implement filtering and pagination
+2. Add route in progressRoutes.js
+3. Test API endpoint with sample data
+4. Optimize query performance
+
+**Phase 2: React Component Development (Days 3-4)**  
+1. Set up build configuration (webpack.config.js)
+2. Create base React components structure
+3. Implement AG-Grid configuration
+4. Build custom cell renderers
+5. Add filtering and pagination logic
+6. Style with Tailwind CSS
+
+**Phase 3: Integration (Days 5-6)**
+1. Modify progress-dashboard.html to include React components
+2. Update progress-dashboard.js for component mounting
+3. Add error handling and loading states
+4. Test cross-browser compatibility
+5. Optimize bundle size and loading performance
+
+**Phase 4: Testing and Refinement (Days 7-8)**
+1. End-to-end testing with real data
+2. Performance testing with large datasets
+3. Mobile responsiveness testing
+4. User acceptance testing
+5. Bug fixes and optimization
 
 ## Dependencies
-- **CSS Variables**: Utilizes existing CSS custom properties (--primary, --success, --neutral-border, etc.)
-- **Existing Classes**: Maintains compatibility with current .filter-group, .btn base classes
-- **JavaScript**: No changes required to existing survey-results.js functionality
-- **Font Icons**: Continues using emoji icons for consistency
+- **React 18+**: For component development
+- **AG-Grid Community**: For data grid functionality  
+- **Webpack**: For building and bundling React components
+- **Babel**: For JSX transpilation
+- **Tailwind CSS**: Already included in existing system
+- **Existing API infrastructure**: progressController, progressRoutes, authentication middleware
 
 ## Risks
-1. **Layout Shift**: Users accustomed to current layout may need brief adjustment period
-2. **Mobile Rendering**: Grid layout complexity on very small screens needs thorough testing
-3. **Content Overflow**: Long shop names or user names might cause layout issues
-4. **Icon Recognition**: Excel button without text might need user education
-
-**Mitigation Strategies:**
-- Implement progressive enhancement with fallbacks
-- Add tooltips for icon-only buttons
-- Test extensively on various screen sizes
-- Maintain semantic HTML structure
-- Provide subtle animation for smooth transitions
-
-## Testing Strategy
-1. **Cross-browser Testing**: Chrome, Firefox, Safari, Edge
-2. **Device Testing**: Desktop, tablet, mobile (iOS/Android)
-3. **Screen Size Testing**: 320px to 2560px widths
-4. **Functionality Testing**: All filter operations, export, clear functions
-5. **Accessibility Testing**: Screen readers, keyboard navigation, color contrast
-6. **Performance Testing**: Layout rendering performance on various devices
-
-## Implementation Timeline
-- **Phase 1** (HTML Updates): 1-2 hours
-- **Phase 2** (CSS Implementation): 2-3 hours  
-- **Phase 3** (Testing & Refinement): 2-4 hours
-- **Total Estimated Time**: 5-9 hours
+1. **Bundle size impact**: Adding React and AG-Grid may increase page load time
+   - Mitigation: Code splitting, lazy loading, CDN delivery
+2. **Browser compatibility**: React/AG-Grid may not support older browsers
+   - Mitigation: Polyfills, graceful degradation to table view
+3. **Data volume performance**: Large matrices may cause rendering issues
+   - Mitigation: Server-side pagination, virtual scrolling in AG-Grid
+4. **Integration complexity**: Mixing React with vanilla JS may cause conflicts
+   - Mitigation: Isolated component mounting, careful event handling
 
 ## Next Steps
-- [ ] Reviewer feedback on design approach and specifications
-- [ ] Main agent implementation of HTML structure changes
-- [ ] Main agent implementation of CSS updates
-- [ ] Cross-browser testing validation
-- [ ] Mobile responsiveness verification
-- [ ] User acceptance testing
+- [ ] **Reviewer feedback on technical approach**
+- [ ] **Approval of API data structure design**
+- [ ] **Confirmation of UI/UX requirements**
+- [ ] **Main agent implementation following approved plan**
+- [ ] **Testing and deployment coordination**
 
----
+## Additional Considerations
 
-## Technical Implementation Details
+**Performance Optimization:**
+- Implement virtual scrolling for large datasets
+- Add debounced search filtering
+- Cache API responses for common queries
+- Consider server-side rendering for SEO
 
-### HTML Code Changes Required
+**Accessibility:**  
+- ARIA labels for grid navigation
+- Keyboard navigation support
+- Screen reader compatibility
+- High contrast mode support
 
-**Replace lines 54-97 in survey-results.html with:**
-```html
-<!-- Filters -->
-<div class="filters">
-    <div class="filter-row-unified">
-        <div class="filter-group filter-main">
-            <label>Submitted By:</label>
-            <select id="submittedByFilter">
-                <option value="">T¥t c£ ng°Ýi dùng</option>
-            </select>
-        </div>
-        <div class="filter-group filter-main">
-            <label>Shop:</label>
-            <div class="autocomplete-wrapper">
-                <input type="text" id="shopFilter" placeholder="Tìm ki¿m shop..." autocomplete="off">
-                <div id="shopDropdown" class="autocomplete-dropdown"></div>
-            </div>
-        </div>
-        <div class="filter-group filter-date">
-            <label>Të ngày:</label>
-            <input type="date" id="dateFromFilter">
-        </div>
-        <div class="filter-group filter-date">
-            <label>¿n ngày:</label>
-            <input type="date" id="dateToFilter">
-        </div>
-        <div class="filter-group filter-controls">
-            <label>SÑ k¿t qu£/trang:</label>
-            <select id="pageSizeSelector">
-                <option value="10">10</option>
-                <option value="20" selected>20</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-            </select>
-        </div>
-        <div class="filter-group filter-actions">
-            <label>&nbsp;</label>
-            <div class="filter-action-buttons">
-                <button id="clearFiltersBtn" class="btn-flat-small" title="Xóa bÙ lÍc">
-                    <span class="btn-icon-text">=Ñ</span>
-                </button>
-                <button id="exportData" class="btn-excel-icon" title="Xu¥t Excel">
-                    <span class="excel-icon">=Ê</span>
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-```
+**Future Enhancements:**
+- Export to Excel functionality
+- Drill-down to individual POSM details
+- Bulk update capabilities
+- Real-time updates via WebSocket
+- Custom dashboard widgets
 
-### CSS Code Additions Required
-
-**Add to styles-admin.css (replace existing filter styles):**
-```css
-/* Enhanced Filters Layout - Single Row Design */
-.filters {
-    background: white;
-    border-radius: 16px;
-    padding: 24px;
-    margin-bottom: 24px;
-    box-shadow: var(--card-shadow);
-    border: 1px solid var(--neutral-border);
-}
-
-.filter-row-unified {
-    display: grid;
-    grid-template-columns: 2fr 2fr 1.5fr 1.5fr 1.5fr 1fr;
-    gap: 20px;
-    align-items: end;
-}
-
-.filter-group {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-}
-
-.filter-group label {
-    font-weight: 600;
-    color: var(--neutral-text);
-    margin-bottom: 8px;
-    font-size: 0.9rem;
-    white-space: nowrap;
-}
-
-.filter-group select,
-.filter-group input {
-    padding: 10px 12px;
-    border: 2px solid var(--neutral-border);
-    border-radius: 8px;
-    font-size: 0.95rem;
-    transition: all 0.3s ease;
-    width: 100%;
-}
-
-.filter-group select:focus,
-.filter-group input:focus {
-    outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-/* Filter Action Buttons */
-.filter-action-buttons {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-}
-
-/* Flat Small Clear Button */
-.btn-flat-small {
-    background: transparent;
-    border: 1px solid var(--neutral-border);
-    border-radius: 6px;
-    padding: 8px 10px;
-    color: var(--neutral-text);
-    cursor: pointer;
-    font-size: 0.85rem;
-    transition: all 0.2s ease;
-    min-width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.btn-flat-small:hover {
-    background: #f8f9fa;
-    border-color: var(--neutral-text);
-    color: var(--neutral-dark);
-}
-
-/* Compact Excel Icon Button */
-.btn-excel-icon {
-    background: var(--success);
-    border: none;
-    border-radius: 6px;
-    padding: 8px 10px;
-    color: white;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    min-width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
-}
-
-.btn-excel-icon:hover {
-    background: #218838;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
-}
-
-.excel-icon {
-    font-size: 16px;
-    line-height: 1;
-}
-
-.btn-icon-text {
-    font-size: 14px;
-    line-height: 1;
-}
-
-/* Responsive Design */
-/* Tablet Breakpoint */
-@media (max-width: 1024px) {
-    .filter-row-unified {
-        grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto;
-        gap: 16px;
-    }
-    
-    .filter-group label {
-        font-size: 0.85rem;
-    }
-    
-    .filter-group select,
-    .filter-group input {
-        padding: 8px 10px;
-        font-size: 0.9rem;
-    }
-}
-
-/* Mobile Breakpoint */
-@media (max-width: 768px) {
-    .filters {
-        padding: 16px;
-        border-radius: 12px;
-        margin-left: -10px;
-        margin-right: -10px;
-    }
-    
-    .filter-row-unified {
-        grid-template-columns: 1fr;
-        gap: 12px;
-    }
-    
-    .filter-group {
-        margin-bottom: 8px;
-    }
-    
-    .filter-group label {
-        margin-bottom: 6px;
-        font-size: 0.9rem;
-    }
-    
-    .filter-group select,
-    .filter-group input {
-        font-size: 16px; /* Prevent iOS zoom */
-        padding: 12px 16px;
-    }
-    
-    .filter-action-buttons {
-        justify-content: center;
-        gap: 16px;
-        margin-top: 8px;
-    }
-    
-    .btn-flat-small,
-    .btn-excel-icon {
-        min-width: 44px; /* Better touch target */
-        height: 44px;
-        padding: 12px;
-    }
-    
-    .excel-icon,
-    .btn-icon-text {
-        font-size: 18px;
-    }
-}
-
-/* Small Mobile Breakpoint */
-@media (max-width: 480px) {
-    .filter-row-unified {
-        gap: 8px;
-    }
-    
-    .filter-action-buttons {
-        gap: 12px;
-    }
-}
-```
-
-## Expected Benefits
-1. **50% reduction** in vertical space usage for filters
-2. **Improved visual flow** with logical left-to-right filter progression
-3. **Enhanced mobile experience** with optimized touch targets
-4. **Cleaner interface** with modern flat button design
-5. **Better performance** with resolved CSS conflicts
-6. **Consistent branding** following established design patterns
-
-## Success Metrics
-- User survey completion time reduction
-- Decreased support requests about filter usage
-- Improved mobile usage analytics
-- Positive user feedback on interface clarity
-- Reduced cognitive load for filter operations
+This comprehensive plan provides a structured approach to implementing the POSM deployment matrix component while maintaining integration with the existing system architecture and ensuring scalability and maintainability.

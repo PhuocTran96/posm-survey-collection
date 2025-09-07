@@ -75,12 +75,14 @@ const loadModelPosmData = async () => {
           const model = row['model'] || row['﻿model'] || '';
           const posm = row['posm'] || '';
           const posmName = row['posm_name'] || '';
+          const category = row['category'] || row['Category'] || null;
 
           if (model.trim() && posm.trim() && posmName.trim()) {
             modelPosmData.push({
               model: model.trim(),
               posm: posm.trim(),
               posmName: posmName.trim(),
+              category: category ? category.trim() : null,
             });
           }
         })

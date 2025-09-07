@@ -1,108 +1,116 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>POSM Survey System</title>
-    <link rel="stylesheet" href="styles-survey.css">
-    <link rel="icon" href="/favicon.ico" type="image/ico"> 
-</head>
-<body>
+    <link rel="stylesheet" href="styles-survey.css" />
+    <link rel="icon" href="/favicon.ico" type="image/ico" />
+  </head>
+  <body>
     <div class="container">
-        <header>
-            <div class="header-content">
-                <div class="header-title">
-                    <h1>Khảo sát POSM</h1>
-                    <p>Hệ thống khảo sát triển khai POSM</p>
-                </div>
-                <div class="header-actions">
-                    <div class="nav-links">
-                        <a href="/" class="nav-link active">New Survey</a>
-                        <a href="/survey-history.html" class="nav-link">Survey History</a>
-                        <a href="/change-password.html" class="nav-link">🔐 Change Password</a>
-                    </div>
-                    <div class="user-info">
-                        <span class="user-welcome">Xin chào, <span id="userDisplayName">User</span></span>
-                        <span class="user-role" id="userRole"></span>
-                    </div>
-                    <button id="logoutBtn" class="btn btn-logout">
-                        <span class="logout-icon">🚪</span>
-                        Đăng xuất
-                    </button>
-                </div>
+      <header>
+        <div class="header-content">
+          <div class="header-title">
+            <h1>Khảo sát POSM</h1>
+            <p>Hệ thống khảo sát triển khai POSM</p>
+          </div>
+          <div class="header-actions">
+            <div class="nav-links">
+              <a href="/" class="nav-link active">New Survey</a>
+              <a href="/survey-history.html" class="nav-link">Survey History</a>
+              <a href="/change-password.html" class="nav-link">🔐 Change Password</a>
             </div>
-        </header>
-
-        <main>
-            <!-- Step 1: Select Shop -->
-            <div id="step1" class="step active">
-                <h2>Bước 1: Chọn Shop của bạn</h2>
-                <div class="form-group" style="position:relative;">
-                    <label for="shopSearchInput">Shop Name:</label>
-                    <input type="text" 
-                           id="shopSearchInput" 
-                           class="form-control" 
-                           placeholder="Nhập tên shop hoặc mã shop để tìm kiếm..." 
-                           autocomplete="off">
-                    <div id="storeList" class="store-list">
-                        <!-- Store items will be dynamically added here -->
-                    </div>
-                </div>
-                <div id="selectedShopInfo" class="selected-shop-info" style="display:none;">
-                    <p><strong>Đã chọn:</strong> <span id="selectedShopText"></span></p>
-                </div>
-                <button id="nextToStep2" class="btn btn-primary" disabled>Tiếp theo</button>
+            <div class="user-info">
+              <span class="user-welcome">Xin chào, <span id="userDisplayName">User</span></span>
+              <span class="user-role" id="userRole"></span>
             </div>
-
-            <!-- Step 2: POSM Selection -->
-            <div id="step2" class="step">
-                <!-- Combined sticky header with step title, shop info and search -->
-                <div class="combined-sticky-header">
-                    <h2>Bước 2: Chọn POSM đã triển khai</h2>
-                    <div class="selected-info-compact">
-                        <p><strong>Shop:</strong> <span id="selectedShop"></span></p>
-                    </div>
-                    <div class="search-section-compact">
-                        <div class="form-group" style="position:relative;">
-                            <div class="search-input-container">
-                                <input type="text" id="modelSearchInput" class="form-control search-with-icon" placeholder="Nhập tên model..." autocomplete="off">
-                            </div>
-                            <div id="modelSuggestions" class="autocomplete-suggestions"></div>
-                            <button id="addModelBtn" class="btn btn-primary" disabled>Thêm Model</button>
-                        </div>
-                        <div id="selectedModelsList" class="compact-models-list"></div>
-                    </div>
-                </div>
-                <div class="models-section-separator"></div>
-                <div class="models-section">
-                    <div id="modelsContainer" class="models-container">
-                        <!-- Models and POSM will be loaded here -->
-                    </div>
-                </div>
-                <div class="button-group">
-                    <button id="backToStep1" class="btn btn-secondary">Quay lại</button>
-                    <button id="submitSurvey" class="btn btn-success">Gửi khảo sát</button>
-                </div>
-            </div>
-
-            <!-- Success Message -->
-            <div id="successMessage" class="step">
-                <div class="success-content">
-                    <h2>✅ Gửi thành công!</h2>
-                    <p>Cảm ơn bạn đã hoàn thành khảo sát POSM.</p>
-                    <p>Dữ liệu của bạn đã được lưu vào hệ thống.</p>
-                    <button id="startNewSurvey" class="btn btn-primary">Làm khảo sát mới</button>
-                </div>
-            </div>
-        </main>
-
-        <!-- Loading overlay -->
-        <div id="loadingOverlay" class="loading-overlay">
-            <div class="loading-spinner"></div>
-            <p>Đang tải dữ liệu...</p>
+            <button id="logoutBtn" class="btn btn-logout">
+              <span class="logout-icon">🚪</span>
+              Đăng xuất
+            </button>
+          </div>
         </div>
+      </header>
+
+      <main>
+        <!-- Step 1: Select Shop -->
+        <div id="step1" class="step active">
+          <h2>Bước 1: Chọn Shop của bạn</h2>
+          <div class="form-group" style="position: relative">
+            <label for="shopSearchInput">Shop Name:</label>
+            <input
+              type="text"
+              id="shopSearchInput"
+              class="form-control"
+              placeholder="Nhập tên shop hoặc mã shop để tìm kiếm..."
+              autocomplete="off"
+            />
+            <div id="storeList" class="store-list">
+              <!-- Store items will be dynamically added here -->
+            </div>
+          </div>
+          <div id="selectedShopInfo" class="selected-shop-info" style="display: none">
+            <p><strong>Đã chọn:</strong> <span id="selectedShopText"></span></p>
+          </div>
+          <button id="nextToStep2" class="btn btn-primary" disabled>Tiếp theo</button>
+        </div>
+
+        <!-- Step 2: POSM Selection -->
+        <div id="step2" class="step">
+          <!-- Combined sticky header with step title, shop info and search -->
+          <div class="combined-sticky-header">
+            <h2>Bước 2: Chọn POSM đã triển khai</h2>
+            <div class="selected-info-compact">
+              <p><strong>Shop:</strong> <span id="selectedShop"></span></p>
+            </div>
+            <div class="search-section-compact">
+              <div class="form-group" style="position: relative">
+                <div class="search-input-container">
+                  <input
+                    type="text"
+                    id="modelSearchInput"
+                    class="form-control search-with-icon"
+                    placeholder="Nhập tên model..."
+                    autocomplete="off"
+                  />
+                </div>
+                <div id="modelSuggestions" class="autocomplete-suggestions"></div>
+                <button id="addModelBtn" class="btn btn-primary" disabled>Thêm Model</button>
+              </div>
+              <div id="selectedModelsList" class="compact-models-list"></div>
+            </div>
+          </div>
+          <div class="models-section-separator"></div>
+          <div class="models-section">
+            <div id="modelsContainer" class="models-container">
+              <!-- Models and POSM will be loaded here -->
+            </div>
+          </div>
+          <div class="button-group">
+            <button id="backToStep1" class="btn btn-secondary">Quay lại</button>
+            <button id="submitSurvey" class="btn btn-success">Gửi khảo sát</button>
+          </div>
+        </div>
+
+        <!-- Success Message -->
+        <div id="successMessage" class="step">
+          <div class="success-content">
+            <h2>✅ Gửi thành công!</h2>
+            <p>Cảm ơn bạn đã hoàn thành khảo sát POSM.</p>
+            <p>Dữ liệu của bạn đã được lưu vào hệ thống.</p>
+            <button id="startNewSurvey" class="btn btn-primary">Làm khảo sát mới</button>
+          </div>
+        </div>
+      </main>
+
+      <!-- Loading overlay -->
+      <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p>Đang tải dữ liệu...</p>
+      </div>
     </div>
 
     <script src="script.js"></script>
-</body>
+  </body>
 </html>

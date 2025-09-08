@@ -4668,3 +4668,328 @@ body {
     gap: 12px;
   }
 }
+
+
+/* Global Search Container Styles */
+.search-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.search-wrapper {
+  position: relative;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+#globalSearchInput {
+  width: 100%;
+  padding: 12px 45px 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 25px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  background: #f8f9fa;
+}
+
+#globalSearchInput:focus {
+  outline: none;
+  border-color: #007bff;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 12px;
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: none;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  transition: all 0.2s ease;
+}
+
+.clear-search-btn:hover {
+  background: #5a6268;
+  transform: scale(1.1);
+}
+
+/* Search Suggestions */
+.search-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1000;
+  margin-top: 4px;
+  display: none;
+}
+
+.search-suggestions.show {
+  display: block;
+}
+
+.suggestion-group {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.suggestion-group:last-child {
+  border-bottom: none;
+}
+
+.suggestion-group-title {
+  padding: 8px 16px;
+  background: #f8f9fa;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #6c757d;
+  letter-spacing: 0.5px;
+}
+
+.suggestion-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  border-left: 3px solid transparent;
+}
+
+.suggestion-item:hover,
+.suggestion-item.highlighted {
+  background: #e3f2fd;
+  border-left-color: #2196f3;
+}
+
+.suggestion-item mark {
+  background: #fff3cd;
+  color: #856404;
+  padding: 1px 3px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+#modelFilter {
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: border-color 0.3s ease;
+}
+
+#modelFilter:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0,123,255,0.1);
+}
+
+
+
+/* Updated Search Group within Filters Container */
+.filter-group.search-group {
+  flex: 2;
+  min-width: 300px;
+}
+
+.filter-group.search-group .search-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.filter-group.search-group .search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.filter-group.search-group #globalSearchInput {
+  width: 100%;
+  padding: 10px 40px 10px 16px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.filter-group.search-group #globalSearchInput:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0,123,255,0.1);
+}
+
+.filter-group.search-group .clear-search-btn {
+  position: absolute;
+  right: 10px;
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: none;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: all 0.2s ease;
+}
+
+.filter-group.search-group .clear-search-btn:hover {
+  background: #5a6268;
+  transform: scale(1.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .filters.filters-unified {
+    grid-template-columns: 1fr;
+  }
+  
+  .filter-group.search-group {
+    min-width: auto;
+  }
+}
+
+
+
+/* Action Buttons Styles */
+.filter-group.filter-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  align-items: flex-end;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 19px 28px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.clear-btn {
+  background: #6c757d;
+  color: white;
+  border-color: #6c757d;
+}
+
+.clear-btn:hover {
+  background: #5a6268;
+  border-color: #545b62;
+}
+
+.export-btn {
+  background: #28a745;
+  color: white;
+  border-color: #28a745;
+}
+
+.export-btn:hover {
+  background: #218838;
+  border-color: #1e7e34;
+}
+
+/* Responsive adjustments for action buttons */
+@media (max-width: 768px) {
+  .filter-group.filter-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .action-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+
+
+/* Dashboard Button with Glowing Effect */
+.dashboard-btn {
+  background: #17a2b8;
+  color: white;
+  border-color: #17a2b8;
+  position: relative;
+  overflow: hidden;
+}
+
+.dashboard-btn:hover {
+  background: #138496;
+  border-color: #117a8b;
+}
+
+/* Glowing Rainbow Effect */
+.glow-on-hover {
+  position: relative;
+  z-index: 0;
+  border-radius: 10px;
+}
+
+.glow-on-hover:before {
+  content: '';
+  background: linear-gradient(45deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000);
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  background-size: 400%;
+  z-index: -1;
+  filter: blur(4px);
+  width: calc(100% + 20px);
+  height: calc(100% + 20px);
+  animation: glowing 20s linear infinite;
+  opacity: 1;
+  border-radius: 10px;
+}
+
+.glow-on-hover:after {
+  z-index: -2;
+  content: '';
+  position: absolute;
+  width: calc(100% + 16px);
+  height: calc(100% + 16px);
+  background: rgba(0, 0, 0, 0.3);
+  left: -8px;
+  top: -8px;
+  border-radius: 10px;
+  filter: blur(6px);
+}
+
+@keyframes glowing {
+  0% { background-position: 0 0; }
+  50% { background-position: 400% 0; }
+  100% { background-position: 0 0; }
+}
+

@@ -146,21 +146,10 @@ class SurveyResultsApp {
       clearFiltersBtn.addEventListener('click', () => this.clearFilters());
     }
 
-    // Handle submittedBy filter change
-    const submittedByFilter = document.getElementById('submittedByFilter');
-    if (submittedByFilter) {
-      submittedByFilter.addEventListener('change', () => {
-        // Reset to page 1 and reload with filters
-        this.currentPage = 1;
-        this.loadResponses(1);
-      });
-    }
+    // Global search setup
+    this.setupGlobalSearch();
 
-    // Handle shop filter with autocomplete
-    this.setupShopAutocomplete();
-
-    // Handle other filter changes
-
+    // Date filter event listeners - these work alongside global search
     const dateFromFilter = document.getElementById('dateFromFilter');
     if (dateFromFilter) {
       dateFromFilter.addEventListener('change', () => {
@@ -356,17 +345,13 @@ class SurveyResultsApp {
         limit: this.itemsPerPage.toString(),
       });
 
-      // Add filters
-      const submittedByFilter = document.getElementById('submittedByFilter');
-      if (submittedByFilter && submittedByFilter.value) {
-        params.append('submittedBy', submittedByFilter.value);
+      // Global search - simplified since most old filters are removed
+      const globalSearchInput = document.getElementById('globalSearchInput');
+      if (globalSearchInput && globalSearchInput.value.trim()) {
+        params.append('search', globalSearchInput.value.trim());
       }
 
-      const shopFilter = document.getElementById('shopFilter');
-      if (shopFilter && shopFilter.value.trim()) {
-        params.append('shopName', shopFilter.value.trim());
-      }
-
+      // Date filters - these are still useful alongside global search
       const dateFromFilter = document.getElementById('dateFromFilter');
       if (dateFromFilter && dateFromFilter.value) {
         params.append('dateFrom', dateFromFilter.value);
@@ -397,11 +382,6 @@ class SurveyResultsApp {
         this.totalPages = responseData.pagination.totalPages;
         this.totalCount = responseData.pagination.totalCount;
 
-        // Load all responses for filters (only on initial load or filter changes)
-        if (page === 1) {
-          await this.loadAllResponsesForFilters();
-        }
-
         this.renderStats();
         this.renderResponses();
         this.renderPagination();
@@ -410,7 +390,6 @@ class SurveyResultsApp {
         this.responses = responseData;
         this.filteredResponses = [...this.responses];
 
-        this.populateFilters();
         this.renderStats();
         this.renderResponses();
       } else if (responseData.success === false) {
@@ -426,46 +405,7 @@ class SurveyResultsApp {
     }
   }
 
-  async loadAllResponsesForFilters() {
-    try {
-      // Load all responses without pagination for filter population
-      const response = await this.makeAuthenticatedRequest('/api/responses?limit=10000');
-      if (response.ok) {
-        const data = await response.json();
-        const allResponses = data.data || data;
-        this.populateFilters(allResponses);
-      }
-    } catch (error) {
-      console.error('Error loading responses for filters:', error);
-      // Use current page responses as fallback
-      this.populateFilters(this.responses);
-    }
-  }
-
-  populateFilters(responses = null) {
-    const responsesToUse = responses || this.responses;
-
-    // Populate submittedBy dropdown
-    const submittedByUsers = [
-      ...new Set(responsesToUse.map((r) => r.submittedBy).filter(Boolean)),
-    ].sort();
-
-    const submittedBySelect = document.getElementById('submittedByFilter');
-    if (submittedBySelect) {
-      const currentValue = submittedBySelect.value;
-      submittedBySelect.innerHTML = '<option value="">Tất cả người dùng</option>';
-      submittedByUsers.forEach((user) => {
-        const option = document.createElement('option');
-        option.value = user;
-        option.textContent = user;
-        option.selected = user === currentValue;
-        submittedBySelect.appendChild(option);
-      });
-    }
-
-    // Store all shop names for autocomplete
-    this.allShops = [...new Set(responsesToUse.map((r) => r.shopName).filter(Boolean))].sort();
-  }
+  // Old filter population functions removed since filters are no longer used
 
   renderStats() {
     const statsContainer = document.getElementById('statsContainer');
@@ -1155,17 +1095,13 @@ class SurveyResultsApp {
   }
 
   clearFilters() {
-    // Clear all filter inputs
-    const submittedByFilter = document.getElementById('submittedByFilter');
-    if (submittedByFilter) {
-      submittedByFilter.value = '';
+    // Clear global search input
+    const globalSearchInput = document.getElementById('globalSearchInput');
+    if (globalSearchInput) {
+      globalSearchInput.value = '';
     }
 
-    const shopFilter = document.getElementById('shopFilter');
-    if (shopFilter) {
-      shopFilter.value = '';
-    }
-
+    // Clear date filters
     const dateFromFilter = document.getElementById('dateFromFilter');
     if (dateFromFilter) {
       dateFromFilter.value = '';
@@ -1183,11 +1119,11 @@ class SurveyResultsApp {
       this.itemsPerPage = 20;
     }
 
-    // Hide shop dropdown if it's open
-    const shopDropdown = document.getElementById('shopDropdown');
-    if (shopDropdown) {
-      shopDropdown.classList.remove('show');
-      shopDropdown.innerHTML = '';
+    // Hide search suggestions if open
+    const searchSuggestions = document.getElementById('searchSuggestions');
+    if (searchSuggestions) {
+      searchSuggestions.classList.remove('show');
+      searchSuggestions.innerHTML = '';
     }
 
     // Reset to first page and reload data
@@ -1195,7 +1131,7 @@ class SurveyResultsApp {
     this.loadResponses(1);
 
     // Show notification
-    this.showNotification('✅ Đã xóa tất cả bộ lọc', 'success', 3000);
+    this.showNotification('✅ Đã xóa tìm kiếm và bộ lọc ngày', 'success', 3000);
   }
 
   // Enhanced confirmation dialog for bulk delete
@@ -1595,119 +1531,223 @@ class SurveyResultsApp {
     this.renderResponses();
   }
 
-  setupShopAutocomplete() {
-    const shopFilter = document.getElementById('shopFilter');
-    const dropdown = document.getElementById('shopDropdown');
+  // Old shop autocomplete function removed since filters are no longer used
 
-    if (!shopFilter || !dropdown) {
+  // Utility function for debouncing
+  debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+
+  // Setup global search functionality
+  setupGlobalSearch() {
+    const searchInput = document.getElementById('globalSearchInput');
+    const searchSuggestions = document.getElementById('searchSuggestions');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+    
+    if (!searchInput || !searchSuggestions) {
       return;
     }
 
+    let currentSearchTerm = '';
     let highlightedIndex = -1;
 
-    // Handle input events
-    shopFilter.addEventListener('input', (e) => {
-      const value = e.target.value.toLowerCase();
-      highlightedIndex = -1;
+    // Clear search button
+    if (clearSearchBtn) {
+      clearSearchBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        searchSuggestions.classList.remove('show');
+        searchSuggestions.innerHTML = '';
+        this.currentPage = 1;
+        this.loadResponses(1);
+      });
+    }
 
-      if (value.length === 0) {
-        dropdown.classList.remove('show');
-        dropdown.innerHTML = '';
-        return;
+    // Show/hide clear button based on input
+    const toggleClearButton = () => {
+      if (clearSearchBtn) {
+        clearSearchBtn.style.display = searchInput.value.trim() ? 'block' : 'none';
       }
+    };
 
-      // Filter shops based on input
-      const filteredShops = (this.allShops || []).filter((shop) =>
-        shop.toLowerCase().includes(value)
-      );
-
-      if (filteredShops.length === 0) {
-        dropdown.classList.remove('show');
-        dropdown.innerHTML = '';
-        return;
-      }
-
-      // Populate dropdown
-      dropdown.innerHTML = filteredShops
-        .map(
-          (shop, index) =>
-            `<div class="autocomplete-item" data-index="${index}" data-shop="${shop}">
-                    ${shop}
-                </div>`
-        )
-        .join('');
-
-      dropdown.classList.add('show');
-
-      // Add click handlers to dropdown items
-      dropdown.querySelectorAll('.autocomplete-item').forEach((item) => {
-        item.addEventListener('click', () => {
-          shopFilter.value = item.dataset.shop;
-          dropdown.classList.remove('show');
-          dropdown.innerHTML = '';
-
-          // Trigger filter reload
+    // Debounced search function
+    const debouncedSearch = this.debounce(async () => {
+      const searchTerm = searchInput.value.trim();
+      
+      if (searchTerm !== currentSearchTerm) {
+        currentSearchTerm = searchTerm;
+        
+        if (searchTerm.length > 0) {
+          // Reload data with search
           this.currentPage = 1;
           this.loadResponses(1);
-        });
-      });
+          
+          // Get search suggestions
+          if (searchTerm.length >= 2) {
+            await this.loadSearchSuggestions(searchTerm);
+          }
+        } else {
+          // Clear search
+          searchSuggestions.classList.remove('show');
+          this.currentPage = 1;
+          this.loadResponses(1);
+        }
+      }
+    }, 500);
+
+    // Input event handler
+    searchInput.addEventListener('input', () => {
+      toggleClearButton();
+      highlightedIndex = -1;
+      debouncedSearch();
     });
 
-    // Handle keyboard navigation
-    shopFilter.addEventListener('keydown', (e) => {
-      const items = dropdown.querySelectorAll('.autocomplete-item');
-
+    // Keyboard navigation for suggestions
+    searchInput.addEventListener('keydown', (e) => {
+      const suggestionItems = searchSuggestions.querySelectorAll('.suggestion-item');
+      
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        highlightedIndex = Math.min(highlightedIndex + 1, items.length - 1);
-        this.updateHighlight(items, highlightedIndex);
+        highlightedIndex = Math.min(highlightedIndex + 1, suggestionItems.length - 1);
+        this.updateSearchSuggestionHighlight(suggestionItems, highlightedIndex);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         highlightedIndex = Math.max(highlightedIndex - 1, -1);
-        this.updateHighlight(items, highlightedIndex);
+        this.updateSearchSuggestionHighlight(suggestionItems, highlightedIndex);
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        if (highlightedIndex >= 0 && items[highlightedIndex]) {
-          items[highlightedIndex].click();
+        if (highlightedIndex >= 0 && suggestionItems[highlightedIndex]) {
+          suggestionItems[highlightedIndex].click();
+        } else {
+          // Perform search with current input
+          searchSuggestions.classList.remove('show');
+          this.currentPage = 1;
+          this.loadResponses(1);
         }
       } else if (e.key === 'Escape') {
-        dropdown.classList.remove('show');
-        dropdown.innerHTML = '';
+        searchSuggestions.classList.remove('show');
         highlightedIndex = -1;
       }
     });
 
-    // Handle filter change to reload data
-    shopFilter.addEventListener('blur', () => {
-      // Delay to allow click events to fire
-      setTimeout(() => {
-        dropdown.classList.remove('show');
-        dropdown.innerHTML = '';
-
-        // Trigger filter reload if value changed
-        this.currentPage = 1;
-        this.loadResponses(1);
-      }, 150);
-    });
-
-    // Close dropdown when clicking outside
+    // Hide suggestions when clicking outside
     document.addEventListener('click', (e) => {
-      if (!shopFilter.contains(e.target) && !dropdown.contains(e.target)) {
-        dropdown.classList.remove('show');
-        dropdown.innerHTML = '';
+      if (!searchInput.contains(e.target) && !searchSuggestions.contains(e.target)) {
+        searchSuggestions.classList.remove('show');
+        highlightedIndex = -1;
       }
     });
+
+    // Initial state
+    toggleClearButton();
   }
 
-  updateHighlight(items, index) {
+  updateSearchSuggestionHighlight(items, index) {
     items.forEach((item, i) => {
       item.classList.toggle('highlighted', i === index);
     });
-
-    // Scroll highlighted item into view
+    
     if (index >= 0 && items[index]) {
       items[index].scrollIntoView({ block: 'nearest' });
     }
+  }
+
+  async loadSearchSuggestions(query) {
+    if (!query || query.length < 2) {
+      return;
+    }
+
+    try {
+      const response = await this.makeAuthenticatedRequest(`/api/search-suggestions?q=${encodeURIComponent(query)}`);
+      
+      if (response.ok) {
+        const suggestions = await response.json();
+        this.renderSearchSuggestions(suggestions, query);
+      }
+    } catch (error) {
+      console.error('Error loading search suggestions:', error);
+    }
+  }
+
+  renderSearchSuggestions(suggestions, query) {
+    const searchSuggestions = document.getElementById('searchSuggestions');
+    if (!searchSuggestions) return;
+
+    const hasResults = suggestions.shops?.length > 0 || 
+                      suggestions.models?.length > 0 || 
+                      suggestions.submitters?.length > 0;
+
+    if (!hasResults) {
+      searchSuggestions.classList.remove('show');
+      return;
+    }
+
+    let html = '';
+
+    // Shop suggestions
+    if (suggestions.shops && suggestions.shops.length > 0) {
+      html += '<div class="suggestion-group">';
+      html += '<div class="suggestion-group-title">🏪 Shops</div>';
+      suggestions.shops.forEach(shop => {
+        html += `<div class="suggestion-item" data-type="shop" data-value="${this.escapeHtml(shop)}">
+          ${this.highlightSearchTerm(shop, query)}
+        </div>`;
+      });
+      html += '</div>';
+    }
+
+    // Model suggestions
+    if (suggestions.models && suggestions.models.length > 0) {
+      html += '<div class="suggestion-group">';
+      html += '<div class="suggestion-group-title">📦 Models</div>';
+      suggestions.models.forEach(model => {
+        html += `<div class="suggestion-item" data-type="model" data-value="${this.escapeHtml(model)}">
+          ${this.highlightSearchTerm(model, query)}
+        </div>`;
+      });
+      html += '</div>';
+    }
+
+    // Submitter suggestions
+    if (suggestions.submitters && suggestions.submitters.length > 0) {
+      html += '<div class="suggestion-group">';
+      html += '<div class="suggestion-group-title">👤 Người thực hiện</div>';
+      suggestions.submitters.forEach(submitter => {
+        html += `<div class="suggestion-item" data-type="submitter" data-value="${this.escapeHtml(submitter)}">
+          ${this.highlightSearchTerm(submitter, query)}
+        </div>`;
+      });
+      html += '</div>';
+    }
+
+    searchSuggestions.innerHTML = html;
+    searchSuggestions.classList.add('show');
+
+    // Add click handlers
+    searchSuggestions.querySelectorAll('.suggestion-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const searchInput = document.getElementById('globalSearchInput');
+        searchInput.value = item.dataset.value;
+        searchSuggestions.classList.remove('show');
+        this.currentPage = 1;
+        this.loadResponses(1);
+      });
+    });
+  }
+
+  highlightSearchTerm(text, searchTerm) {
+    if (!searchTerm || !text) return this.escapeHtml(text);
+    
+    const escaped = this.escapeHtml(text);
+    const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    return escaped.replace(regex, '<mark>$1</mark>');
   }
 
   // Edit functionality

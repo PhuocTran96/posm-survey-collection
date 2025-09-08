@@ -42,19 +42,16 @@
         <!-- Stats will be loaded here -->
       </div>
 
-      <!-- Filters -->
+      <!-- Search and Actions -->
       <div class="filters filters-unified">
-        <div class="filter-group filter-main">
-          <label>Submitted By:</label>
-          <select id="submittedByFilter">
-            <option value="">Tất cả người dùng</option>
-          </select>
-        </div>
-        <div class="filter-group filter-main">
-          <label>Shop:</label>
-          <div class="autocomplete-wrapper">
-            <input type="text" id="shopFilter" placeholder="Tìm kiếm shop..." autocomplete="off" />
-            <div id="shopDropdown" class="autocomplete-dropdown"></div>
+        <div class="filter-group search-group">
+          <label>Tìm kiếm toàn bộ:</label>
+          <div class="search-wrapper">
+            <div class="search-input-wrapper">
+              <input type="text" id="globalSearchInput" placeholder="🔍 Tìm kiếm shop, model, người dùng..." autocomplete="off" />
+              <button id="clearSearchBtn" class="clear-search-btn" title="Xóa tìm kiếm">&times;</button>
+            </div>
+            <div id="searchSuggestions" class="search-suggestions"></div>
           </div>
         </div>
         <div class="filter-group filter-date">
@@ -75,27 +72,15 @@
           </select>
         </div>
         <div class="filter-group filter-actions">
-          <button
-            id="clearFiltersBtn"
-            class="icon-btn"
-            title="Xóa bộ lọc"
-          >
-            🗑️
+          <button id="clearFiltersBtn" class="action-btn clear-btn">
+            🗑️ Clear Filters
           </button>
-          <button
-            id="exportData"
-            class="icon-btn"
-            title="Xuất Excel"
-          >
-            📊
+          <button id="exportData" class="action-btn export-btn">
+            📊 Export XLSX
           </button>
-          <a
-            href="progress-dashboard.html"
-            id="progressDashboardBtn"
-            class="icon-btn"
-            title="Xem Progress Dashboard"
-            >📈</a
-          >
+          <a href="progress-dashboard.html" id="progressDashboardBtn" class="action-btn dashboard-btn glow-on-hover">
+            📈 View Dashboard
+          </a>
         </div>
       </div>
 

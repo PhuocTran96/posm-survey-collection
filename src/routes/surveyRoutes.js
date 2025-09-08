@@ -40,6 +40,22 @@ router.get(
   surveyController.getPosmByModel
 );
 
+// Search and autocomplete endpoints
+router.get(
+  '/shop-autocomplete',
+  verifyToken,
+  updateActivity,
+  requireAdmin,
+  surveyController.getShopAutocomplete
+);
+router.get(
+  '/search-suggestions',
+  verifyToken,
+  updateActivity,
+  requireAdmin,
+  surveyController.getSearchSuggestions
+);
+
 // Protected routes for survey submission
 router.post(
   '/submit',

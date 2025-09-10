@@ -74,6 +74,20 @@ function isStoreMatch(
     });
   }
 
+  // Method 0: EXACT store name match (highest priority)
+  if (storeMap && displayId) {
+    const storeInfo = storeMap[displayId];
+    if (storeInfo && storeInfo.store_name) {
+      const storeName = normalizeString(storeInfo.store_name);
+      if (shopName === storeName) {
+        if (debug) {
+          console.log(`✅ Method 0 Match: EXACT store name match (highest priority)`);
+        }
+        return true; // Exact match gets highest priority
+      }
+    }
+  }
+
   // Method 1: Direct ID match (if survey somehow has store ID)
   if (surveyId === displayId) {
     if (debug) {
@@ -82,7 +96,7 @@ function isStoreMatch(
     return true;
   }
 
-  // Method 2: Use store mapping to match display store_id with survey shop name
+  // Method 2: Use store mapping for partial matches (lower priority than exact)
   if (storeMap && displayId) {
     const storeInfo = storeMap[displayId];
     if (storeInfo && storeInfo.store_name) {
@@ -93,19 +107,12 @@ function isStoreMatch(
           storeInfo,
           storeName,
           shopName,
-          exact: shopName === storeName,
           shopIncludesStore: shopName && storeName && shopName.includes(storeName),
           storeIncludesShop: shopName && storeName && storeName.includes(shopName),
         });
       }
 
-      // Check if survey shop name matches or contains store name
-      if (shopName === storeName) {
-        if (debug) {
-          console.log(`✅ Method 2 Match: Exact name match`);
-        }
-        return true;
-      }
+      // Check partial matches (lower confidence than exact)
       if (shopName && storeName && shopName.includes(storeName)) {
         if (debug) {
           console.log(`✅ Method 2 Match: Shop name includes store name`);
@@ -979,6 +986,55 @@ function getMatrixCellStatus(completed, required) {
 }
 
 /**
+ * Survey validation and quality scoring functions
+ */
+function calculateSurveyQuality(survey) {
+  let score = 0;
+  
+  // Check if survey has responses
+  if (!survey.responses || survey.responses.length === 0) return 0;
+  
+  // Base score for having responses
+  score += 30;
+  
+  // Check for valid POSM selections
+  const hasValidPosm = survey.responses.some(response => 
+    response.posmSelections && response.posmSelections.length > 0
+  );
+  if (hasValidPosm) score += 40;
+  
+  // Check for complete data (store name, model info)
+  if (survey.shopName && survey.shopName.trim() !== '') score += 15;
+  if (survey.leader && survey.leader.trim() !== '') score += 10;
+  
+  // Check submission completeness
+  if (survey.submittedAt || survey.createdAt) score += 5;
+  
+  return Math.min(score, 100);
+}
+
+function validateAndCleanSurveys(surveys) {
+  return surveys.filter(survey => {
+    // Filter out surveys with no responses
+    if (!survey.responses || survey.responses.length === 0) return false;
+    
+    // Filter out surveys with no POSM data
+    const hasValidPosm = survey.responses.some(response => 
+      response.posmSelections && response.posmSelections.length > 0
+    );
+    if (!hasValidPosm) return false;
+    
+    // Filter out surveys without store identification
+    if (!survey.shopName || survey.shopName.trim() === '') return false;
+    
+    return true;
+  }).map(survey => ({
+    ...survey,
+    qualityScore: calculateSurveyQuality(survey)
+  })).filter(survey => survey.qualityScore >= 30); // Minimum quality threshold
+}
+
+/**
  * Improved helper function to calculate store progress with better matching
  */
 async function calculateStoreProgressImproved(
@@ -987,6 +1043,11 @@ async function calculateStoreProgressImproved(
   stores = [],
   modelPosmCounts = {}
 ) {
+  // Validate and clean surveys first to prevent corrupt data
+  const validatedSurveys = validateAndCleanSurveys(surveys);
+  
+  console.log(`Survey validation: ${surveys.length} raw surveys → ${validatedSurveys.length} validated surveys`);
+  
   const storeStats = {};
   const storeMap = {};
 
@@ -1035,64 +1096,91 @@ async function calculateStoreProgressImproved(
     }
   });
 
-  // Check verification against surveys using improved matching
+  // Check verification against surveys using improved matching with cumulative POSM tracking
   displays.forEach((display) => {
-    const allMatchingSurveysForStore = surveys.filter((survey) =>
+    const allMatchingSurveysForStore = validatedSurveys.filter((survey) =>
       isStoreMatch(survey.leader, survey.shopName, display.store_id, storeMap)
     );
 
+    // Debug specific store
+    const debugStore = (storeId) => {
+      const debugStores = ['cao_phong_dist_5', 'Cao Phong Dist 5'];
+      return debugStores.some(debug => 
+        storeId.toLowerCase().includes(debug.toLowerCase()) ||
+        debug.toLowerCase().includes(storeId.toLowerCase())
+      );
+    };
+
     if (allMatchingSurveysForStore.length > 0) {
-      const latestSurveyForStore = allMatchingSurveysForStore.sort(
-        (a, b) => new Date(b.createdAt || b.submittedAt) - new Date(a.createdAt || a.submittedAt)
-      )[0];
+      // Use cumulative approach: track all completed POSMs from all surveys for this model
+      const completedPosmSet = new Set();
+      let latestSurveyDate = null;
+      let hasValidResponse = false;
 
-      // Find matching survey response for this display model
-      const matchingResponse =
-        latestSurveyForStore.responses &&
-        latestSurveyForStore.responses.find((response) =>
-          isModelMatch(display.model, response.model)
-        );
+      // Process all surveys to build cumulative POSM completion
+      allMatchingSurveysForStore.forEach((survey) => {
+        const matchingResponse = survey.responses &&
+          survey.responses.find((response) => isModelMatch(display.model, response.model));
+        
+        if (matchingResponse && matchingResponse.posmSelections && Array.isArray(matchingResponse.posmSelections)) {
+          hasValidResponse = true;
+          
+          // Add all selected POSMs to our cumulative set
+          matchingResponse.posmSelections.forEach((posmSelection) => {
+            if (posmSelection.selected) {
+              completedPosmSet.add(posmSelection.posmCode || posmSelection.posm_id || JSON.stringify(posmSelection));
+            }
+          });
 
-      if (matchingResponse) {
+          // Track latest survey date
+          const surveyDate = new Date(survey.createdAt || survey.submittedAt);
+          if (!latestSurveyDate || surveyDate > latestSurveyDate) {
+            latestSurveyDate = surveyDate;
+          }
+        }
+      });
+
+      // Only proceed if we found valid responses
+      if (hasValidResponse) {
         storeStats[display.store_id].verifiedDisplays++;
         storeStats[display.store_id].verifiedModels.add(display.model);
 
-        // Count completed POSMs from posmSelections
-        if (matchingResponse.posmSelections && Array.isArray(matchingResponse.posmSelections)) {
-          const completedPosmCount = matchingResponse.posmSelections.filter(
-            (posm) => posm.selected
-          ).length;
+        // Use cumulative completed POSM count
+        const completedPosmCount = completedPosmSet.size;
 
-          // Update store totals
-          storeStats[display.store_id].completedPOSMs += completedPosmCount;
-
-          // Update per-model completion details
-          if (storeStats[display.store_id].posmCompletionDetails[display.model]) {
-            storeStats[display.store_id].posmCompletionDetails[display.model].completed =
-              completedPosmCount;
-          }
+        if (debugStore(display.store_id)) {
+          console.log(`DEBUG: Store ${display.store_id}, Model ${display.model}:`);
+          console.log(`  - Found ${allMatchingSurveysForStore.length} matching surveys`);
+          console.log(`  - Cumulative completed POSMs: ${completedPosmCount}`);
+          console.log(`  - POSM codes: [${Array.from(completedPosmSet).join(', ')}]`);
         }
 
-        // Update last survey date from the latest survey
-        const surveyDate = new Date(
-          latestSurveyForStore.createdAt || latestSurveyForStore.submittedAt
-        );
-        if (
-          !storeStats[display.store_id].lastSurveyDate ||
-          surveyDate > storeStats[display.store_id].lastSurveyDate
-        ) {
-          storeStats[display.store_id].lastSurveyDate = surveyDate;
+        // Update store totals
+        storeStats[display.store_id].completedPOSMs += completedPosmCount;
+
+        // Update per-model completion details
+        if (storeStats[display.store_id].posmCompletionDetails[display.model]) {
+          storeStats[display.store_id].posmCompletionDetails[display.model].completed = completedPosmCount;
         }
 
-        // Add debug info from the latest survey
+        // Update last survey date
+        if (!storeStats[display.store_id].lastSurveyDate || latestSurveyDate > storeStats[display.store_id].lastSurveyDate) {
+          storeStats[display.store_id].lastSurveyDate = latestSurveyDate;
+        }
+
+        // Add debug info using the best available data
+        const latestSurvey = allMatchingSurveysForStore.sort(
+          (a, b) => new Date(b.createdAt || b.submittedAt) - new Date(a.createdAt || a.submittedAt)
+        )[0];
+        
         storeStats[display.store_id].matchingDebug.push({
           displayModel: display.model,
-          surveyModels: latestSurveyForStore.responses.map((r) => r.model),
-          surveyShop: latestSurveyForStore.shopName,
-          surveyLeader: latestSurveyForStore.leader,
-          completedPOSMs: matchingResponse.posmSelections
-            ? matchingResponse.posmSelections.filter((p) => p.selected).length
-            : 0,
+          surveyModels: latestSurvey.responses.map((r) => r.model),
+          surveyShop: latestSurvey.shopName,
+          surveyLeader: latestSurvey.leader,
+          completedPOSMs: completedPosmCount, // Use cumulative count
+          totalSurveys: allMatchingSurveysForStore.length,
+          method: 'cumulative'
         });
       }
     }

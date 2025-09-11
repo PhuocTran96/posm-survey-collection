@@ -398,40 +398,41 @@ const uploadPOSM = async (req, res) => {
 const exportPOSM = async (req, res) => {
   try {
     const posmData = await ModelPosm.find({}).lean();
-    
+
     if (posmData.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'No POSM data found to export'
+        message: 'No POSM data found to export',
       });
     }
 
     // Convert to CSV format with UTF-8 BOM
     const csvHeaders = 'model,posm,posm_name,category\n';
-    const csvRows = posmData.map(item => {
-      const model = item.model || '';
-      const posm = item.posm || '';
-      const posmName = item.posmName || '';
-      const category = item.category || '';
-      return `"${model}","${posm}","${posmName}","${category}"`;
-    }).join('\n');
-    
+    const csvRows = posmData
+      .map((item) => {
+        const model = item.model || '';
+        const posm = item.posm || '';
+        const posmName = item.posmName || '';
+        const category = item.category || '';
+        return `"${model}","${posm}","${posmName}","${category}"`;
+      })
+      .join('\n');
+
     const csvContent = csvHeaders + csvRows;
-    
+
     // Create Buffer with UTF-8 BOM
-    const BOM = Buffer.from([0xEF, 0xBB, 0xBF]);
+    const BOM = Buffer.from([0xef, 0xbb, 0xbf]);
     const csvBuffer = Buffer.from(csvContent, 'utf8');
     const csvWithBOM = Buffer.concat([BOM, csvBuffer]);
-    
+
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="posm_export.csv"');
     res.send(csvWithBOM);
-    
   } catch (error) {
     console.error('❌ POSM export failed:', error);
     res.status(500).json({
       success: false,
-      message: 'POSM export failed: ' + error.message
+      message: 'POSM export failed: ' + error.message,
     });
   }
 };

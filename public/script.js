@@ -1431,7 +1431,7 @@ class SurveyApp {
             } else {
               console.error('❌ No POSM data found for model:', model, 'Response:', modelData);
               alert(
-                `Không tìm thấy POSM cho model "${model}". Model sẽ bị loại bỏ khỏi danh sách.`
+                `Không tìm thấy POSM cho model "${model}". Vui lòng kiểm tra lại tên model hoặc liên hệ admin. Model sẽ bị loại bỏ khỏi danh sách.`
               );
               // Remove the model from selected list
               this.selectedModels = this.selectedModels.filter((m) => m !== model);
@@ -1439,7 +1439,9 @@ class SurveyApp {
               return;
             }
           } else {
-            alert('Không tìm thấy POSM cho model này.');
+            const statusText = modelResponse ? modelResponse.status : 'Network Error';
+            console.error('❌ API request failed for model:', model, 'Status:', statusText);
+            alert(`Lỗi kết nối khi tìm POSM cho model "${model}". Status: ${statusText}. Vui lòng thử lại.`);
             // Remove the model from selected list
             this.selectedModels = this.selectedModels.filter((m) => m !== model);
             console.log('❌ Model removed due to API error');

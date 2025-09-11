@@ -25,4 +25,14 @@ const modelPosmSchema = new mongoose.Schema(
   }
 );
 
+// Add case-insensitive index for model field to improve query performance
+modelPosmSchema.index(
+  {
+    model: 1,
+  },
+  {
+    collation: { locale: 'en', strength: 2 }, // Case-insensitive collation
+  }
+);
+
 module.exports = mongoose.model('ModelPosm', modelPosmSchema);

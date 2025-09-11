@@ -79,7 +79,7 @@ const loadModelPosmData = async () => {
 
           if (model.trim() && posm.trim() && posmName.trim()) {
             modelPosmData.push({
-              model: model.trim(),
+              model: model.trim().toUpperCase(), // Normalize to uppercase for consistency
               posm: posm.trim(),
               posmName: posmName.trim(),
               category: category ? category.trim() : null,

@@ -193,25 +193,25 @@ const getSurveyResponses = async (req, res) => {
 
     // Build filter conditions from query parameters
     const filters = {};
-    
+
     // Global search functionality
     if (req.query.search) {
       const searchTerm = req.query.search.trim();
       if (searchTerm) {
         console.log(`🔍 Global search term: "${searchTerm}"`);
-        
+
         // Create text search across multiple fields
         const searchRegex = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-        
+
         filters.$or = [
           { shopName: { $regex: searchRegex } },
           { leader: { $regex: searchRegex } },
           { submittedBy: { $regex: searchRegex } },
-          { 'responses.model': { $regex: searchRegex } }
+          { 'responses.model': { $regex: searchRegex } },
         ];
       }
     }
-    
+
     // Specific field filters (work alongside global search)
     if (req.query.leader) {
       if (filters.$or) {
@@ -222,7 +222,9 @@ const getSurveyResponses = async (req, res) => {
       }
     }
     if (req.query.shopName) {
-      const shopNameFilter = { shopName: new RegExp(req.query.shopName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') };
+      const shopNameFilter = {
+        shopName: new RegExp(req.query.shopName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
+      };
       if (filters.$and) {
         filters.$and.push(shopNameFilter);
       } else if (filters.$or) {
@@ -243,10 +245,12 @@ const getSurveyResponses = async (req, res) => {
         filters.submittedBy = req.query.submittedBy;
       }
     }
-    
+
     // Model filtering
     if (req.query.model) {
-      const modelFilter = { 'responses.model': new RegExp(req.query.model.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') };
+      const modelFilter = {
+        'responses.model': new RegExp(req.query.model.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
+      };
       if (filters.$and) {
         filters.$and.push(modelFilter);
       } else if (filters.$or) {
@@ -871,14 +875,32 @@ const getModelAutocomplete = async (req, res) => {
 const getPosmByModel = async (req, res) => {
   try {
     const { model } = req.params;
-    const modelPosmData = await ModelPosm.find({ model: model }).lean();
+
+    // Add logging for debugging mobile requests
+    const userAgent = req.headers['user-agent'] || '';
+    const isMobile = /Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      userAgent
+    );
+    console.log(
+      `🔍 Model lookup request: "${model}" from mobile=${isMobile}, UA="${userAgent.substring(0, 50)}"`
+    );
+
+    // Case-insensitive query with regex to handle mobile case variations
+    const modelPosmData = await ModelPosm.find({
+      model: { $regex: new RegExp(`^${model.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+    }).lean();
 
     if (modelPosmData.length === 0) {
+      console.log(`❌ No POSM found for model: "${model}" (mobile=${isMobile})`);
       return res.status(404).json({
         success: false,
         message: 'Model not found',
       });
     }
+
+    console.log(
+      `✅ Found ${modelPosmData.length} POSM records for model: "${model}" (mobile=${isMobile})`
+    );
 
     const posmList = modelPosmData.map((item) => ({
       posmCode: item.posm,
@@ -903,37 +925,45 @@ const getPosmByModel = async (req, res) => {
 const getShopAutocomplete = async (req, res) => {
   try {
     const query = req.query.q || '';
-    
+
     if (query.length < 2) {
       return res.json([]);
     }
-    
+
     console.log(`🔍 Shop autocomplete search: "${query}"`);
-    
+
     const searchRegex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-    
+
     const shops = await SurveyResponse.distinct('shopName', {
-      shopName: { $regex: searchRegex }
+      shopName: { $regex: searchRegex },
     });
-    
+
     // Sort by relevance (exact matches first, then alphabetical)
     const sortedShops = shops.sort((a, b) => {
       const aLower = a.toLowerCase();
       const bLower = b.toLowerCase();
       const queryLower = query.toLowerCase();
-      
+
       // Exact match first
-      if (aLower === queryLower) return -1;
-      if (bLower === queryLower) return 1;
-      
+      if (aLower === queryLower) {
+        return -1;
+      }
+      if (bLower === queryLower) {
+        return 1;
+      }
+
       // Starts with query
-      if (aLower.startsWith(queryLower) && !bLower.startsWith(queryLower)) return -1;
-      if (bLower.startsWith(queryLower) && !aLower.startsWith(queryLower)) return 1;
-      
+      if (aLower.startsWith(queryLower) && !bLower.startsWith(queryLower)) {
+        return -1;
+      }
+      if (bLower.startsWith(queryLower) && !aLower.startsWith(queryLower)) {
+        return 1;
+      }
+
       // Alphabetical
       return a.localeCompare(b);
     });
-    
+
     res.json(sortedShops.slice(0, 10)); // Limit to 10 suggestions
   } catch (error) {
     console.error('Error in shop autocomplete:', error);
@@ -951,41 +981,45 @@ const getShopAutocomplete = async (req, res) => {
 const getSearchSuggestions = async (req, res) => {
   try {
     const query = req.query.q || '';
-    
+
     if (query.length < 2) {
       return res.json({
         shops: [],
         models: [],
-        submitters: []
+        submitters: [],
       });
     }
-    
+
     console.log(`💡 Search suggestions for: "${query}"`);
-    
+
     const searchRegex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-    
+
     // Get suggestions from different fields in parallel
     const [shops, models, submitters] = await Promise.all([
       SurveyResponse.distinct('shopName', { shopName: { $regex: searchRegex } }),
       SurveyResponse.distinct('responses.model', { 'responses.model': { $regex: searchRegex } }),
-      SurveyResponse.distinct('submittedBy', { submittedBy: { $regex: searchRegex } })
+      SurveyResponse.distinct('submittedBy', { submittedBy: { $regex: searchRegex } }),
     ]);
-    
+
     // Sort each array
     const sortFn = (a, b) => {
       const aLower = a.toLowerCase();
       const bLower = b.toLowerCase();
       const queryLower = query.toLowerCase();
-      
-      if (aLower.startsWith(queryLower) && !bLower.startsWith(queryLower)) return -1;
-      if (bLower.startsWith(queryLower) && !aLower.startsWith(queryLower)) return 1;
+
+      if (aLower.startsWith(queryLower) && !bLower.startsWith(queryLower)) {
+        return -1;
+      }
+      if (bLower.startsWith(queryLower) && !aLower.startsWith(queryLower)) {
+        return 1;
+      }
       return a.localeCompare(b);
     };
-    
+
     res.json({
       shops: shops.sort(sortFn).slice(0, 5),
       models: models.filter(Boolean).sort(sortFn).slice(0, 5),
-      submitters: submitters.filter(Boolean).sort(sortFn).slice(0, 5)
+      submitters: submitters.filter(Boolean).sort(sortFn).slice(0, 5),
     });
   } catch (error) {
     console.error('Error getting search suggestions:', error);

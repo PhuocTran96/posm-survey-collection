@@ -852,10 +852,10 @@ const getPOSMMatrix = async (req, res) => {
     );
 
     // Get all unique models from displays
-    const allModels = [...new Set(allDisplays.map(d => d.model))].sort();
+    const allModels = [...new Set(allDisplays.map((d) => d.model))].sort();
 
     // Create matrix data structure
-    const matrixData = storeProgress.map(store => {
+    const matrixData = storeProgress.map((store) => {
       const row = {
         storeId: store.storeId,
         storeName: store.storeName,
@@ -865,11 +865,11 @@ const getPOSMMatrix = async (req, res) => {
         totalModels: store.models.length,
         completionRate: store.completionRate,
         status: store.status,
-        posmStatus: {}
+        posmStatus: {},
       };
 
       // For each model, determine the POSM status
-      allModels.forEach(model => {
+      allModels.forEach((model) => {
         if (store.models.includes(model)) {
           // Store has this model
           const modelDetails = store.posmCompletionDetails[model];
@@ -879,7 +879,10 @@ const getPOSMMatrix = async (req, res) => {
               completed: modelDetails.completed,
               required: modelDetails.required,
               status: status,
-              percentage: modelDetails.required > 0 ? Math.round((modelDetails.completed / modelDetails.required) * 100) : 0
+              percentage:
+                modelDetails.required > 0
+                  ? Math.round((modelDetails.completed / modelDetails.required) * 100)
+                  : 0,
             };
           } else {
             // Model exists but no POSM details
@@ -887,7 +890,7 @@ const getPOSMMatrix = async (req, res) => {
               completed: 0,
               required: 0,
               status: 'not_applicable',
-              percentage: 0
+              percentage: 0,
             };
           }
         } else {
@@ -896,7 +899,7 @@ const getPOSMMatrix = async (req, res) => {
             completed: 0,
             required: 0,
             status: 'not_applicable',
-            percentage: 0
+            percentage: 0,
           };
         }
       });
@@ -908,11 +911,12 @@ const getPOSMMatrix = async (req, res) => {
     let filteredData = matrixData;
     if (search) {
       const searchLower = search.toLowerCase();
-      filteredData = matrixData.filter(row => 
-        row.storeName.toLowerCase().includes(searchLower) ||
-        row.storeId.toLowerCase().includes(searchLower) ||
-        row.region.toLowerCase().includes(searchLower) ||
-        row.province.toLowerCase().includes(searchLower)
+      filteredData = matrixData.filter(
+        (row) =>
+          row.storeName.toLowerCase().includes(searchLower) ||
+          row.storeId.toLowerCase().includes(searchLower) ||
+          row.region.toLowerCase().includes(searchLower) ||
+          row.province.toLowerCase().includes(searchLower)
       );
     }
 
@@ -920,14 +924,18 @@ const getPOSMMatrix = async (req, res) => {
     filteredData.sort((a, b) => {
       let aValue = a[sortBy];
       let bValue = b[sortBy];
-      
+
       if (typeof aValue === 'string') {
         aValue = aValue.toLowerCase();
         bValue = bValue.toLowerCase();
       }
-      
-      if (aValue < bValue) return -1 * sortOrder;
-      if (aValue > bValue) return 1 * sortOrder;
+
+      if (aValue < bValue) {
+        return -1 * sortOrder;
+      }
+      if (aValue > bValue) {
+        return 1 * sortOrder;
+      }
       return 0;
     });
 
@@ -940,13 +948,14 @@ const getPOSMMatrix = async (req, res) => {
     const summary = {
       totalStores: matrixData.length,
       totalModels: allModels.length,
-      averageCompletion: matrixData.reduce((sum, store) => sum + store.completionRate, 0) / matrixData.length,
+      averageCompletion:
+        matrixData.reduce((sum, store) => sum + store.completionRate, 0) / matrixData.length,
       statusCounts: {
-        complete: matrixData.filter(s => s.status === 'complete').length,
-        partial: matrixData.filter(s => s.status === 'partial').length,
-        not_verified: matrixData.filter(s => s.status === 'not_verified').length,
-        no_displays: matrixData.filter(s => s.status === 'no_displays').length
-      }
+        complete: matrixData.filter((s) => s.status === 'complete').length,
+        partial: matrixData.filter((s) => s.status === 'partial').length,
+        not_verified: matrixData.filter((s) => s.status === 'not_verified').length,
+        no_displays: matrixData.filter((s) => s.status === 'no_displays').length,
+      },
     };
 
     res.json({
@@ -962,10 +971,9 @@ const getPOSMMatrix = async (req, res) => {
           limit,
           hasNextPage: page < totalPages,
           hasPrevPage: page > 1,
-        }
-      }
+        },
+      },
     });
-
   } catch (error) {
     console.error('Get POSM matrix error:', error);
     res.status(500).json({
@@ -979,9 +987,15 @@ const getPOSMMatrix = async (req, res) => {
  * Helper function to determine matrix cell status
  */
 function getMatrixCellStatus(completed, required) {
-  if (required === 0) return 'not_applicable';
-  if (completed === 0) return 'none';
-  if (completed === required) return 'complete';
+  if (required === 0) {
+    return 'not_applicable';
+  }
+  if (completed === 0) {
+    return 'none';
+  }
+  if (completed === required) {
+    return 'complete';
+  }
   return 'partial';
 }
 
@@ -990,48 +1004,67 @@ function getMatrixCellStatus(completed, required) {
  */
 function calculateSurveyQuality(survey) {
   let score = 0;
-  
+
   // Check if survey has responses
-  if (!survey.responses || survey.responses.length === 0) return 0;
-  
+  if (!survey.responses || survey.responses.length === 0) {
+    return 0;
+  }
+
   // Base score for having responses
   score += 30;
-  
+
   // Check for valid POSM selections
-  const hasValidPosm = survey.responses.some(response => 
-    response.posmSelections && response.posmSelections.length > 0
+  const hasValidPosm = survey.responses.some(
+    (response) => response.posmSelections && response.posmSelections.length > 0
   );
-  if (hasValidPosm) score += 40;
-  
+  if (hasValidPosm) {
+    score += 40;
+  }
+
   // Check for complete data (store name, model info)
-  if (survey.shopName && survey.shopName.trim() !== '') score += 15;
-  if (survey.leader && survey.leader.trim() !== '') score += 10;
-  
+  if (survey.shopName && survey.shopName.trim() !== '') {
+    score += 15;
+  }
+  if (survey.leader && survey.leader.trim() !== '') {
+    score += 10;
+  }
+
   // Check submission completeness
-  if (survey.submittedAt || survey.createdAt) score += 5;
-  
+  if (survey.submittedAt || survey.createdAt) {
+    score += 5;
+  }
+
   return Math.min(score, 100);
 }
 
 function validateAndCleanSurveys(surveys) {
-  return surveys.filter(survey => {
-    // Filter out surveys with no responses
-    if (!survey.responses || survey.responses.length === 0) return false;
-    
-    // Filter out surveys with no POSM data
-    const hasValidPosm = survey.responses.some(response => 
-      response.posmSelections && response.posmSelections.length > 0
-    );
-    if (!hasValidPosm) return false;
-    
-    // Filter out surveys without store identification
-    if (!survey.shopName || survey.shopName.trim() === '') return false;
-    
-    return true;
-  }).map(survey => ({
-    ...survey,
-    qualityScore: calculateSurveyQuality(survey)
-  })).filter(survey => survey.qualityScore >= 30); // Minimum quality threshold
+  return surveys
+    .filter((survey) => {
+      // Filter out surveys with no responses
+      if (!survey.responses || survey.responses.length === 0) {
+        return false;
+      }
+
+      // Filter out surveys with no POSM data
+      const hasValidPosm = survey.responses.some(
+        (response) => response.posmSelections && response.posmSelections.length > 0
+      );
+      if (!hasValidPosm) {
+        return false;
+      }
+
+      // Filter out surveys without store identification
+      if (!survey.shopName || survey.shopName.trim() === '') {
+        return false;
+      }
+
+      return true;
+    })
+    .map((survey) => ({
+      ...survey,
+      qualityScore: calculateSurveyQuality(survey),
+    }))
+    .filter((survey) => survey.qualityScore >= 30); // Minimum quality threshold
 }
 
 /**
@@ -1045,9 +1078,11 @@ async function calculateStoreProgressImproved(
 ) {
   // Validate and clean surveys first to prevent corrupt data
   const validatedSurveys = validateAndCleanSurveys(surveys);
-  
-  console.log(`Survey validation: ${surveys.length} raw surveys → ${validatedSurveys.length} validated surveys`);
-  
+
+  console.log(
+    `Survey validation: ${surveys.length} raw surveys → ${validatedSurveys.length} validated surveys`
+  );
+
   const storeStats = {};
   const storeMap = {};
 
@@ -1105,9 +1140,10 @@ async function calculateStoreProgressImproved(
     // Debug specific store
     const debugStore = (storeId) => {
       const debugStores = ['cao_phong_dist_5', 'Cao Phong Dist 5'];
-      return debugStores.some(debug => 
-        storeId.toLowerCase().includes(debug.toLowerCase()) ||
-        debug.toLowerCase().includes(storeId.toLowerCase())
+      return debugStores.some(
+        (debug) =>
+          storeId.toLowerCase().includes(debug.toLowerCase()) ||
+          debug.toLowerCase().includes(storeId.toLowerCase())
       );
     };
 
@@ -1119,16 +1155,23 @@ async function calculateStoreProgressImproved(
 
       // Process all surveys to build cumulative POSM completion
       allMatchingSurveysForStore.forEach((survey) => {
-        const matchingResponse = survey.responses &&
+        const matchingResponse =
+          survey.responses &&
           survey.responses.find((response) => isModelMatch(display.model, response.model));
-        
-        if (matchingResponse && matchingResponse.posmSelections && Array.isArray(matchingResponse.posmSelections)) {
+
+        if (
+          matchingResponse &&
+          matchingResponse.posmSelections &&
+          Array.isArray(matchingResponse.posmSelections)
+        ) {
           hasValidResponse = true;
-          
+
           // Add all selected POSMs to our cumulative set
           matchingResponse.posmSelections.forEach((posmSelection) => {
             if (posmSelection.selected) {
-              completedPosmSet.add(posmSelection.posmCode || posmSelection.posm_id || JSON.stringify(posmSelection));
+              completedPosmSet.add(
+                posmSelection.posmCode || posmSelection.posm_id || JSON.stringify(posmSelection)
+              );
             }
           });
 
@@ -1160,11 +1203,15 @@ async function calculateStoreProgressImproved(
 
         // Update per-model completion details
         if (storeStats[display.store_id].posmCompletionDetails[display.model]) {
-          storeStats[display.store_id].posmCompletionDetails[display.model].completed = completedPosmCount;
+          storeStats[display.store_id].posmCompletionDetails[display.model].completed =
+            completedPosmCount;
         }
 
         // Update last survey date
-        if (!storeStats[display.store_id].lastSurveyDate || latestSurveyDate > storeStats[display.store_id].lastSurveyDate) {
+        if (
+          !storeStats[display.store_id].lastSurveyDate ||
+          latestSurveyDate > storeStats[display.store_id].lastSurveyDate
+        ) {
           storeStats[display.store_id].lastSurveyDate = latestSurveyDate;
         }
 
@@ -1172,7 +1219,7 @@ async function calculateStoreProgressImproved(
         const latestSurvey = allMatchingSurveysForStore.sort(
           (a, b) => new Date(b.createdAt || b.submittedAt) - new Date(a.createdAt || a.submittedAt)
         )[0];
-        
+
         storeStats[display.store_id].matchingDebug.push({
           displayModel: display.model,
           surveyModels: latestSurvey.responses.map((r) => r.model),
@@ -1180,7 +1227,7 @@ async function calculateStoreProgressImproved(
           surveyLeader: latestSurvey.leader,
           completedPOSMs: completedPosmCount, // Use cumulative count
           totalSurveys: allMatchingSurveysForStore.length,
-          method: 'cumulative'
+          method: 'cumulative',
         });
       }
     }

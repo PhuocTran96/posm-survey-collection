@@ -49,7 +49,7 @@ const generateTokens = (user) => {
  */
 const verifyToken = async (req, res, next) => {
   try {
-    // Enhanced authentication debugging
+    // Mobile and ETG request detection for targeted logging
     const isMobile = /Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
       req.headers['user-agent'] || ''
     );
@@ -57,11 +57,6 @@ const verifyToken = async (req, res, next) => {
     const isETGRequest =
       requestUrl.includes('ETG') ||
       (req.params && req.params.model && req.params.model.includes('ETG'));
-
-    console.log(`🔐 === AUTHENTICATION CHECK ===`);
-    console.log(
-      `📍 Request: ${req.method} ${requestUrl} (mobile=${isMobile}, isETG=${isETGRequest})`
-    );
 
     const authHeader = req.headers.authorization;
 
@@ -123,25 +118,10 @@ const verifyToken = async (req, res, next) => {
       });
     }
 
-    // Enhanced session timeout debugging
+    // Check for session timeout (60 minutes of inactivity)
     const now = Date.now();
     const lastActivity = decoded.lastActivity || decoded.iat * 1000; // Fallback to token issued time
     const timeSinceLastActivity = now - lastActivity;
-    const timeUntilTimeout = SESSION_TIMEOUT - timeSinceLastActivity;
-
-    console.log(`⏰ Session Timing Analysis:`, {
-      url: requestUrl,
-      mobile: isMobile,
-      isETG: isETGRequest,
-      userId: user._id,
-      username: user.username,
-      currentTime: new Date(now).toISOString(),
-      lastActivityTime: new Date(lastActivity).toISOString(),
-      timeSinceLastActivity: `${Math.round(timeSinceLastActivity / 1000)}s`,
-      timeUntilTimeout: `${Math.round(timeUntilTimeout / 1000)}s`,
-      sessionTimeoutLimit: `${SESSION_TIMEOUT / 1000}s`,
-      willTimeout: timeSinceLastActivity > SESSION_TIMEOUT,
-    });
 
     if (timeSinceLastActivity > SESSION_TIMEOUT) {
       console.log(`❌ AUTH FAILED - Session timeout:`, {
@@ -163,14 +143,16 @@ const verifyToken = async (req, res, next) => {
     req.user = user;
     req.tokenData = decoded;
 
-    console.log(`✅ AUTH SUCCESS:`, {
-      url: requestUrl,
-      mobile: isMobile,
-      isETG: isETGRequest,
-      userId: user._id,
-      username: user.username,
-      timeRemaining: `${Math.round(timeUntilTimeout / 1000)}s`,
-    });
+    // Only log for ETG mobile requests or approaching timeout
+    const timeUntilTimeout = SESSION_TIMEOUT - timeSinceLastActivity;
+    if ((isMobile && isETGRequest) || timeUntilTimeout < 10 * 60 * 1000) {
+      console.log(`✅ AUTH SUCCESS (ETG/Near-timeout):`, {
+        url: requestUrl,
+        mobile: isMobile,
+        isETG: isETGRequest,
+        timeRemaining: `${Math.round(timeUntilTimeout / 1000)}s`,
+      });
+    }
 
     next();
   } catch (error) {
@@ -386,50 +368,19 @@ const updateActivity = async (req, res, next) => {
       const timeSinceLastActivity = now - lastActivity;
       const activityThreshold = 5 * 60 * 1000; // 5 minutes
 
-      console.log(`⚡ === ACTIVITY UPDATE ===`);
-      console.log(
-        `📍 Request: ${req.method} ${requestUrl} (mobile=${isMobile}, isETG=${isETGRequest})`
-      );
-      console.log(`⏰ Activity Timing:`, {
-        userId: req.user._id,
-        username: req.user.username,
-        currentTime: new Date(now).toISOString(),
-        lastActivityTime: new Date(lastActivity).toISOString(),
-        timeSinceLastActivity: `${Math.round(timeSinceLastActivity / 1000)}s`,
-        activityThreshold: `${activityThreshold / 1000}s`,
-        willUpdateToken: timeSinceLastActivity > activityThreshold,
-        mobile: isMobile,
-        isETG: isETGRequest,
-      });
-
       // Update activity if more than 5 minutes have passed to avoid excessive token generation
       if (timeSinceLastActivity > activityThreshold) {
-        console.log(
-          `🔄 Generating new token due to activity threshold (mobile=${isMobile}, ETG=${isETGRequest})`
-        );
+        // Only log token generation for ETG mobile requests or when debugging needed
+        if (isMobile && isETGRequest) {
+          console.log(`🔄 Generating new token for ETG mobile request`);
+        }
 
         // Generate new token with updated activity
         const newTokens = generateTokens(req.user);
 
         // Set new token in response header for client to update
         res.setHeader('X-New-Access-Token', newTokens.accessToken);
-
-        console.log(
-          `✅ New access token generated and sent in header (mobile=${isMobile}, ETG=${isETGRequest})`
-        );
-      } else {
-        console.log(
-          `⏭️ No token update needed - within activity threshold (mobile=${isMobile}, ETG=${isETGRequest})`
-        );
       }
-    } else {
-      console.log(`⚠️ Activity update skipped - missing user or token data:`, {
-        hasUser: !!req.user,
-        hasTokenData: !!req.tokenData,
-        url: requestUrl,
-        mobile: isMobile,
-        isETG: isETGRequest,
-      });
     }
   } catch (error) {
     const isMobile = /Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(

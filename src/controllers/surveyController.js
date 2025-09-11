@@ -133,28 +133,15 @@ const getModelsByStoreId = async (req, res) => {
   try {
     const storeId = req.params.storeId;
 
-    console.log(`🏪 === SHOP MODELS API CALL ===`);
-    console.log(`📍 Request: GET /api/models/${storeId}`);
-    console.log(`🔍 Store ID: "${storeId}"`);
-
     // Find the store by store_id
     const store = await Store.findOne({ store_id: storeId });
     if (!store) {
-      console.log(`❌ Store not found:`, {
-        storeId: storeId,
-        searchField: 'store_id',
-      });
+      console.log(`❌ Store not found: ${storeId}`);
       return res.status(404).json({
         success: false,
         message: 'Store not found',
       });
     }
-
-    console.log(`✅ Store found:`, {
-      storeId: storeId,
-      storeName: store.name,
-      leader: store.leader,
-    });
 
     // Get all models and POSM data (same logic as getModelsByLeaderAndShop)
     const modelPosmData = await ModelPosm.find().lean();
@@ -168,13 +155,6 @@ const getModelsByStoreId = async (req, res) => {
         posmCode: item.posm,
         posmName: item.posmName,
       });
-    });
-
-    console.log(`📊 Models data prepared:`, {
-      storeId: storeId,
-      totalModels: Object.keys(modelGroups).length,
-      etgModels: Object.keys(modelGroups).filter((model) => model.includes('ETG')).length,
-      sampleModels: Object.keys(modelGroups).slice(0, 5),
     });
 
     res.json(modelGroups);

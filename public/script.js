@@ -1306,11 +1306,25 @@ class SurveyApp {
 
   async onModelInput(e) {
     const value = e.target.value.trim();
+    
+    // === ENHANCED MODEL INPUT DEBUGGING ===
+    console.log(`⌨️ === MODEL INPUT EVENT ===`);
+    console.log(`📝 User typed: "${value}"`, {
+      originalValue: e.target.value,
+      trimmedValue: value,
+      containsETG: value.includes('ETG'),
+      startsWithETG: value.startsWith('ETG'),
+      valueLength: value.length,
+      inputElement: e.target.id,
+      timestamp: new Date().toISOString()
+    });
+    
     this.modelSearchValue = value;
     this.modelSearchSelected = '';
     document.getElementById('addModelBtn').disabled = true;
 
     if (!value) {
+      console.log(`❌ Empty input, hiding suggestions`);
       this.hideModelSuggestions();
       return;
     }
@@ -1322,36 +1336,72 @@ class SurveyApp {
 
     // Debounce the API call by 300ms to prevent race conditions
     this.modelSearchDebounceTimer = setTimeout(async () => {
+      console.log(`🔍 === AUTOCOMPLETE API CALL ===`);
+      console.log(`📞 Calling autocomplete for: "${value}"`);
+      
       try {
-        const res = await this.authenticatedFetch(
-          `/api/model-autocomplete?q=${encodeURIComponent(value)}`
-        );
+        const autocompleteUrl = `/api/model-autocomplete?q=${encodeURIComponent(value)}`;
+        console.log(`📞 Autocomplete URL: ${autocompleteUrl}`);
+        
+        const res = await this.authenticatedFetch(autocompleteUrl);
+        
+        console.log(`📥 Autocomplete response:`, {
+          ok: res?.ok,
+          status: res?.status,
+          statusText: res?.statusText
+        });
+        
         if (res && res.ok) {
           const models = await res.json();
+          
+          console.log(`🎯 Autocomplete results for "${value}":`, {
+            totalResults: models?.length || 0,
+            results: models,
+            hasETGResults: models?.some(m => m.includes('ETG')),
+            etgResults: models?.filter(m => m.includes('ETG')) || []
+          });
+          
           this.showModelSuggestions(models);
         } else {
-          console.error('Model search API call failed:', res?.status);
+          console.error('❌ Model search API call failed:', res?.status);
           this.hideModelSuggestions();
         }
       } catch (error) {
-        console.error('Model search error:', error);
+        console.error('❌ Model search error:', error);
         this.hideModelSuggestions();
       }
     }, 300);
   }
 
   showModelSuggestions(models) {
+    console.log(`🎯 === DISPLAYING MODEL SUGGESTIONS ===`);
+    console.log(`📋 Received models to display:`, {
+      totalModels: models?.length || 0,
+      models: models,
+      etgModels: models?.filter(m => m.includes('ETG')) || [],
+      hasETG: models?.some(m => m.includes('ETG'))
+    });
+    
     const suggestionsBox = document.getElementById('modelSuggestions');
     suggestionsBox.innerHTML = '';
+    
     if (!models.length) {
+      console.log(`❌ No models to display, hiding suggestions`);
       suggestionsBox.style.display = 'none';
       return;
     }
+    
+    let displayedModels = [];
     models.forEach((model, idx) => {
       // Prevent duplicates
       if (this.selectedModels.includes(model)) {
+        console.log(`⚠️ Skipping duplicate model: "${model}"`);
         return;
       }
+      
+      console.log(`✅ Adding suggestion: "${model}" (index: ${idx})`);
+      displayedModels.push(model);
+      
       const div = document.createElement('div');
       div.className = 'autocomplete-suggestion';
       div.textContent = model;
@@ -1411,19 +1461,66 @@ class SurveyApp {
   }
 
   selectModelSuggestion(model) {
+    console.log(`👆 === MODEL SELECTION ===`);
+    console.log(`✅ User selected model: "${model}"`, {
+      modelType: typeof model,
+      modelLength: model?.length,
+      containsETG: model?.includes('ETG'),
+      startsWithETG: model?.startsWith('ETG'),
+      timestamp: new Date().toISOString()
+    });
+    
     document.getElementById('modelSearchInput').value = model;
     this.modelSearchSelected = model;
+    
+    console.log(`🔄 Model selection state updated:`, {
+      modelSearchSelected: this.modelSearchSelected,
+      inputValue: document.getElementById('modelSearchInput').value,
+      addButtonDisabled: document.getElementById('addModelBtn').disabled
+    });
+    
     document.getElementById('addModelBtn').disabled = false;
     this.hideModelSuggestions();
+    
+    console.log(`✅ Model "${model}" is now ready to be added`);
   }
 
   async onAddModel() {
+    // === ENHANCED MODEL ADDITION DEBUGGING ===
+    console.log(`🚀 === STARTING Model Addition Process ===`);
+    console.log(`🔍 Initial State Check:`, {
+      timestamp: new Date().toISOString(),
+      isMobile: /Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+      modelSearchSelected: this.modelSearchSelected,
+      modelSearchValue: this.modelSearchValue,
+      rawInputValue: document.getElementById('modelSearchInput')?.value,
+      selectedModelsCount: this.selectedModels?.length,
+      currentSelectedModels: [...(this.selectedModels || [])]
+    });
+
     const model = this.modelSearchSelected;
+    
+    // Enhanced validation debugging
+    console.log(`📋 Model Validation Check:`, {
+      model: model,
+      modelType: typeof model,
+      modelLength: model?.length,
+      isEmpty: !model,
+      isAlreadySelected: this.selectedModels.includes(model),
+      selectedModelsList: this.selectedModels,
+      willContinue: !(!model || this.selectedModels.includes(model))
+    });
+    
     if (!model || this.selectedModels.includes(model)) {
+      console.log(`❌ EARLY RETURN - Model validation failed:`, {
+        reason: !model ? 'No model selected' : 'Model already in list',
+        model: model,
+        currentList: this.selectedModels
+      });
       return;
     }
 
-    console.log('🔄 Adding model:', model);
+    console.log('✅ Model validation passed, proceeding with addition:', model);
     console.log('📋 Current selectedModels before adding:', this.selectedModels);
 
     try {
@@ -1435,18 +1532,51 @@ class SurveyApp {
 
       // Load POSM for this model if not already loaded
       if (!this.surveyData[model]) {
-        console.log('🔍 Loading POSM data for model:', model);
+        console.log(`🔍 === STARTING POSM Data Loading for model: "${model}" ===`);
+        
+        // Enhanced shop data API debugging
+        const shopApiUrl = `/api/models/${encodeURIComponent(this.selectedShop.store_id)}`;
+        console.log(`🏪 Fetching shop-specific models:`, {
+          model: model,
+          shopId: this.selectedShop.store_id,
+          apiUrl: shopApiUrl,
+          timestamp: new Date().toISOString()
+        });
+        
         // Fetch POSM for this specific model
-        const response = await this.authenticatedFetch(
-          `/api/models/${encodeURIComponent(this.selectedShop.store_id)}`
-        );
+        const response = await this.authenticatedFetch(shopApiUrl);
         const allModels = await response.json();
+
+        // Comprehensive shop data analysis
+        console.log(`📊 Shop Data Analysis:`, {
+          model: model,
+          shopId: this.selectedShop.store_id,
+          responseOk: response?.ok,
+          responseStatus: response?.status,
+          allModelsType: typeof allModels,
+          allModelsIsArray: Array.isArray(allModels),
+          totalModelsCount: Object.keys(allModels || {}).length,
+          modelExistsInShopData: !!(allModels && allModels[model]),
+          sampleModelKeys: Object.keys(allModels || {}).slice(0, 5),
+          modelKeysWithETG: Object.keys(allModels || {}).filter(key => key.includes('ETG')),
+          exactModelMatch: allModels ? allModels[model] : 'N/A'
+        });
 
         if (allModels[model]) {
           this.surveyData[model] = allModels[model];
-          console.log('✅ POSM data loaded from shop data for model:', model);
+          console.log(`✅ POSM data loaded from shop data for model: "${model}"`);
+          console.log(`📋 Shop data content for "${model}":`, allModels[model]);
         } else {
-          console.log('🔍 Model not found in shop data, trying general model list');
+          console.log(`❌ Model "${model}" NOT FOUND in shop data`);
+          console.log(`🔍 Available models in shop data:`, Object.keys(allModels || {}));
+          console.log(`🔍 Trying general model list for: "${model}"`);
+          
+          // Check for case-sensitive issues in shop data
+          const modelKeys = Object.keys(allModels || {});
+          const caseInsensitiveMatch = modelKeys.find(key => key.toLowerCase() === model.toLowerCase());
+          if (caseInsensitiveMatch) {
+            console.log(`⚠️ CASE SENSITIVITY ISSUE: Found "${caseInsensitiveMatch}" in shop data, but looking for "${model}"`);
+          }
           // Enhanced mobile debugging
           const isMobile = /Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
           console.log(`📱 Client info for model "${model}":`, {
@@ -1454,6 +1584,12 @@ class SurveyApp {
             userAgent: navigator.userAgent.substring(0, 100),
             requestTime: new Date().toISOString()
           });
+          
+          // === CRITICAL DEBUG POINT: About to call general model API ===
+          console.log(`🚀 === CALLING GENERAL MODEL API ===`);
+          console.log(`📞 About to call /api/model-posm/ for model: "${model}"`);
+          console.log(`📞 API URL: /api/model-posm/${encodeURIComponent(model)}`);
+          console.log(`📞 This should appear in server logs if successful`);
           
           // If model not found in shop data, try to get it from the general model list
           const modelResponse = await this.authenticatedFetch(

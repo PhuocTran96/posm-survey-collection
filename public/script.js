@@ -351,20 +351,48 @@ class SurveyApp {
           .json()
           .catch(() => ({}));
 
+        console.log(`🔐 401 Error Analysis:`, {
+          url: url,
+          mobile: isMobile,
+          errorCode: errorData.code,
+          errorMessage: errorData.message,
+          retryCount: retryCount,
+          willRetry: retryCount === 0
+        });
+
         if (errorData.code === 'SESSION_TIMEOUT') {
-          // Session timeout - redirect to login immediately
-          this.clearAuthData();
-          this.redirectToLogin('Session expired due to inactivity. Please login again.');
-          return null;
+          // Enhanced session timeout handling for mobile
+          if (isMobile && retryCount === 0) {
+            console.log(`📱 Mobile session timeout detected, attempting refresh before logout...`);
+            
+            const refreshSuccess = await this.refreshToken();
+            if (refreshSuccess) {
+              console.log(`✅ Mobile session refresh successful, retrying request`);
+              return await this.authenticatedFetch(url, options, 1);
+            } else {
+              console.log(`❌ Mobile session refresh failed, redirecting to login`);
+              this.clearAuthData();
+              this.redirectToLogin('Session expired due to inactivity. Please login again.');
+              return null;
+            }
+          } else {
+            // Desktop or already retried - redirect to login immediately
+            console.log(`🖥️ Desktop session timeout or retry exhausted, redirecting to login`);
+            this.clearAuthData();
+            this.redirectToLogin('Session expired due to inactivity. Please login again.');
+            return null;
+          }
         } else if (retryCount === 0) {
           // Token expired, try to refresh token once
-          console.log('Token expired, attempting refresh...');
+          console.log(`🔄 Token expired, attempting refresh... (mobile=${isMobile})`);
 
           const refreshSuccess = await this.refreshToken();
           if (refreshSuccess) {
+            console.log(`✅ Token refresh successful, retrying request`);
             // Retry the original request with new token
             return await this.authenticatedFetch(url, options, 1);
           } else {
+            console.log(`❌ Token refresh failed, redirecting to login`);
             // Refresh failed, redirect to login
             this.clearAuthData();
             this.redirectToLogin('Session expired, please login again');
@@ -372,6 +400,7 @@ class SurveyApp {
           }
         } else {
           // Already retried once, redirect to login
+          console.log(`❌ Authentication retry exhausted, redirecting to login`);
           this.clearAuthData();
           this.redirectToLogin('Authentication failed');
           return null;
@@ -400,15 +429,23 @@ class SurveyApp {
     }
   }
 
-  // Token refresh method
+  // Enhanced token refresh method
   async refreshToken() {
     const refreshToken = localStorage.getItem('refreshToken');
+    const isMobile = /Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    console.log(`🔄 === TOKEN REFRESH ATTEMPT ===`);
+    console.log(`📱 Mobile: ${isMobile}, Has refresh token: ${!!refreshToken}`);
+    
     if (!refreshToken) {
-      console.log('No refresh token available');
+      console.log('❌ No refresh token available for refresh');
       return false;
     }
 
     try {
+      const refreshStartTime = Date.now();
+      console.log(`📞 Calling refresh endpoint...`);
+      
       const response = await fetch('/api/auth/refresh', {
         method: 'POST',
         headers: {
@@ -417,22 +454,54 @@ class SurveyApp {
         body: JSON.stringify({ refreshToken }),
       });
 
+      const refreshDuration = Date.now() - refreshStartTime;
+      console.log(`⏱️ Refresh request completed in ${refreshDuration}ms`);
+      
+      console.log(`📥 Refresh response:`, {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        mobile: isMobile
+      });
+
       if (response.ok) {
         const result = await response.json();
+        
+        console.log(`🔍 Refresh result:`, {
+          success: result.success,
+          hasData: !!result.data,
+          hasAccessToken: !!(result.data?.accessToken),
+          hasRefreshToken: !!(result.data?.refreshToken),
+          hasUser: !!(result.data?.user)
+        });
+        
         if (result.success) {
           // Update tokens in localStorage
           localStorage.setItem('accessToken', result.data.accessToken);
           localStorage.setItem('refreshToken', result.data.refreshToken);
           localStorage.setItem('user', JSON.stringify(result.data.user));
-          console.log('Token refreshed successfully');
+          console.log(`✅ Token refreshed successfully (mobile=${isMobile})`);
           return true;
+        } else {
+          console.log(`❌ Refresh failed - success=false:`, result.message);
         }
+      } else {
+        console.log(`❌ Refresh request failed:`, {
+          status: response.status,
+          statusText: response.statusText,
+          mobile: isMobile
+        });
       }
 
-      console.log('Token refresh failed:', response.status);
+      console.log(`❌ Token refresh failed: ${response.status}`);
       return false;
     } catch (error) {
-      console.error('Token refresh error:', error);
+      console.error(`❌ Token refresh error (mobile=${isMobile}):`, {
+        errorType: error.name,
+        errorMessage: error.message,
+        isTimeout: error.message.includes('timeout'),
+        isNetworkError: error.message.includes('Failed to fetch')
+      });
       return false;
     }
   }

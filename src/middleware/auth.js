@@ -49,9 +49,29 @@ const generateTokens = (user) => {
  */
 const verifyToken = async (req, res, next) => {
   try {
+    // Enhanced authentication debugging
+    const isMobile = /Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      req.headers['user-agent'] || ''
+    );
+    const requestUrl = req.originalUrl || req.url;
+    const isETGRequest =
+      requestUrl.includes('ETG') ||
+      (req.params && req.params.model && req.params.model.includes('ETG'));
+
+    console.log(`🔐 === AUTHENTICATION CHECK ===`);
+    console.log(
+      `📍 Request: ${req.method} ${requestUrl} (mobile=${isMobile}, isETG=${isETGRequest})`
+    );
+
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log(`❌ AUTH FAILED - No Bearer token:`, {
+        url: requestUrl,
+        mobile: isMobile,
+        isETG: isETGRequest,
+        authHeader: authHeader ? 'present but invalid' : 'missing',
+      });
       return res.status(401).json({
         success: false,
         message: 'Access token is required',
@@ -70,6 +90,17 @@ const verifyToken = async (req, res, next) => {
     const user = await User.findById(decoded.id).select('-password -refreshToken');
 
     if (!user) {
+      console.log(`❌ AUTH FAILED - User not found:`, {
+        url: requestUrl,
+        mobile: isMobile,
+        isETG: isETGRequest,
+        userId: decoded.id,
+        decodedData: {
+          ...decoded,
+          iat: new Date(decoded.iat * 1000),
+          exp: new Date(decoded.exp * 1000),
+        },
+      });
       return res.status(401).json({
         success: false,
         message: 'User not found',
@@ -78,6 +109,13 @@ const verifyToken = async (req, res, next) => {
     }
 
     if (!user.isActive) {
+      console.log(`❌ AUTH FAILED - Account deactivated:`, {
+        url: requestUrl,
+        mobile: isMobile,
+        isETG: isETGRequest,
+        userId: user._id,
+        username: user.username,
+      });
       return res.status(401).json({
         success: false,
         message: 'Account is deactivated',
@@ -85,11 +123,35 @@ const verifyToken = async (req, res, next) => {
       });
     }
 
-    // Check for session timeout (60 minutes of inactivity)
+    // Enhanced session timeout debugging
     const now = Date.now();
     const lastActivity = decoded.lastActivity || decoded.iat * 1000; // Fallback to token issued time
+    const timeSinceLastActivity = now - lastActivity;
+    const timeUntilTimeout = SESSION_TIMEOUT - timeSinceLastActivity;
 
-    if (now - lastActivity > SESSION_TIMEOUT) {
+    console.log(`⏰ Session Timing Analysis:`, {
+      url: requestUrl,
+      mobile: isMobile,
+      isETG: isETGRequest,
+      userId: user._id,
+      username: user.username,
+      currentTime: new Date(now).toISOString(),
+      lastActivityTime: new Date(lastActivity).toISOString(),
+      timeSinceLastActivity: `${Math.round(timeSinceLastActivity / 1000)}s`,
+      timeUntilTimeout: `${Math.round(timeUntilTimeout / 1000)}s`,
+      sessionTimeoutLimit: `${SESSION_TIMEOUT / 1000}s`,
+      willTimeout: timeSinceLastActivity > SESSION_TIMEOUT,
+    });
+
+    if (timeSinceLastActivity > SESSION_TIMEOUT) {
+      console.log(`❌ AUTH FAILED - Session timeout:`, {
+        url: requestUrl,
+        mobile: isMobile,
+        isETG: isETGRequest,
+        userId: user._id,
+        username: user.username,
+        exceededBy: `${Math.round((timeSinceLastActivity - SESSION_TIMEOUT) / 1000)}s`,
+      });
       return res.status(401).json({
         success: false,
         message: 'Session expired due to inactivity',
@@ -101,11 +163,41 @@ const verifyToken = async (req, res, next) => {
     req.user = user;
     req.tokenData = decoded;
 
+    console.log(`✅ AUTH SUCCESS:`, {
+      url: requestUrl,
+      mobile: isMobile,
+      isETG: isETGRequest,
+      userId: user._id,
+      username: user.username,
+      timeRemaining: `${Math.round(timeUntilTimeout / 1000)}s`,
+    });
+
     next();
   } catch (error) {
-    console.error('Token verification error:', error);
+    const isMobile = /Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      req.headers['user-agent'] || ''
+    );
+    const requestUrl = req.originalUrl || req.url;
+    const isETGRequest =
+      requestUrl.includes('ETG') ||
+      (req.params && req.params.model && req.params.model.includes('ETG'));
+
+    console.error(`❌ AUTH ERROR - Token verification failed:`, {
+      url: requestUrl,
+      mobile: isMobile,
+      isETG: isETGRequest,
+      errorName: error.name,
+      errorMessage: error.message,
+      stack: error.stack?.split('\n')[0],
+    });
 
     if (error.name === 'TokenExpiredError') {
+      console.log(`❌ AUTH FAILED - Token expired:`, {
+        url: requestUrl,
+        mobile: isMobile,
+        isETG: isETGRequest,
+        expiredAt: new Date(error.expiredAt).toISOString(),
+      });
       return res.status(401).json({
         success: false,
         message: 'Access token expired',
@@ -114,6 +206,12 @@ const verifyToken = async (req, res, next) => {
     }
 
     if (error.name === 'JsonWebTokenError') {
+      console.log(`❌ AUTH FAILED - Invalid JWT:`, {
+        url: requestUrl,
+        mobile: isMobile,
+        isETG: isETGRequest,
+        reason: error.message,
+      });
       return res.status(401).json({
         success: false,
         message: 'Invalid access token',
@@ -274,21 +372,79 @@ const getClientInfo = (req) => {
  */
 const updateActivity = async (req, res, next) => {
   try {
+    const isMobile = /Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      req.headers['user-agent'] || ''
+    );
+    const requestUrl = req.originalUrl || req.url;
+    const isETGRequest =
+      requestUrl.includes('ETG') ||
+      (req.params && req.params.model && req.params.model.includes('ETG'));
+
     if (req.user && req.tokenData) {
       const now = Date.now();
       const lastActivity = req.tokenData.lastActivity || req.tokenData.iat * 1000;
+      const timeSinceLastActivity = now - lastActivity;
+      const activityThreshold = 5 * 60 * 1000; // 5 minutes
+
+      console.log(`⚡ === ACTIVITY UPDATE ===`);
+      console.log(
+        `📍 Request: ${req.method} ${requestUrl} (mobile=${isMobile}, isETG=${isETGRequest})`
+      );
+      console.log(`⏰ Activity Timing:`, {
+        userId: req.user._id,
+        username: req.user.username,
+        currentTime: new Date(now).toISOString(),
+        lastActivityTime: new Date(lastActivity).toISOString(),
+        timeSinceLastActivity: `${Math.round(timeSinceLastActivity / 1000)}s`,
+        activityThreshold: `${activityThreshold / 1000}s`,
+        willUpdateToken: timeSinceLastActivity > activityThreshold,
+        mobile: isMobile,
+        isETG: isETGRequest,
+      });
 
       // Update activity if more than 5 minutes have passed to avoid excessive token generation
-      if (now - lastActivity > 5 * 60 * 1000) {
+      if (timeSinceLastActivity > activityThreshold) {
+        console.log(
+          `🔄 Generating new token due to activity threshold (mobile=${isMobile}, ETG=${isETGRequest})`
+        );
+
         // Generate new token with updated activity
         const newTokens = generateTokens(req.user);
 
         // Set new token in response header for client to update
         res.setHeader('X-New-Access-Token', newTokens.accessToken);
+
+        console.log(
+          `✅ New access token generated and sent in header (mobile=${isMobile}, ETG=${isETGRequest})`
+        );
+      } else {
+        console.log(
+          `⏭️ No token update needed - within activity threshold (mobile=${isMobile}, ETG=${isETGRequest})`
+        );
       }
+    } else {
+      console.log(`⚠️ Activity update skipped - missing user or token data:`, {
+        hasUser: !!req.user,
+        hasTokenData: !!req.tokenData,
+        url: requestUrl,
+        mobile: isMobile,
+        isETG: isETGRequest,
+      });
     }
   } catch (error) {
-    console.error('Activity update error:', error);
+    const isMobile = /Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      req.headers['user-agent'] || ''
+    );
+    const requestUrl = req.originalUrl || req.url;
+    const isETGRequest =
+      requestUrl.includes('ETG') ||
+      (req.params && req.params.model && req.params.model.includes('ETG'));
+
+    console.error(`❌ Activity update error (mobile=${isMobile}, ETG=${isETGRequest}):`, {
+      url: requestUrl,
+      error: error.message,
+      stack: error.stack,
+    });
     // Don't fail the request if activity update fails
   }
 

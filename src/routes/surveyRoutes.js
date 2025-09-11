@@ -26,6 +26,13 @@ router.get(
   surveyController.getModelsByLeaderAndShop
 );
 router.get(
+  '/models/:storeId',
+  verifyToken,
+  updateActivity,
+  requireSurveyUser,
+  surveyController.getModelsByStoreId
+);
+router.get(
   '/model-autocomplete',
   verifyToken,
   updateActivity,

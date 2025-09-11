@@ -306,6 +306,12 @@ class SurveyApp {
       return null;
     }
 
+    // Mobile detection and timeout configuration
+    const isMobile = /Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const timeoutMs = isMobile ? 15000 : 8000; // Longer timeout for mobile devices
+    
+    console.log(`🌐 API Request: ${url} (mobile=${isMobile}, timeout=${timeoutMs}ms, retry=${retryCount})`);
+
     const authOptions = {
       ...options,
       headers: {
@@ -320,8 +326,16 @@ class SurveyApp {
       authOptions.headers['Content-Type'] = 'application/json';
     }
 
+    // Create timeout promise
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Request timeout after ${timeoutMs}ms (mobile=${isMobile})`)), timeoutMs)
+    );
+
     try {
-      const response = await fetch(url, authOptions);
+      const response = await Promise.race([
+        fetch(url, authOptions),
+        timeoutPromise
+      ]);
 
       // Check for new access token in response headers (for activity updates)
       const newToken = response.headers.get('X-New-Access-Token');
@@ -366,7 +380,22 @@ class SurveyApp {
 
       return response;
     } catch (error) {
-      console.error('API request failed:', error);
+      const isMobile = /Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      console.error(`❌ API request failed for ${url} (mobile=${isMobile}, retry=${retryCount}):`, {
+        errorType: error.name,
+        errorMessage: error.message,
+        isTimeout: error.message.includes('timeout'),
+        isNetworkError: error.message.includes('Failed to fetch'),
+        userAgent: navigator.userAgent.substring(0, 100),
+        connectionType: navigator.connection?.effectiveType || 'unknown',
+        onLine: navigator.onLine
+      });
+      
+      // For mobile timeout errors, provide more specific guidance
+      if (isMobile && error.message.includes('timeout')) {
+        console.warn(`⚠️ Mobile timeout detected for ${url}. Consider checking network stability.`);
+      }
+      
       throw error;
     }
   }
@@ -1418,12 +1447,40 @@ class SurveyApp {
           console.log('✅ POSM data loaded from shop data for model:', model);
         } else {
           console.log('🔍 Model not found in shop data, trying general model list');
+          // Enhanced mobile debugging
+          const isMobile = /Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          console.log(`📱 Client info for model "${model}":`, {
+            isMobile: isMobile,
+            userAgent: navigator.userAgent.substring(0, 100),
+            requestTime: new Date().toISOString()
+          });
+          
           // If model not found in shop data, try to get it from the general model list
           const modelResponse = await this.authenticatedFetch(
             `/api/model-posm/${encodeURIComponent(model)}`
           );
+          
+          // Enhanced response debugging
+          console.log(`📥 Received response for model "${model}" (mobile=${isMobile}):`, {
+            ok: modelResponse?.ok,
+            status: modelResponse?.status,
+            statusText: modelResponse?.statusText,
+            headers: modelResponse ? Object.fromEntries(modelResponse.headers.entries()) : null,
+            responseType: typeof modelResponse
+          });
+          
           if (modelResponse && modelResponse.ok) {
             const modelData = await modelResponse.json();
+            
+            // Enhanced data debugging
+            console.log(`🔍 Parsed response data for model "${model}" (mobile=${isMobile}):`, {
+              isArray: Array.isArray(modelData),
+              length: modelData?.length,
+              dataType: typeof modelData,
+              firstItem: modelData?.[0],
+              stringified: JSON.stringify(modelData).substring(0, 200)
+            });
+            
             // Add validation to ensure we have an array
             if (modelData && Array.isArray(modelData) && modelData.length > 0) {
               this.surveyData[model] = modelData;

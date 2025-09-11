@@ -907,8 +907,24 @@ const getPosmByModel = async (req, res) => {
       posmName: item.posmName,
     }));
 
+    // Enhanced logging for mobile debugging
+    console.log(`📤 Preparing response for model "${model}" (mobile=${isMobile}):`, {
+      recordCount: posmList.length,
+      dataSize: JSON.stringify(posmList).length,
+      sampleData: posmList.slice(0, 2), // First 2 records for debugging
+      requestHeaders: {
+        userAgent: req.headers['user-agent']?.substring(0, 100),
+        contentType: req.headers['content-type'],
+        accept: req.headers.accept?.substring(0, 50),
+      },
+    });
+
     // Return just the array to match frontend expectations
+    const responseStartTime = Date.now();
     res.json(posmList);
+    console.log(
+      `⏱️ Response sent for model "${model}" in ${Date.now() - responseStartTime}ms (mobile=${isMobile})`
+    );
   } catch (error) {
     console.error('Error fetching POSM for model:', error);
     res.status(500).json({

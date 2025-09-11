@@ -6,7 +6,6 @@ const {
   updateActivity,
   requireSurveyUser,
   requireAdmin,
-  optionalAuth,
 } = require('../middleware/auth');
 
 // Protected routes (require authentication)
@@ -52,7 +51,7 @@ router.get(
   '/shop-autocomplete',
   verifyToken,
   updateActivity,
-  requireAdmin,
+  requireSurveyUser,
   surveyController.getShopAutocomplete
 );
 router.get(

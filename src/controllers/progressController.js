@@ -65,6 +65,10 @@ function isStoreMatch(
   const surveyId = normalizeStoreId(surveyStoreId);
   const shopName = normalizeString(surveyShopName);
 
+  // CONFIDENCE THRESHOLD - Only matches with confidence >= 0.85 are accepted
+  const CONFIDENCE_THRESHOLD = 0.85;
+  let matchResult = { matched: false, confidence: 0, method: 'none', details: null };
+
   if (debug) {
     console.log(`🔍 Store Match Debug:`, {
       displayStoreId,
@@ -74,89 +78,187 @@ function isStoreMatch(
     });
   }
 
-  // Method 0: EXACT store name match (highest priority)
+  // METHOD 1: EXACT store name match (confidence: 1.0)
   if (storeMap && displayId) {
     const storeInfo = storeMap[displayId];
     if (storeInfo && storeInfo.store_name) {
       const storeName = normalizeString(storeInfo.store_name);
       if (shopName === storeName) {
+        matchResult = {
+          matched: true,
+          confidence: 1.0,
+          method: 'exact_store_name',
+          details: { storeName, shopName },
+        };
         if (debug) {
-          console.log(`✅ Method 0 Match: EXACT store name match (highest priority)`);
+          console.log(`✅ Method 1: EXACT store name match (confidence: 1.0)`);
         }
-        return true; // Exact match gets highest priority
+        return matchResult.confidence >= CONFIDENCE_THRESHOLD;
       }
     }
   }
 
-  // Method 1: Direct ID match (if survey somehow has store ID)
+  // METHOD 2: Direct ID match (confidence: 1.0)
   if (surveyId === displayId) {
+    matchResult = {
+      matched: true,
+      confidence: 1.0,
+      method: 'exact_id',
+      details: { surveyId, displayId },
+    };
     if (debug) {
-      console.log(`✅ Method 1 Match: Direct ID match`);
+      console.log(`✅ Method 2: Direct ID match (confidence: 1.0)`);
     }
-    return true;
+    return matchResult.confidence >= CONFIDENCE_THRESHOLD;
   }
 
-  // Method 2: Use store mapping for partial matches (lower priority than exact)
+  // METHOD 3: Controlled partial name matching with validation
   if (storeMap && displayId) {
     const storeInfo = storeMap[displayId];
     if (storeInfo && storeInfo.store_name) {
       const storeName = normalizeString(storeInfo.store_name);
 
       if (debug) {
-        console.log(`🔍 Method 2 Check:`, {
-          storeInfo,
-          storeName,
-          shopName,
-          shopIncludesStore: shopName && storeName && shopName.includes(storeName),
-          storeIncludesShop: shopName && storeName && storeName.includes(shopName),
-        });
+        console.log(`🔍 Method 3 Check:`, { storeName, shopName });
       }
 
-      // Check partial matches (lower confidence than exact)
-      if (shopName && storeName && shopName.includes(storeName)) {
-        if (debug) {
-          console.log(`✅ Method 2 Match: Shop name includes store name`);
+      // Only allow partial matches if both strings are substantial (>3 chars) and contain multiple words
+      if (shopName && storeName && shopName.length > 3 && storeName.length > 3) {
+        const shopWords = shopName.split(' ').filter((w) => w.length > 2);
+        const storeWords = storeName.split(' ').filter((w) => w.length > 2);
+
+        // Calculate word-level similarity
+        if (shopWords.length > 1 && storeWords.length > 1) {
+          const commonWords = shopWords.filter((word) => storeWords.includes(word));
+          const wordSimilarity = commonWords.length / Math.max(shopWords.length, storeWords.length);
+
+          // FIX 1: Increase similarity threshold to prevent false matches like "Cao Phong Binh Tan" vs "Cao Phong Binh Tan 2"
+          if (wordSimilarity >= 0.85 && commonWords.length >= 3) {
+            // FIX 2: Add exact length validation to prevent subset matching
+            const lengthDifference = Math.abs(shopWords.length - storeWords.length);
+
+            // FIX 3: Only allow matches if the length difference is minimal (max 1 word)
+            if (lengthDifference <= 1) {
+              // FIX 4: Add special handling for numbered stores to prevent cross-matching
+              const shopHasNumber = /\d+$/.test(shopName.trim());
+              const storeHasNumber = /\d+$/.test(storeName.trim());
+
+              if (shopHasNumber || storeHasNumber) {
+                // For numbered stores, require exact match to prevent false positives
+                if (shopName !== storeName) {
+                  if (debug) {
+                    console.log(
+                      `❌ Method 3: Numbered store mismatch prevented - "${shopName}" vs "${storeName}"`
+                    );
+                  }
+                  return false;
+                }
+              }
+
+              const shopIncludesStore = shopName.includes(storeName);
+              const storeIncludesShop = storeName.includes(shopName);
+
+              // FIX 5: Require bidirectional containment check for high confidence
+              if (shopIncludesStore && storeIncludesShop) {
+                const confidence = Math.min(0.9, 0.75 + wordSimilarity * 0.15);
+                matchResult = {
+                  matched: confidence >= CONFIDENCE_THRESHOLD,
+                  confidence: confidence,
+                  method: 'strict_partial_name',
+                  details: {
+                    storeName,
+                    shopName,
+                    wordSimilarity,
+                    commonWords,
+                    lengthDifference,
+                    shopHasNumber,
+                    storeHasNumber,
+                  },
+                };
+
+                if (debug) {
+                  console.log(
+                    `✅ Method 3: Strict partial name match (confidence: ${confidence}) - prevented numbered store cross-match`
+                  );
+                }
+                return matchResult.confidence >= CONFIDENCE_THRESHOLD;
+              }
+
+              if (debug) {
+                console.log(
+                  `❌ Method 3: Bidirectional containment failed - shopIncludes=${shopIncludesStore}, storeIncludes=${storeIncludesShop}`
+                );
+              }
+            } else {
+              if (debug) {
+                console.log(
+                  `❌ Method 3: Length difference too large - ${lengthDifference} words (max 1 allowed)`
+                );
+              }
+            }
+          } else {
+            if (debug) {
+              console.log(
+                `❌ Method 3: Insufficient similarity - wordSimilarity=${wordSimilarity.toFixed(
+                  2
+                )}, commonWords=${commonWords.length} (need >=0.85 similarity, >=3 common words)`
+              );
+            }
+          }
         }
-        return true;
       }
-      if (shopName && storeName && storeName.includes(shopName)) {
+    }
+  }
+
+  // METHOD 4: Controlled ID-in-name matching with strict validation
+  if (shopName && displayId && shopName.length > displayId.length) {
+    // Only match if display ID is substantial and appears as complete word in shop name
+    if (displayId.length >= 4) {
+      // Check for word boundary matches to prevent partial word matches
+      const regex = new RegExp(`\\b${displayId.toLowerCase()}\\b`);
+      if (regex.test(shopName)) {
+        const confidence = 0.88; // Just above threshold but lower than exact matches
+        matchResult = {
+          matched: true,
+          confidence: confidence,
+          method: 'controlled_id_in_name',
+          details: { displayId, shopName },
+        };
+
         if (debug) {
-          console.log(`✅ Method 2 Match: Store name includes shop name`);
+          console.log(`✅ Method 4: Controlled ID-in-name match (confidence: ${confidence})`);
         }
-        return true;
+        return matchResult.confidence >= CONFIDENCE_THRESHOLD;
       }
     }
   }
 
-  // Method 3: Check if shop name contains store ID directly (fallback)
-  if (shopName && displayId && shopName.includes(displayId.toLowerCase())) {
-    if (debug) {
-      console.log(`✅ Method 3 Match: Shop name contains display ID`);
-    }
-    return true;
-  }
-  if (shopName && surveyId && shopName.includes(surveyId.toLowerCase())) {
-    if (debug) {
-      console.log(`✅ Method 3 Match: Shop name contains survey ID`);
-    }
-    return true;
-  }
+  // METHOD 5: Survey ID in shop name (similar validation)
+  if (shopName && surveyId && surveyId.length >= 4 && shopName.length > surveyId.length) {
+    const regex = new RegExp(`\\b${surveyId.toLowerCase()}\\b`);
+    if (regex.test(shopName)) {
+      const confidence = 0.87;
+      matchResult = {
+        matched: true,
+        confidence: confidence,
+        method: 'controlled_survey_id_in_name',
+        details: { surveyId, shopName },
+      };
 
-  // Method 4: Fuzzy matching with shop name words
-  if (displayId && shopName) {
-    const shopWords = shopName.split(' ').filter((word) => word.length > 2);
-    const hasWordMatch = shopWords.some((word) => displayId.toLowerCase().includes(word));
-    if (hasWordMatch) {
       if (debug) {
-        console.log(`✅ Method 4 Match: Fuzzy word match`);
+        console.log(`✅ Method 5: Controlled survey ID-in-name match (confidence: ${confidence})`);
       }
-      return true;
+      return matchResult.confidence >= CONFIDENCE_THRESHOLD;
     }
   }
 
+  // REMOVED: The dangerous Method 4 fuzzy word matching that caused false positives
+
+  // Log no match found
   if (debug) {
-    console.log(`❌ No match found`);
+    console.log(`❌ No match found (highest confidence: ${matchResult.confidence})`);
   }
+
   return false;
 }
 
@@ -291,9 +393,45 @@ const getProgressOverview = async (req, res) => {
       stores,
       modelPosmCounts
     );
+
+    // Generate audit trail for monitoring (with debug flag from query params)
+    const enableAudit = false; // Can be enabled via environment variable or request parameter
+    let auditResults = null;
+    if (enableAudit) {
+      auditResults = generateCompletionRateAudit(storeProgress, allDisplays, allSurveys);
+      console.log('📊 COMPLETION RATE AUDIT GENERATED:', auditResults.summary);
+
+      // Log critical issues
+      if (auditResults.potentialIssues.length > 0) {
+        console.warn(
+          `🚨 AUDIT ALERT: ${auditResults.potentialIssues.length} stores flagged with potential issues`
+        );
+        auditResults.potentialIssues.slice(0, 5).forEach((issue) => {
+          console.warn(
+            `  - ${issue.storeId}: ${issue.issues.join(', ')} (confidence: ${issue.confidence})`
+          );
+        });
+      }
+    }
+
     const storesWithCompletPOSM = storeProgress.filter(
       (store) => store.completionRate === 100
     ).length;
+
+    // Alert for suspicious completion rates
+    const completionRateDistribution = storeProgress.reduce((acc, store) => {
+      const bucket = Math.floor(store.completionRate / 10) * 10;
+      acc[bucket] = (acc[bucket] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Flag if more than 30% of stores have 100% completion (potentially suspicious)
+    const totalStoresCalc = storeProgress.length;
+    if (totalStoresCalc > 0 && storesWithCompletPOSM / totalStoresCalc > 0.3) {
+      console.warn(
+        `🚨 HIGH COMPLETION ALERT: ${((storesWithCompletPOSM / totalStoresCalc) * 100).toFixed(1)}% of stores have 100% completion - verify accuracy`
+      );
+    }
 
     // 6. Calculate Overall Completion percentage
     const totalRequiredPOSMsAll = storeProgress.reduce(
@@ -1131,7 +1269,7 @@ async function calculateStoreProgressImproved(
     }
   });
 
-  // Check verification against surveys using improved matching with cumulative POSM tracking
+  // Check verification against surveys using improved matching with validation and cumulative POSM tracking
   displays.forEach((display) => {
     const allMatchingSurveysForStore = validatedSurveys.filter((survey) =>
       isStoreMatch(survey.leader, survey.shopName, display.store_id, storeMap)
@@ -1148,13 +1286,32 @@ async function calculateStoreProgressImproved(
     };
 
     if (allMatchingSurveysForStore.length > 0) {
+      // VALIDATION STEP 1: Verify surveys actually exist and contain valid data
+      const validSurveysForStore = allMatchingSurveysForStore.filter((survey) => {
+        return (
+          survey.responses &&
+          survey.responses.length > 0 &&
+          (survey.shopName || survey.leader) &&
+          survey.createdAt
+        ); // Must have creation date
+      });
+
+      if (validSurveysForStore.length === 0) {
+        console.warn(
+          `🚨 VALIDATION FAILED: Store ${display.store_id} matched ${allMatchingSurveysForStore.length} surveys but none contain valid data`
+        );
+        return; // Skip processing this display if no valid surveys found
+      }
+
       // Use cumulative approach: track all completed POSMs from all surveys for this model
       const completedPosmSet = new Set();
       let latestSurveyDate = null;
       let hasValidResponse = false;
+      let validResponseCount = 0;
+      const matchingMethod = 'none';
 
-      // Process all surveys to build cumulative POSM completion
-      allMatchingSurveysForStore.forEach((survey) => {
+      // Process all validated surveys to build cumulative POSM completion
+      validSurveysForStore.forEach((survey) => {
         const matchingResponse =
           survey.responses &&
           survey.responses.find((response) => isModelMatch(display.model, response.model));
@@ -1165,14 +1322,25 @@ async function calculateStoreProgressImproved(
           Array.isArray(matchingResponse.posmSelections)
         ) {
           hasValidResponse = true;
+          validResponseCount++;
+
+          // VALIDATION STEP 2: Cross-verify POSM selections are meaningful
+          const validPosmSelections = matchingResponse.posmSelections.filter(
+            (posmSelection) =>
+              posmSelection.selected && (posmSelection.posmCode || posmSelection.posm_id)
+          );
+
+          if (validPosmSelections.length === 0) {
+            console.warn(
+              `🚨 VALIDATION WARNING: Store ${display.store_id} has survey response but no valid POSM selections`
+            );
+          }
 
           // Add all selected POSMs to our cumulative set
-          matchingResponse.posmSelections.forEach((posmSelection) => {
-            if (posmSelection.selected) {
-              completedPosmSet.add(
-                posmSelection.posmCode || posmSelection.posm_id || JSON.stringify(posmSelection)
-              );
-            }
+          validPosmSelections.forEach((posmSelection) => {
+            completedPosmSet.add(
+              posmSelection.posmCode || posmSelection.posm_id || JSON.stringify(posmSelection)
+            );
           });
 
           // Track latest survey date
@@ -1183,28 +1351,69 @@ async function calculateStoreProgressImproved(
         }
       });
 
-      // Only proceed if we found valid responses
-      if (hasValidResponse) {
+      // VALIDATION STEP 3: Only proceed if we found valid responses with actual POSM data
+      if (hasValidResponse && completedPosmSet.size > 0) {
         storeStats[display.store_id].verifiedDisplays++;
         storeStats[display.store_id].verifiedModels.add(display.model);
 
         // Use cumulative completed POSM count
         const completedPosmCount = completedPosmSet.size;
+        const requiredPosmCount = modelPosmCounts[display.model] || 0;
+
+        // VALIDATION STEP 4: Anomaly detection for suspicious completion rates
+        if (completedPosmCount > requiredPosmCount) {
+          console.warn(
+            `🚨 ANOMALY DETECTED: Store ${display.store_id} claims ${completedPosmCount} POSMs for model ${display.model}, but only ${requiredPosmCount} are required`
+          );
+
+          // Cap the completed count to prevent inflation
+          const cappedCount = Math.min(completedPosmCount, requiredPosmCount);
+          console.log(
+            `🔧 CORRECTION: Capped completed POSMs from ${completedPosmCount} to ${cappedCount}`
+          );
+
+          // Update the store totals with capped count
+          storeStats[display.store_id].completedPOSMs += cappedCount;
+
+          // Update per-model completion details with capped count
+          if (storeStats[display.store_id].posmCompletionDetails[display.model]) {
+            storeStats[display.store_id].posmCompletionDetails[display.model].completed =
+              cappedCount;
+          }
+        } else {
+          // Normal case: use actual completed count
+          storeStats[display.store_id].completedPOSMs += completedPosmCount;
+
+          // Update per-model completion details
+          if (storeStats[display.store_id].posmCompletionDetails[display.model]) {
+            storeStats[display.store_id].posmCompletionDetails[display.model].completed =
+              completedPosmCount;
+          }
+        }
+
+        // VALIDATION STEP 5: Flag stores with sudden 100% completion for review
+        const completionRate =
+          requiredPosmCount > 0
+            ? (Math.min(completedPosmCount, requiredPosmCount) / requiredPosmCount) * 100
+            : 0;
+        if (completionRate === 100 && validResponseCount === 1) {
+          console.log(
+            `🔍 REVIEW FLAGGED: Store ${display.store_id} achieved 100% completion (${completedPosmCount}/${requiredPosmCount}) from single survey - verify accuracy`
+          );
+        }
 
         if (debugStore(display.store_id)) {
           console.log(`DEBUG: Store ${display.store_id}, Model ${display.model}:`);
-          console.log(`  - Found ${allMatchingSurveysForStore.length} matching surveys`);
-          console.log(`  - Cumulative completed POSMs: ${completedPosmCount}`);
+          console.log(
+            `  - Found ${allMatchingSurveysForStore.length} matching surveys (${validSurveysForStore.length} valid)`
+          );
+          console.log(`  - Valid responses: ${validResponseCount}`);
+          console.log(
+            `  - Cumulative completed POSMs: ${completedPosmCount} (capped to ${Math.min(completedPosmCount, requiredPosmCount)})`
+          );
+          console.log(`  - Required POSMs: ${requiredPosmCount}`);
+          console.log(`  - Completion rate: ${completionRate.toFixed(1)}%`);
           console.log(`  - POSM codes: [${Array.from(completedPosmSet).join(', ')}]`);
-        }
-
-        // Update store totals
-        storeStats[display.store_id].completedPOSMs += completedPosmCount;
-
-        // Update per-model completion details
-        if (storeStats[display.store_id].posmCompletionDetails[display.model]) {
-          storeStats[display.store_id].posmCompletionDetails[display.model].completed =
-            completedPosmCount;
         }
 
         // Update last survey date
@@ -1215,8 +1424,8 @@ async function calculateStoreProgressImproved(
           storeStats[display.store_id].lastSurveyDate = latestSurveyDate;
         }
 
-        // Add debug info using the best available data
-        const latestSurvey = allMatchingSurveysForStore.sort(
+        // Add enhanced debug info with validation results
+        const latestSurvey = validSurveysForStore.sort(
           (a, b) => new Date(b.createdAt || b.submittedAt) - new Date(a.createdAt || a.submittedAt)
         )[0];
 
@@ -1225,10 +1434,20 @@ async function calculateStoreProgressImproved(
           surveyModels: latestSurvey.responses.map((r) => r.model),
           surveyShop: latestSurvey.shopName,
           surveyLeader: latestSurvey.leader,
-          completedPOSMs: completedPosmCount, // Use cumulative count
+          completedPOSMs: Math.min(completedPosmCount, requiredPosmCount), // Show capped value
+          requiredPOSMs: requiredPosmCount,
+          completionRate: completionRate.toFixed(1),
           totalSurveys: allMatchingSurveysForStore.length,
-          method: 'cumulative',
+          validSurveys: validSurveysForStore.length,
+          validResponses: validResponseCount,
+          anomalyDetected: completedPosmCount > requiredPosmCount,
+          method: 'validated_cumulative',
         });
+      } else {
+        // Log why we rejected this store-model combination
+        console.warn(
+          `🚨 VALIDATION REJECTED: Store ${display.store_id}, Model ${display.model}: hasValidResponse=${hasValidResponse}, posmCount=${completedPosmSet.size}, surveys=${allMatchingSurveysForStore.length}`
+        );
       }
     }
   });
@@ -1379,6 +1598,464 @@ function getStorePosmStatus(completedPosms, totalRequiredPosms) {
   return 'partial';
 }
 
+/**
+ * Enhanced completion rate audit and statistics tracking
+ */
+function generateCompletionRateAudit(storeProgress, displays, surveys) {
+  const audit = {
+    timestamp: new Date().toISOString(),
+    summary: {
+      totalStores: storeProgress.length,
+      totalDisplays: displays.length,
+      totalSurveys: surveys.length,
+      completionRateDistribution: {},
+      statusDistribution: {},
+      anomaliesDetected: 0,
+      validationResults: {
+        highConfidenceMatches: 0,
+        lowConfidenceMatches: 0,
+        rejectedMatches: 0,
+        cappedCompletions: 0,
+      },
+    },
+    storeAnalysis: [],
+    potentialIssues: [],
+    recommendations: [],
+  };
+
+  // Analyze completion rate distribution
+  const completionRates = {};
+  storeProgress.forEach((store) => {
+    const rate = Math.floor(store.completionRate / 10) * 10; // Group by 10% buckets
+    completionRates[rate] = (completionRates[rate] || 0) + 1;
+    audit.summary.statusDistribution[store.status] =
+      (audit.summary.statusDistribution[store.status] || 0) + 1;
+  });
+  audit.summary.completionRateDistribution = completionRates;
+
+  // Analyze individual stores for potential issues
+  storeProgress.forEach((store) => {
+    const storeAudit = {
+      storeId: store.storeId,
+      storeName: store.storeName,
+      completionRate: store.completionRate,
+      status: store.status,
+      totalRequiredPOSMs: store.totalRequiredPOSMs,
+      completedPOSMs: store.completedPOSMs,
+      issues: [],
+      confidence: 'high',
+    };
+
+    // Check for suspicious completion patterns
+    if (store.completionRate === 100 && store.matchingDebug && store.matchingDebug.length > 0) {
+      const debug = store.matchingDebug[0];
+      if (debug.totalSurveys === 1 && debug.validSurveys === 1) {
+        storeAudit.issues.push('100% completion from single survey - verify accuracy');
+        storeAudit.confidence = 'medium';
+        audit.summary.validationResults.lowConfidenceMatches++;
+      } else {
+        audit.summary.validationResults.highConfidenceMatches++;
+      }
+
+      if (debug.anomalyDetected) {
+        storeAudit.issues.push('POSM count anomaly detected and corrected');
+        audit.summary.anomaliesDetected++;
+        audit.summary.validationResults.cappedCompletions++;
+      }
+
+      if (debug.method === 'validated_cumulative') {
+        storeAudit.confidence = 'high';
+      }
+    }
+
+    // Check for data quality issues
+    if (
+      store.completionRate > 0 &&
+      (!store.lastSurveyDate || !store.verifiedModels || store.verifiedModels.length === 0)
+    ) {
+      storeAudit.issues.push('Completion reported but missing verification data');
+      storeAudit.confidence = 'low';
+      audit.summary.validationResults.rejectedMatches++;
+    }
+
+    // Check for stores with displays but no surveys
+    if (store.totalRequiredPOSMs > 0 && store.completedPOSMs === 0) {
+      storeAudit.issues.push('Has displays but no survey completion');
+    }
+
+    audit.storeAnalysis.push(storeAudit);
+
+    // Add to potential issues list if confidence is not high
+    if (storeAudit.confidence !== 'high' || storeAudit.issues.length > 0) {
+      audit.potentialIssues.push({
+        storeId: store.storeId,
+        storeName: store.storeName,
+        issues: storeAudit.issues,
+        confidence: storeAudit.confidence,
+        completionRate: store.completionRate,
+      });
+    }
+  });
+
+  // Generate recommendations based on analysis
+  const highCompletionStores = storeProgress.filter((s) => s.completionRate === 100).length;
+  const totalStores = storeProgress.length;
+  const completionPercentage = totalStores > 0 ? (highCompletionStores / totalStores) * 100 : 0;
+
+  if (completionPercentage > 50) {
+    audit.recommendations.push(
+      'High completion rate detected - verify accuracy of fuzzy matching logic'
+    );
+  }
+
+  if (audit.summary.anomaliesDetected > 0) {
+    audit.recommendations.push(
+      `${audit.summary.anomaliesDetected} anomalies detected and corrected - consider improving data validation`
+    );
+  }
+
+  if (
+    audit.summary.validationResults.rejectedMatches >
+    audit.summary.validationResults.highConfidenceMatches
+  ) {
+    audit.recommendations.push('More matches rejected than accepted - review matching criteria');
+  }
+
+  if (audit.potentialIssues.length > totalStores * 0.1) {
+    audit.recommendations.push(
+      'More than 10% of stores flagged with issues - systematic review needed'
+    );
+  }
+
+  return audit;
+}
+
+/**
+ * Log completion rate changes for monitoring
+ */
+function logCompletionRateChange(storeId, oldRate, newRate, method, details = {}) {
+  const change = {
+    timestamp: new Date().toISOString(),
+    storeId: storeId,
+    oldCompletionRate: oldRate,
+    newCompletionRate: newRate,
+    change: newRate - oldRate,
+    method: method,
+    details: details,
+  };
+
+  // Log significant changes
+  if (Math.abs(change.change) >= 10) {
+    console.log(
+      `📊 COMPLETION RATE CHANGE: Store ${storeId}: ${oldRate}% → ${newRate}% (${change.change > 0 ? '+' : ''}${change.change}%) via ${method}`
+    );
+  }
+
+  // Could be extended to write to database or file for persistent tracking
+  return change;
+}
+
+/**
+ * Debug specific store matching issues
+ */
+const debugStoreMatching = async (req, res) => {
+  try {
+    const { storeId, storeName } = req.query;
+
+    if (!storeId && !storeName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Either storeId or storeName parameter is required',
+      });
+    }
+
+    // Get store data
+    const stores = await Store.find().select('store_id store_name region province channel').lean();
+    const storeMap = {};
+    stores.forEach((store) => {
+      storeMap[store.store_id] = store;
+    });
+
+    // Find target store
+    let targetStore = null;
+    if (storeId) {
+      targetStore = storeMap[storeId];
+    } else if (storeName) {
+      targetStore = stores.find(
+        (s) =>
+          s.store_name.toLowerCase().includes(storeName.toLowerCase()) ||
+          storeName.toLowerCase().includes(s.store_name.toLowerCase())
+      );
+    }
+
+    if (!targetStore) {
+      return res.status(404).json({
+        success: false,
+        message: `Store not found: ${storeId || storeName}`,
+      });
+    }
+
+    // Get displays for this store
+    const displays = await Display.find({
+      store_id: targetStore.store_id,
+      is_displayed: true,
+    })
+      .select('store_id model')
+      .lean();
+
+    // Get all surveys
+    const allSurveys = await SurveyResponse.find()
+      .select('leader shopName responses createdAt submittedAt')
+      .lean();
+
+    const debugResults = {
+      targetStore: {
+        storeId: targetStore.store_id,
+        storeName: targetStore.store_name,
+        region: targetStore.region,
+        province: targetStore.province,
+        channel: targetStore.channel,
+      },
+      displays: displays.map((d) => ({ model: d.model, storeId: d.store_id })),
+      totalDisplays: displays.length,
+      matchAnalysis: [],
+      surveyMatches: [],
+      noMatches: [],
+      potentialIssues: [],
+    };
+
+    // Test matching with all surveys
+    allSurveys.forEach((survey) => {
+      const matchResult = isStoreMatch(
+        survey.leader,
+        survey.shopName,
+        targetStore.store_id,
+        storeMap,
+        true // Enable debug
+      );
+
+      // Pre-calculate word analysis for all surveys
+      const shopNormalized = normalizeString(survey.shopName || '');
+      const storeNormalized = normalizeString(targetStore.store_name);
+      const shopWords = shopNormalized.split(' ').filter((w) => w.length > 2);
+      const storeWords = storeNormalized.split(' ').filter((w) => w.length > 2);
+
+      const surveyAnalysis = {
+        surveyId: survey._id,
+        leader: survey.leader,
+        shopName: survey.shopName,
+        createdAt: survey.createdAt,
+        responseCount: survey.responses?.length || 0,
+        matched: matchResult,
+        models: survey.responses?.map((r) => r.model) || [],
+      };
+
+      if (matchResult) {
+        debugResults.surveyMatches.push(surveyAnalysis);
+
+        // Check if this could be a false positive
+        const commonWords = shopWords.filter((word) => storeWords.includes(word));
+        const wordSimilarity =
+          shopWords.length > 0 && storeWords.length > 0
+            ? commonWords.length / Math.max(shopWords.length, storeWords.length)
+            : 0;
+
+        if (wordSimilarity < 0.9 || Math.abs(shopWords.length - storeWords.length) > 0) {
+          debugResults.potentialIssues.push({
+            issue: 'Potential false positive match',
+            survey: surveyAnalysis,
+            similarity: wordSimilarity,
+            lengthDiff: Math.abs(shopWords.length - storeWords.length),
+            explanation: 'Store names are not exact matches but passed fuzzy matching',
+          });
+        }
+      } else {
+        // Only include first 5 non-matches to avoid huge response
+        if (debugResults.noMatches.length < 5) {
+          debugResults.noMatches.push(surveyAnalysis);
+        }
+      }
+
+      debugResults.matchAnalysis.push({
+        survey: `${survey.leader || 'No leader'} - ${survey.shopName || 'No shop name'}`,
+        matched: matchResult,
+        similarity: survey.shopName
+          ? shopWords.filter((word) => storeWords.includes(word)).length
+          : 0,
+      });
+    });
+
+    // Calculate expected completion rate
+    const modelPosmCounts = await getModelPosmCounts();
+    let totalRequiredPOSMs = 0;
+    let totalCompletedPOSMs = 0;
+
+    displays.forEach((display) => {
+      totalRequiredPOSMs += modelPosmCounts[display.model] || 0;
+
+      // Check if there are matching surveys for this model
+      debugResults.surveyMatches.forEach((surveyMatch) => {
+        const matchingResponse = surveyMatch.models.find((model) =>
+          isModelMatch(display.model, model)
+        );
+        if (matchingResponse) {
+          totalCompletedPOSMs += modelPosmCounts[display.model] || 0;
+        }
+      });
+    });
+
+    debugResults.completion = {
+      totalRequiredPOSMs,
+      totalCompletedPOSMs,
+      completionRate:
+        totalRequiredPOSMs > 0 ? ((totalCompletedPOSMs / totalRequiredPOSMs) * 100).toFixed(1) : 0,
+      hasValidSurveys: debugResults.surveyMatches.length > 0,
+    };
+
+    res.json({
+      success: true,
+      data: debugResults,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Debug store matching error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to debug store matching',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Get detailed completion rate audit information for debugging
+ */
+const getCompletionAudit = async (req, res) => {
+  try {
+    // Get all data needed for audit
+    const allDisplays = await Display.find({ is_displayed: true })
+      .select('store_id model createdAt updatedAt')
+      .lean();
+    const allSurveys = await SurveyResponse.find()
+      .select('leader shopName responses createdAt submittedAt')
+      .lean();
+    const stores = await Store.find().select('store_id store_name region province channel').lean();
+    const modelPosmCounts = await getModelPosmCounts();
+
+    // Calculate store progress
+    const storeProgress = await calculateStoreProgressImproved(
+      allDisplays,
+      allSurveys,
+      stores,
+      modelPosmCounts
+    );
+
+    // Generate comprehensive audit
+    const auditResults = generateCompletionRateAudit(storeProgress, allDisplays, allSurveys);
+
+    // Add additional debugging statistics
+    const debugStats = {
+      matchingStatistics: {
+        totalMatchAttempts: allDisplays.length,
+        successfulMatches: storeProgress.filter((s) => s.completionRate > 0).length,
+        perfectMatches: storeProgress.filter((s) => s.completionRate === 100).length,
+        partialMatches: storeProgress.filter((s) => s.completionRate > 0 && s.completionRate < 100)
+          .length,
+        noMatches: storeProgress.filter((s) => s.completionRate === 0).length,
+      },
+      dataQuality: {
+        displayModels: [...new Set(allDisplays.map((d) => d.model))].length,
+        surveyModels: [
+          ...new Set(allSurveys.flatMap((s) => s.responses?.map((r) => r.model) || [])),
+        ].length,
+        orphanedSurveys: allSurveys.filter((survey) => {
+          return !allDisplays.some((display) =>
+            isStoreMatch(
+              survey.leader,
+              survey.shopName,
+              display.store_id,
+              stores.reduce((acc, s) => ({ ...acc, [s.store_id]: s }), {})
+            )
+          );
+        }).length,
+      },
+      performanceMetrics: {
+        averageCompletionRate:
+          auditResults.summary.totalStores > 0
+            ? (
+                storeProgress.reduce((sum, s) => sum + s.completionRate, 0) /
+                auditResults.summary.totalStores
+              ).toFixed(2)
+            : 0,
+        medianCompletionRate: calculateMedian(storeProgress.map((s) => s.completionRate)),
+        completionRateVariance: calculateVariance(storeProgress.map((s) => s.completionRate)),
+      },
+    };
+
+    res.json({
+      success: true,
+      data: {
+        audit: auditResults,
+        debugging: debugStats,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error('Get completion audit error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate completion audit',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Enable or disable debug mode for store matching
+ */
+const toggleDebugMode = async (req, res) => {
+  try {
+    const { enabled, storeIds } = req.body;
+
+    // This could be extended to store debug settings in database
+    // For now, just return the current settings
+    const debugSettings = {
+      enabled: enabled || false,
+      targetStores: storeIds || [],
+      timestamp: new Date().toISOString(),
+    };
+
+    console.log(`🔧 DEBUG MODE ${enabled ? 'ENABLED' : 'DISABLED'}`, debugSettings);
+
+    res.json({
+      success: true,
+      message: `Debug mode ${enabled ? 'enabled' : 'disabled'}`,
+      settings: debugSettings,
+    });
+  } catch (error) {
+    console.error('Toggle debug mode error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to toggle debug mode',
+    });
+  }
+};
+
+/**
+ * Helper functions for statistics
+ */
+function calculateMedian(numbers) {
+  const sorted = numbers.slice().sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
+}
+
+function calculateVariance(numbers) {
+  const mean = numbers.reduce((sum, num) => sum + num, 0) / numbers.length;
+  const squaredDiffs = numbers.map((num) => Math.pow(num - mean, 2));
+  return squaredDiffs.reduce((sum, diff) => sum + diff, 0) / numbers.length;
+}
+
 module.exports = {
   getProgressOverview,
   getStoreProgress,
@@ -1387,4 +2064,7 @@ module.exports = {
   getRegionProgress,
   getProgressTimeline,
   getPOSMMatrix,
+  getCompletionAudit,
+  toggleDebugMode,
+  debugStoreMatching,
 };

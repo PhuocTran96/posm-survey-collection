@@ -8,6 +8,9 @@ const config = {
 
   database: {
     uri: process.env.MONGODB_URI,
+    analyticsUri: process.env.MONGODB_URI_2,
+    analyticsEnabled: process.env.ANALYTICS_DB_ENABLED === 'true',
+    fallbackToPrimary: process.env.FALLBACK_TO_PRIMARY === 'true' || true, // Default to true
   },
 
   aws: {
@@ -37,6 +40,13 @@ const validateConfig = () => {
 
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+
+  // Warn about analytics database if not configured
+  if (process.env.ANALYTICS_DB_ENABLED === 'true' && !process.env.MONGODB_URI_2) {
+    console.warn(
+      '⚠️  ANALYTICS_DB_ENABLED is true but MONGODB_URI_2 is not configured. Dashboard will use primary database.'
+    );
   }
 };
 

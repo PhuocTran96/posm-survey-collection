@@ -11,6 +11,10 @@ let dashboardCache = new Map();
 let cacheTimestamp = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
 
+// Async processing constants
+const CHUNK_SIZE = 50; // Process 50 displays at a time
+const YIELD_INTERVAL = 10; // Yield control every 10 operations
+
 /**
  * Caching helper functions to prevent event loop blocking
  */
@@ -366,6 +370,7 @@ function getLatestSurveyPerStore(surveys) {
  */
 async function getModelPosmCounts() {
   try {
+    // Use analytics database for POSM counts
     const ModelPosm = getModelPosmModel();
     const modelPosms = await ModelPosm.find().select('model posm').lean();
     const modelPosmCounts = {};
@@ -382,10 +387,10 @@ async function getModelPosmCounts() {
       modelPosmCounts[model] = modelPosmCounts[model].size;
     });
 
-    console.log('Model POSM Counts:', modelPosmCounts);
+    console.log('Model POSM Counts (from analytics DB):', modelPosmCounts);
     return modelPosmCounts;
   } catch (error) {
-    console.error('Error getting model POSM counts:', error);
+    console.error('Error getting model POSM counts from analytics DB:', error);
     return {};
   }
 }
@@ -399,33 +404,26 @@ const getProgressOverview = async (req, res) => {
     const Display = getDisplayModel();
     const Store = getStoreModel();
     const SurveyResponse = getSurveyResponseModel();
-    
-    // Check cache first to prevent heavy computation
-    const cacheKey = 'progress_overview';
-    const cachedData = getCachedDashboardData(cacheKey);
-    if (cachedData) {
-      return res.json(cachedData);
-    }
-    
-    // 1. Calculate Total Stores from Display table
+
+    // 1. Calculate Total Stores from Display table (using analytics database)
     const displayStoreIds = await Display.distinct('store_id');
     const totalStores = displayStoreIds.length;
 
-    // 2. Calculate Total Models from Display table
+    // 2. Calculate Total Models from Display table (using analytics database)
     const allModelsInDisplay = await Display.distinct('model');
     const totalModels = allModelsInDisplay.length;
 
-    // 3. Get POSM counts for each model
+    // 3. Get POSM counts for each model (using analytics database)
     const modelPosmCounts = await getModelPosmCounts();
 
-    // 4. Calculate Total POSM from all displays and their required POSMs
+    // 4. Calculate Total POSM from all displays and their required POSMs (using analytics database)
     const allDisplays = await Display.find({ is_displayed: true }).select('store_id model').lean();
     let totalPOSM = 0;
     allDisplays.forEach((display) => {
       totalPOSM += modelPosmCounts[display.model] || 0;
     });
 
-    // 5. Calculate Stores with Complete POSM using new completion logic
+    // 5. Calculate Stores with Complete POSM using new completion logic (using analytics database)
     const allSurveys = await SurveyResponse.find()
       .select('leader shopName responses createdAt submittedAt')
       .lean();
@@ -492,7 +490,7 @@ const getProgressOverview = async (req, res) => {
         ? parseFloat(((totalCompletedPOSMsAll / totalRequiredPOSMsAll) * 100).toFixed(1))
         : 0;
 
-    const result = {
+    res.json({
       success: true,
       data: {
         overview: {
@@ -503,12 +501,7 @@ const getProgressOverview = async (req, res) => {
           overallCompletion, // Overall POSM completion percentage
         },
       },
-    };
-
-    // Cache the result to prevent repeated heavy computations
-    setCachedDashboardData(cacheKey, result);
-    
-    res.json(result);
+    });
   } catch (error) {
     console.error('Get progress overview error:', error);
     res.status(500).json({
@@ -523,11 +516,6 @@ const getProgressOverview = async (req, res) => {
  */
 const getStoreProgress = async (req, res) => {
   try {
-    // Get analytics database models
-    const Display = getDisplayModel();
-    const Store = getStoreModel();
-    const SurveyResponse = getSurveyResponseModel();
-    
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const skip = (page - 1) * limit;
@@ -541,14 +529,26 @@ const getStoreProgress = async (req, res) => {
       return res.json(cachedData);
     }
 
-    // Get displays and surveys with improved filtering
+    // Get analytics database models
+    const Display = getDisplayModel();
+    const Store = getStoreModel();
+    const SurveyResponse = getSurveyResponseModel();
+
+    // Get displays and surveys with improved filtering (using analytics database)
+    // Add query limits to prevent full table scans and excessive memory usage
     const allDisplays = await Display.find({ is_displayed: true })
       .select('store_id model createdAt updatedAt')
+      .limit(10000) // Limit to prevent excessive memory usage
       .lean();
     const allSurveys = await SurveyResponse.find()
       .select('leader shopName responses createdAt submittedAt')
+      .limit(5000) // Limit surveys to most recent ones
+      .sort({ createdAt: -1 }) // Get most recent surveys first
       .lean();
-    const stores = await Store.find().select('store_id store_name region province channel').lean();
+    const stores = await Store.find()
+      .select('store_id store_name region province channel')
+      .limit(2000) // Reasonable limit for stores
+      .lean();
 
     // Get POSM counts for each model
     const modelPosmCounts = await getModelPosmCounts();
@@ -605,15 +605,8 @@ const getModelProgress = async (req, res) => {
     const Display = getDisplayModel();
     const Store = getStoreModel();
     const SurveyResponse = getSurveyResponseModel();
-    
-    // Check cache first to prevent heavy computation
-    const cacheKey = 'model_progress';
-    const cachedData = getCachedDashboardData(cacheKey);
-    if (cachedData) {
-      return res.json(cachedData);
-    }
-    
-    // Get latest records with improved filtering
+
+    // Get latest records with improved filtering (using analytics database)
     const allDisplays = await Display.find({ is_displayed: true })
       .select('store_id model createdAt updatedAt')
       .lean();
@@ -726,15 +719,10 @@ const getModelProgress = async (req, res) => {
       })
       .sort((a, b) => b.completionRate - a.completionRate);
 
-    const result = {
+    res.json({
       success: true,
       data: modelProgress,
-    };
-
-    // Cache the result to prevent repeated heavy computations
-    setCachedDashboardData(cacheKey, result);
-    
-    res.json(result);
+    });
   } catch (error) {
     console.error('Get model progress error:', error);
     res.status(500).json({
@@ -753,15 +741,9 @@ const getPOSMProgress = async (req, res) => {
     const Display = getDisplayModel();
     const Store = getStoreModel();
     const SurveyResponse = getSurveyResponseModel();
-    
-    // Check cache first to prevent heavy computation
-    const cacheKey = 'posm_progress';
-    const cachedData = getCachedDashboardData(cacheKey);
-    if (cachedData) {
-      return res.json(cachedData);
-    }
-    
-    // Get all displays with models and stores
+    const ModelPosm = getModelPosmModel();
+
+    // Get all displays with models and stores (using analytics database)
     const allDisplays = await Display.find({ is_displayed: true }).select('store_id model').lean();
     const allSurveys = await SurveyResponse.find()
       .select('leader shopName responses createdAt submittedAt')
@@ -771,7 +753,7 @@ const getPOSMProgress = async (req, res) => {
     // Get current models from displays (models that are actually deployed)
     const currentModels = [...new Set(allDisplays.map((d) => d.model))];
 
-    // Get all POSM types relevant to current models
+    // Get all POSM types relevant to current models (using analytics database)
     const relevantModelPosms = await ModelPosm.find({
       model: { $in: currentModels },
     })
@@ -876,15 +858,10 @@ const getPOSMProgress = async (req, res) => {
       })
       .sort((a, b) => b.completion - a.completion);
 
-    const result = {
+    res.json({
       success: true,
       data: posmProgress,
-    };
-
-    // Cache the result to prevent repeated heavy computations
-    setCachedDashboardData(cacheKey, result);
-    
-    res.json(result);
+    });
   } catch (error) {
     console.error('Get POSM progress error:', error);
     res.status(500).json({
@@ -903,15 +880,8 @@ const getRegionProgress = async (req, res) => {
     const Display = getDisplayModel();
     const Store = getStoreModel();
     const SurveyResponse = getSurveyResponseModel();
-    
-    // Check cache first to prevent heavy computation
-    const cacheKey = 'region_progress';
-    const cachedData = getCachedDashboardData(cacheKey);
-    if (cachedData) {
-      return res.json(cachedData);
-    }
-    
-    // Get latest records with improved filtering
+
+    // Get latest records with improved filtering (using analytics database)
     const allDisplays = await Display.find({ is_displayed: true })
       .select('store_id model createdAt updatedAt')
       .lean();
@@ -986,15 +956,10 @@ const getRegionProgress = async (req, res) => {
       }))
       .sort((a, b) => b.completionRate - a.completionRate);
 
-    const result = {
+    res.json({
       success: true,
       data: regionProgress,
-    };
-
-    // Cache the result to prevent repeated heavy computations
-    setCachedDashboardData(cacheKey, result);
-    
-    res.json(result);
+    });
   } catch (error) {
     console.error('Get region progress error:', error);
     res.status(500).json({
@@ -1009,11 +974,14 @@ const getRegionProgress = async (req, res) => {
  */
 const getProgressTimeline = async (req, res) => {
   try {
+    // Get analytics database models
+    const SurveyResponse = getSurveyResponseModel();
+
     const days = parseInt(req.query.days) || 30; // Default to 30 days
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    // Get surveys within the time range
+    // Get surveys within the time range (using analytics database)
     const surveys = await SurveyResponse.find({
       createdAt: { $gte: startDate },
     })
@@ -1082,11 +1050,6 @@ const getProgressTimeline = async (req, res) => {
  */
 const getPOSMMatrix = async (req, res) => {
   try {
-    // Get analytics database models
-    const Display = getDisplayModel();
-    const Store = getStoreModel();
-    const SurveyResponse = getSurveyResponseModel();
-    
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const skip = (page - 1) * limit;
@@ -1103,14 +1066,26 @@ const getPOSMMatrix = async (req, res) => {
       return res.json(cachedData);
     }
 
-    // Get all displays, surveys, and stores
+    // Get analytics database models
+    const Display = getDisplayModel();
+    const Store = getStoreModel();
+    const SurveyResponse = getSurveyResponseModel();
+
+    // Get all displays, surveys, and stores (using analytics database)
+    // Add query limits to prevent full table scans
     const allDisplays = await Display.find({ is_displayed: true })
       .select('store_id model createdAt updatedAt')
+      .limit(10000)
       .lean();
     const allSurveys = await SurveyResponse.find()
       .select('leader shopName responses createdAt submittedAt')
+      .limit(5000)
+      .sort({ createdAt: -1 })
       .lean();
-    const stores = await Store.find().select('store_id store_name region province channel').lean();
+    const stores = await Store.find()
+      .select('store_id store_name region province channel')
+      .limit(2000)
+      .lean();
 
     // Get POSM counts for each model
     const modelPosmCounts = await getModelPosmCounts();
@@ -1370,82 +1345,90 @@ async function calculateStoreProgressImproved(
     });
   }
 
-  // Initialize store stats from displays
-  displays.forEach((display) => {
-    if (!storeStats[display.store_id]) {
-      const storeInfo = storeMap[display.store_id];
-      storeStats[display.store_id] = {
-        storeId: display.store_id,
-        storeName: storeInfo?.store_name || display.store_id,
-        region: storeInfo?.region || 'Unknown',
-        province: storeInfo?.province || 'Unknown',
-        channel: storeInfo?.channel || 'Unknown',
-        totalDisplays: 0,
-        verifiedDisplays: 0,
-        models: new Set(),
-        verifiedModels: new Set(),
-        totalRequiredPOSMs: 0,
-        completedPOSMs: 0,
-        posmCompletionDetails: {},
-        lastSurveyDate: null,
-        matchingDebug: [],
-      };
+  // Initialize store stats from displays (with async chunking to prevent event loop blocking)
+  console.log(`🔄 Processing ${displays.length} displays in chunks of ${CHUNK_SIZE}...`);
+  for (let i = 0; i < displays.length; i += CHUNK_SIZE) {
+    const displayChunk = displays.slice(i, i + CHUNK_SIZE);
+    
+    for (const display of displayChunk) {
+      if (!storeStats[display.store_id]) {
+        const storeInfo = storeMap[display.store_id];
+        storeStats[display.store_id] = {
+          storeId: display.store_id,
+          storeName: storeInfo?.store_name || display.store_id,
+          region: storeInfo?.region || 'Unknown',
+          province: storeInfo?.province || 'Unknown',
+          channel: storeInfo?.channel || 'Unknown',
+          totalDisplays: 0,
+          verifiedDisplays: 0,
+          models: new Set(),
+          verifiedModels: new Set(),
+          totalRequiredPOSMs: 0,
+          completedPOSMs: 0,
+          posmCompletionDetails: {},
+          lastSurveyDate: null,
+          matchingDebug: [],
+        };
+      }
+
+      storeStats[display.store_id].totalDisplays++;
+      storeStats[display.store_id].models.add(display.model);
+
+      // Calculate required POSMs for this model
+      const posmCount = modelPosmCounts[display.model] || 0;
+      storeStats[display.store_id].totalRequiredPOSMs += posmCount;
+
+      // Initialize POSM completion tracking for this model
+      if (!storeStats[display.store_id].posmCompletionDetails[display.model]) {
+        storeStats[display.store_id].posmCompletionDetails[display.model] = {
+          required: posmCount,
+          completed: 0,
+        };
+      }
     }
 
-    storeStats[display.store_id].totalDisplays++;
-    storeStats[display.store_id].models.add(display.model);
-
-    // Calculate required POSMs for this model
-    const posmCount = modelPosmCounts[display.model] || 0;
-    storeStats[display.store_id].totalRequiredPOSMs += posmCount;
-
-    // Initialize POSM completion tracking for this model
-    if (!storeStats[display.store_id].posmCompletionDetails[display.model]) {
-      storeStats[display.store_id].posmCompletionDetails[display.model] = {
-        required: posmCount,
-        completed: 0,
-      };
-    }
-  });
-
-  // Check verification against surveys using improved matching with validation and cumulative POSM tracking
-  console.log(`🔄 Starting survey verification for ${displays.length} displays...`);
-  let processedCount = 0;
-  
-  for (const display of displays) {
-    // Yield control periodically to prevent event loop blocking
-    if (processedCount > 0 && processedCount % 100 === 0) {
-      console.log(`🔄 Survey verification progress: ${processedCount}/${displays.length} displays (${Math.round(processedCount / displays.length * 100)}%)`);
+    // Yield control every chunk to prevent event loop blocking
+    if (i > 0 && i % (CHUNK_SIZE * YIELD_INTERVAL) === 0) {
+      console.log(`🔄 Processed ${Math.min(i + CHUNK_SIZE, displays.length)}/${displays.length} displays (${Math.round((i + CHUNK_SIZE) / displays.length * 100)}%)`);
       await new Promise(resolve => setImmediate(resolve));
     }
+  }
+
+  // Check verification against surveys using improved matching with validation and cumulative POSM tracking
+  // Process displays in chunks to prevent event loop blocking
+  console.log(`🔄 Starting survey verification for ${displays.length} displays...`);
+  const startTime = Date.now();
+  
+  for (let i = 0; i < displays.length; i += CHUNK_SIZE) {
+    const displayChunk = displays.slice(i, i + CHUNK_SIZE);
     
-    processedCount++;
-    const allMatchingSurveysForStore = validatedSurveys.filter((survey) =>
-      isStoreMatch(survey.leader, survey.shopName, display.store_id, storeMap)
-    );
-
-    // Debug specific store
-    const debugStore = (storeId) => {
-      const debugStores = ['cao_phong_dist_5', 'Cao Phong Dist 5'];
-      return debugStores.some(
-        (debug) =>
-          storeId.toLowerCase().includes(debug.toLowerCase()) ||
-          debug.toLowerCase().includes(storeId.toLowerCase())
+    for (const display of displayChunk) {
+      const allMatchingSurveysForStore = validatedSurveys.filter((survey) =>
+        isStoreMatch(survey.leader, survey.shopName, display.store_id, storeMap)
       );
-    };
 
-    if (allMatchingSurveysForStore.length > 0) {
-      // VALIDATION STEP 1: Verify surveys actually exist and contain valid data
-      const validSurveysForStore = allMatchingSurveysForStore.filter((survey) => {
-        return (
+      // Debug specific store
+      const debugStore = (storeId) => {
+        const debugStores = ['cao_phong_dist_5', 'Cao Phong Dist 5'];
+        return debugStores.some(
+          (debug) =>
+            storeId.toLowerCase().includes(debug.toLowerCase()) ||
+            debug.toLowerCase().includes(storeId.toLowerCase())
+        );
+      };
+
+      if (allMatchingSurveysForStore.length > 0) {
+        // VALIDATION STEP 1: Verify surveys actually exist and contain valid data
+        const validSurveysForStore = allMatchingSurveysForStore.filter((survey) => {
+          return (
           survey.responses &&
           survey.responses.length > 0 &&
           (survey.shopName || survey.leader) &&
           survey.createdAt
-        ); // Must have creation date
-      });
+          ); // Must have creation date
+        });
 
-      if (validSurveysForStore.length === 0) {
+        if (validSurveysForStore.length === 0) {
         console.warn(
           `🚨 VALIDATION FAILED: Store ${display.store_id} matched ${allMatchingSurveysForStore.length} surveys but none contain valid data`
         );
@@ -1599,9 +1582,16 @@ async function calculateStoreProgressImproved(
         );
       }
     }
+
+    // Yield control every chunk to prevent event loop blocking
+    if (i > 0 && i % (CHUNK_SIZE * YIELD_INTERVAL) === 0) {
+      console.log(`🔄 Survey verification progress: ${Math.min(i + CHUNK_SIZE, displays.length)}/${displays.length} displays (${Math.round((i + CHUNK_SIZE) / displays.length * 100)}%)`);
+      await new Promise(resolve => setImmediate(resolve));
+    }
   }
-  
-  console.log(`✅ Survey verification completed for ${displays.length} displays`);
+
+  const endTime = Date.now();
+  console.log(`✅ Survey verification completed in ${endTime - startTime}ms for ${displays.length} displays`);
 
   // Convert to array and calculate completion rates
   return Object.values(storeStats)
@@ -1920,7 +1910,12 @@ const debugStoreMatching = async (req, res) => {
       });
     }
 
-    // Get store data
+    // Get analytics database models
+    const Display = getDisplayModel();
+    const Store = getStoreModel();
+    const SurveyResponse = getSurveyResponseModel();
+
+    // Get store data (using analytics database)
     const stores = await Store.find().select('store_id store_name region province channel').lean();
     const storeMap = {};
     stores.forEach((store) => {
@@ -1946,7 +1941,7 @@ const debugStoreMatching = async (req, res) => {
       });
     }
 
-    // Get displays for this store
+    // Get displays for this store (using analytics database)
     const displays = await Display.find({
       store_id: targetStore.store_id,
       is_displayed: true,
@@ -1954,7 +1949,7 @@ const debugStoreMatching = async (req, res) => {
       .select('store_id model')
       .lean();
 
-    // Get all surveys
+    // Get all surveys (using analytics database)
     const allSurveys = await SurveyResponse.find()
       .select('leader shopName responses createdAt submittedAt')
       .lean();
@@ -2083,7 +2078,12 @@ const debugStoreMatching = async (req, res) => {
  */
 const getCompletionAudit = async (req, res) => {
   try {
-    // Get all data needed for audit
+    // Get analytics database models
+    const Display = getDisplayModel();
+    const Store = getStoreModel();
+    const SurveyResponse = getSurveyResponseModel();
+
+    // Get all data needed for audit (using analytics database)
     const allDisplays = await Display.find({ is_displayed: true })
       .select('store_id model createdAt updatedAt')
       .lean();

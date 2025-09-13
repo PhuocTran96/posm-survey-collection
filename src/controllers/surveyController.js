@@ -1,4 +1,5 @@
 const { SurveyResponse, Store, ModelPosm } = require('../models');
+const { getPrimarySurveyResponseModel, getUserModel, modelFactory } = require('../utils/modelFactory');
 const { s3 } = require('../utils/s3Helper');
 const mongoose = require('mongoose');
 
@@ -67,28 +68,39 @@ const extractS3KeyFromUrl = (url) => {
 
 const getLeaders = async (req, res) => {
   try {
-    const leaders = await Store.distinct('leader');
+    // Use primary database for survey operations (real-time data needed)
+    const StorePrimary = modelFactory.getPrimaryModel('Store');
+    
+    console.log('🔍 Fetching leaders using primary database');
+    const leaders = await StorePrimary.distinct('leader');
     res.json(leaders);
   } catch (error) {
-    console.error('Error fetching leaders:', error);
+    console.error('❌ Error fetching leaders:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching leaders from database',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
 
 const getShopsByLeader = async (req, res) => {
   try {
+    // Use primary database for survey operations (real-time data needed)
+    const StorePrimary = modelFactory.getPrimaryModel('Store');
+    
     const leader = decodeURIComponent(req.params.leader);
-    const shops = await Store.find({ leader: leader }).select('name -_id');
+    console.log(`🔍 Fetching shops for leader: "${leader}" using primary database`);
+    
+    const shops = await StorePrimary.find({ leader: leader }).select('name -_id');
     const shopNames = shops.map((shop) => shop.name);
     res.json(shopNames);
   } catch (error) {
-    console.error('Error fetching shops:', error);
+    console.error('❌ Error fetching shops:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching shops from database',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
@@ -98,7 +110,8 @@ const getModelsByLeaderAndShop = async (req, res) => {
     const leader = decodeURIComponent(req.params.leader);
     const shopName = decodeURIComponent(req.params.shopName);
 
-    const shop = await Store.findOne({ leader: leader, name: shopName });
+    const StorePrimary = modelFactory.getPrimaryModel('Store');
+    const shop = await StorePrimary.findOne({ leader: leader, name: shopName });
     if (!shop) {
       return res.status(404).json({
         success: false,
@@ -106,7 +119,8 @@ const getModelsByLeaderAndShop = async (req, res) => {
       });
     }
 
-    const modelPosmData = await ModelPosm.find().lean();
+    const ModelPosmPrimary = modelFactory.getPrimaryModel('ModelPosm');
+    const modelPosmData = await ModelPosmPrimary.find().lean();
     const modelGroups = {};
 
     modelPosmData.forEach((item) => {
@@ -131,10 +145,15 @@ const getModelsByLeaderAndShop = async (req, res) => {
 
 const getModelsByStoreId = async (req, res) => {
   try {
+    // Use primary database for survey operations (real-time data needed)
+    const StorePrimary = modelFactory.getPrimaryModel('Store');
+    const ModelPosmPrimary = modelFactory.getPrimaryModel('ModelPosm');
+    
     const storeId = req.params.storeId;
+    console.log(`🔍 Store lookup: "${storeId}" using primary database`);
 
     // Find the store by store_id
-    const store = await Store.findOne({ store_id: storeId });
+    const store = await StorePrimary.findOne({ store_id: storeId });
     if (!store) {
       console.log(`❌ Store not found: ${storeId}`);
       return res.status(404).json({
@@ -144,7 +163,7 @@ const getModelsByStoreId = async (req, res) => {
     }
 
     // Get all models and POSM data (same logic as getModelsByLeaderAndShop)
-    const modelPosmData = await ModelPosm.find().lean();
+    const modelPosmData = await ModelPosmPrimary.find().lean();
     const modelGroups = {};
 
     modelPosmData.forEach((item) => {
@@ -183,7 +202,8 @@ const submitSurvey = async (req, res) => {
       });
     }
 
-    const surveyResponse = new SurveyResponse({
+    const SurveyResponsePrimary = modelFactory.getPrimaryModel('SurveyResponse');
+    const surveyResponse = new SurveyResponsePrimary({
       leader,
       shopName,
       responses,
@@ -219,6 +239,7 @@ const submitSurvey = async (req, res) => {
 const getSurveyResponses = async (req, res) => {
   try {
     console.log('📊 Fetching survey responses from MongoDB...');
+    const SurveyResponsePrimary = modelFactory.getPrimaryModel('SurveyResponse');
 
     // Get pagination parameters from query
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -368,7 +389,7 @@ const getSurveyResponses = async (req, res) => {
     // Database debugging - get statistics
     let totalDocuments = 0;
     try {
-      totalDocuments = await SurveyResponse.countDocuments({});
+      totalDocuments = await SurveyResponsePrimary.countDocuments({});
       console.log('📊 Database Statistics:', {
         totalDocumentsInCollection: totalDocuments,
       });
@@ -409,7 +430,7 @@ const getSurveyResponses = async (req, res) => {
       let createdAtCount = 0;
 
       try {
-        submittedAtCount = await SurveyResponse.countDocuments({
+        submittedAtCount = await SurveyResponsePrimary.countDocuments({
           submittedAt: submittedAtFilter,
         });
       } catch (error) {
@@ -417,7 +438,7 @@ const getSurveyResponses = async (req, res) => {
       }
 
       try {
-        createdAtCount = await SurveyResponse.countDocuments({
+        createdAtCount = await SurveyResponsePrimary.countDocuments({
           createdAt: createdAtFilter,
         });
       } catch (error) {
@@ -435,7 +456,7 @@ const getSurveyResponses = async (req, res) => {
 
       // Sample a few documents to see their actual date field values
       try {
-        const sampleDocs = await SurveyResponse.find({}).limit(3).lean();
+        const sampleDocs = await SurveyResponsePrimary.find({}).limit(3).lean();
         console.log(
           '📋 Sample Documents Date Fields:',
           sampleDocs.map((doc) => ({
@@ -451,7 +472,7 @@ const getSurveyResponses = async (req, res) => {
     }
 
     // Get total count for pagination metadata
-    const totalCount = await SurveyResponse.countDocuments(filters);
+    const totalCount = await SurveyResponsePrimary.countDocuments(filters);
     console.log('🔢 Query Results Count:', {
       matchingDocuments: totalCount,
       appliedFilters: filters,
@@ -469,7 +490,7 @@ const getSurveyResponses = async (req, res) => {
     }
 
     // Get responses - optimized for export requests
-    let query = SurveyResponse.find(filters).sort({ submittedAt: -1 });
+    let query = SurveyResponsePrimary.find(filters).sort({ submittedAt: -1 });
 
     if (isExportRequest) {
       // For exports: return ALL records, no pagination
@@ -577,6 +598,7 @@ const getSurveyResponseById = async (req, res) => {
     const { id } = req.params;
 
     console.log(`📋 Admin fetching survey response: ${id}`);
+    const SurveyResponsePrimary = modelFactory.getPrimaryModel('SurveyResponse');
 
     // Validate ObjectId format
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -586,7 +608,7 @@ const getSurveyResponseById = async (req, res) => {
       });
     }
 
-    const survey = await SurveyResponse.findById(id).lean();
+    const survey = await SurveyResponsePrimary.findById(id).lean();
 
     if (!survey) {
       return res.status(404).json({
@@ -614,6 +636,7 @@ const deleteSurveyResponse = async (req, res) => {
   try {
     const { id } = req.params;
     console.log(`🗑️ Delete request for survey ID: ${id}`);
+    const SurveyResponsePrimary = modelFactory.getPrimaryModel('SurveyResponse');
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       console.log(`❌ Invalid ObjectId format: ${id}`);
@@ -623,7 +646,7 @@ const deleteSurveyResponse = async (req, res) => {
       });
     }
 
-    const response = await SurveyResponse.findById(id);
+    const response = await SurveyResponsePrimary.findById(id);
     if (!response) {
       console.log(`❌ Survey response not found: ${id}`);
       return res.status(404).json({
@@ -693,7 +716,7 @@ const deleteSurveyResponse = async (req, res) => {
     }
 
     // Phase 2: Delete from MongoDB
-    const deletedResponse = await SurveyResponse.findByIdAndDelete(id);
+    const deletedResponse = await SurveyResponsePrimary.findByIdAndDelete(id);
     if (!deletedResponse) {
       console.log(`❌ Failed to delete survey response from DB: ${id}`);
 
@@ -752,6 +775,7 @@ const bulkDeleteSurveyResponses = async (req, res) => {
   try {
     const { ids } = req.body;
     console.log(`🗑️ Bulk delete request for ${ids?.length || 0} survey responses`);
+    const SurveyResponsePrimary = modelFactory.getPrimaryModel('SurveyResponse');
 
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({
@@ -771,7 +795,7 @@ const bulkDeleteSurveyResponses = async (req, res) => {
 
     // Fetch all responses in parallel for better performance
     console.log('📋 Fetching responses to delete...');
-    const responses = await SurveyResponse.find({ _id: { $in: ids } }).lean();
+    const responses = await SurveyResponsePrimary.find({ _id: { $in: ids } }).lean();
 
     const foundIds = responses.map((r) => r._id.toString());
     const notFoundIds = ids.filter((id) => !foundIds.includes(id));
@@ -857,7 +881,7 @@ const bulkDeleteSurveyResponses = async (req, res) => {
 
     // Delete survey responses from database in bulk
     console.log('🗑️ Deleting survey responses from database...');
-    const deleteResult = await SurveyResponse.deleteMany({ _id: { $in: foundIds } });
+    const deleteResult = await SurveyResponsePrimary.deleteMany({ _id: { $in: foundIds } });
 
     const successMessage = `Successfully deleted ${deleteResult.deletedCount} survey response(s)`;
     console.log(`✅ ${successMessage}`);
@@ -900,16 +924,24 @@ const bulkDeleteSurveyResponses = async (req, res) => {
 
 const getModelAutocomplete = async (req, res) => {
   try {
+    // Use primary database for survey operations (real-time data needed)
+    const ModelPosmPrimary = modelFactory.getPrimaryModel('ModelPosm');
+    
     const q = req.query.q || '';
-    const models = await ModelPosm.find({
+    console.log(`🔍 Model autocomplete search: "${q}" using primary database`);
+    
+    const models = await ModelPosmPrimary.find({
       model: { $regex: q, $options: 'i' },
     }).distinct('model');
+    
+    console.log(`📋 Found ${models.length} matching models for search: "${q}"`);
     res.json(models);
   } catch (error) {
-    console.error('Error in model autocomplete:', error);
+    console.error('❌ Error in model autocomplete:', error);
     res.status(500).json({
       success: false,
       message: 'Error searching models',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
@@ -927,10 +959,15 @@ const getPosmByModel = async (req, res) => {
       `🔍 Model lookup request: "${model}" from mobile=${isMobile}, UA="${userAgent.substring(0, 50)}"`
     );
 
+    // Use primary database for survey operations (real-time data needed)
+    const ModelPosmPrimary = modelFactory.getPrimaryModel('ModelPosm');
+    
     // Case-insensitive query with regex to handle mobile case variations
-    const modelPosmData = await ModelPosm.find({
+    const modelPosmData = await ModelPosmPrimary.find({
       model: { $regex: new RegExp(`^${model.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
     }).lean();
+    
+    console.log(`📋 Using primary database for model: "${model}" (mobile=${isMobile})`);
 
     if (modelPosmData.length === 0) {
       console.log(`❌ No POSM found for model: "${model}" (mobile=${isMobile})`);
@@ -982,17 +1019,20 @@ const getPosmByModel = async (req, res) => {
  */
 const getShopAutocomplete = async (req, res) => {
   try {
+    // Use primary database for survey operations (real-time data needed)
+    const SurveyResponsePrimary = modelFactory.getPrimaryModel('SurveyResponse');
+    
     const query = req.query.q || '';
 
     if (query.length < 2) {
       return res.json([]);
     }
 
-    console.log(`🔍 Shop autocomplete search: "${query}"`);
+    console.log(`🔍 Shop autocomplete search: "${query}" using primary database`);
 
     const searchRegex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
 
-    const shops = await SurveyResponse.distinct('shopName', {
+    const shops = await SurveyResponsePrimary.distinct('shopName', {
       shopName: { $regex: searchRegex },
     });
 
@@ -1098,9 +1138,10 @@ const updateSurveyResponse = async (req, res) => {
     const updateData = req.body;
 
     console.log(`🔄 Attempting to update survey response: ${id}`);
+    const SurveyResponsePrimary = modelFactory.getPrimaryModel('SurveyResponse');
 
     // Validate the survey exists
-    const existingSurvey = await SurveyResponse.findById(id);
+    const existingSurvey = await SurveyResponsePrimary.findById(id);
     if (!existingSurvey) {
       console.log(`❌ Survey response not found: ${id}`);
       return res.status(404).json({
@@ -1110,7 +1151,7 @@ const updateSurveyResponse = async (req, res) => {
     }
 
     // Update the survey with validation
-    const updatedSurvey = await SurveyResponse.findByIdAndUpdate(
+    const updatedSurvey = await SurveyResponsePrimary.findByIdAndUpdate(
       id,
       {
         shopName: updateData.shopName,
@@ -1177,6 +1218,7 @@ const deleteModelFromSurvey = async (req, res) => {
   try {
     const { surveyId, modelIndex } = req.params;
     console.log(`🗑️ Delete model request: surveyId=${surveyId}, modelIndex=${modelIndex}`);
+    const SurveyResponsePrimary = modelFactory.getPrimaryModel('SurveyResponse');
 
     // Validate surveyId format
     if (!mongoose.Types.ObjectId.isValid(surveyId)) {
@@ -1198,7 +1240,7 @@ const deleteModelFromSurvey = async (req, res) => {
     }
 
     // Find the survey
-    const survey = await SurveyResponse.findById(surveyId);
+    const survey = await SurveyResponsePrimary.findById(surveyId);
     if (!survey) {
       console.log(`❌ Survey response not found: ${surveyId}`);
       return res.status(404).json({
@@ -1323,6 +1365,7 @@ const bulkDeleteModelsFromSurveys = async (req, res) => {
   try {
     const { deletions } = req.body;
     console.log(`🗑️ Bulk delete models request for ${deletions?.length || 0} models`);
+    const SurveyResponsePrimary = modelFactory.getPrimaryModel('SurveyResponse');
 
     if (!Array.isArray(deletions) || deletions.length === 0) {
       return res.status(400).json({
@@ -1374,7 +1417,7 @@ const bulkDeleteModelsFromSurveys = async (req, res) => {
     // Process each survey
     for (const [surveyId, surveyDeletions] of Object.entries(deletionsBySurvey)) {
       try {
-        const survey = await SurveyResponse.findById(surveyId);
+        const survey = await SurveyResponsePrimary.findById(surveyId);
         if (!survey) {
           surveyDeletions.forEach((deletion) => {
             results.failed.push({

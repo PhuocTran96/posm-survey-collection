@@ -5,7 +5,7 @@ const fs = require('fs');
 const mongoose = require('mongoose');
 
 const { config, validateConfig } = require('./src/config');
-const { connectDB, setupDatabaseEvents } = require('./src/config/database');
+const { connectDB, setupDatabaseEvents, databaseManager } = require('./src/config/database');
 const routes = require('./src/routes');
 const { errorHandler, notFoundHandler } = require('./src/middleware/errorHandler');
 const {
@@ -37,6 +37,79 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: config.upload.maxFileSize }));
 app.use(express.urlencoded({ extended: true, limit: config.upload.maxFileSize }));
+
+// Health check endpoints for database monitoring
+app.get('/api/health/system', async (req, res) => {
+  try {
+    const dbHealth = await databaseManager.healthCheck();
+    const systemStatus = {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      database: dbHealth,
+      server: {
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        nodeVersion: process.version
+      }
+    };
+
+    // Determine overall status
+    if (dbHealth.primary.status !== 'connected') {
+      systemStatus.status = 'error';
+      return res.status(503).json(systemStatus);
+    }
+
+    if (dbHealth.analytics.status === 'disconnected' && dbHealth.analytics.status !== 'disabled') {
+      systemStatus.status = 'warning';
+    }
+
+    res.json(systemStatus);
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.get('/api/health/primary-db', async (req, res) => {
+  try {
+    const connection = databaseManager.getConnection('primary');
+    await connection.db.admin().ping();
+    res.json({
+      status: 'connected',
+      database: connection.name,
+      host: connection.host,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'disconnected',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+app.get('/api/health/analytics-db', async (req, res) => {
+  try {
+    const connection = databaseManager.getConnection('analytics');
+    await connection.db.admin().ping();
+    res.json({
+      status: 'connected',
+      database: connection.name,
+      host: connection.host,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'disconnected',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
 
 // Debug endpoint to count users
 app.get('/debug/users/count', async (req, res) => {
@@ -194,7 +267,16 @@ app.use('*', notFoundHandler);
 
 const gracefulShutdown = async (signal) => {
   console.log(`${signal} received. Shutting down gracefully...`);
-  await mongoose.connection.close();
+  try {
+    // Close both database connections
+    await databaseManager.close();
+    // Also close the default mongoose connection for safety
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.connection.close();
+    }
+  } catch (error) {
+    console.error('Error during graceful shutdown:', error.message);
+  }
   process.exit(0);
 };
 

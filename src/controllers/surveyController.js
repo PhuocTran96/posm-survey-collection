@@ -302,6 +302,73 @@ const getSurveyResponses = async (req, res) => {
         filters['responses.model'] = modelFilter['responses.model'];
       }
     }
+
+    // Multi-select sidebar filtering
+    const addMultiSelectFilter = (filterName, fieldPath, queryParam) => {
+      if (req.query[queryParam]) {
+        // Handle both single values and arrays
+        const values = Array.isArray(req.query[queryParam])
+          ? req.query[queryParam]
+          : [req.query[queryParam]];
+
+        if (values.length > 0) {
+          console.log(`🔍 Multi-select ${filterName} filter:`, values);
+
+          const multiSelectFilter = { [fieldPath]: { $in: values } };
+
+          if (filters.$and) {
+            filters.$and.push(multiSelectFilter);
+          } else if (filters.$or) {
+            filters.$and = [{ $or: filters.$or }, multiSelectFilter];
+            delete filters.$or;
+          } else {
+            filters[fieldPath] = multiSelectFilter[fieldPath];
+          }
+        }
+      }
+    };
+
+    // Apply multi-select filters for sidebar
+    addMultiSelectFilter('shops', 'shopName', 'shops');
+    addMultiSelectFilter('users', 'submittedBy', 'users');
+    addMultiSelectFilter('models', 'responses.model', 'models');
+
+    // Category filtering requires special handling since categories are in ModelPosm collection
+    if (req.query.categories) {
+      // Normalize categories to array format (handle both single string and array inputs)
+      const categoriesArray = Array.isArray(req.query.categories)
+        ? req.query.categories
+        : [req.query.categories];
+
+      if (categoriesArray.length > 0) {
+        console.log('🔍 Multi-select categories filter:', categoriesArray);
+
+        // First, find all models that belong to the selected categories
+        const modelsInCategory = await ModelPosm.distinct('model', {
+          category: { $in: categoriesArray }
+        });
+
+        console.log('📋 Models found for categories:', modelsInCategory);
+        console.log('📋 Number of models found:', modelsInCategory.length);
+
+        if (modelsInCategory.length === 0) {
+          console.warn('⚠️ No models found for the selected categories. This might indicate a data issue.');
+        }
+
+        // Then filter survey responses by those models
+        const categoryFilter = { 'responses.model': { $in: modelsInCategory } };
+
+        if (filters.$and) {
+          filters.$and.push(categoryFilter);
+        } else if (filters.$or) {
+          filters.$and = [{ $or: filters.$or }, categoryFilter];
+          delete filters.$or;
+        } else {
+          filters['responses.model'] = categoryFilter['responses.model'];
+        }
+      }
+    }
+
     // Enhanced date filtering with comprehensive debugging
     if (req.query.dateFrom || req.query.dateTo) {
       console.log('📅 Backend Date Filtering Debug:', {
@@ -1516,6 +1583,224 @@ const bulkDeleteModelsFromSurveys = async (req, res) => {
   }
 };
 
+const getFilterOptions = async (req, res) => {
+  try {
+    console.log('🔍 Fetching filter options for sidebar...');
+
+    // Get distinct values for each filter category
+    const [shops, users, categories, models] = await Promise.all([
+      // Get distinct shop names
+      SurveyResponse.distinct('shopName').exec(),
+
+      // Get distinct users (submittedBy)
+      SurveyResponse.distinct('submittedBy').exec(),
+
+      // Get distinct categories from ModelPosm collection
+      ModelPosm.distinct('category').exec(),
+
+      // Get distinct models
+      SurveyResponse.distinct('responses.model').exec()
+    ]);
+
+    // Format the response
+    const filterOptions = {
+      shops: shops.filter(shop => shop && shop.trim() !== '').sort(),
+      users: users.filter(user => user && user.trim() !== '').sort(),
+      categories: categories.filter(cat => cat && cat.trim() !== '').sort(),
+      models: models.filter(model => model && model.trim() !== '').sort()
+    };
+
+    console.log('📊 Filter options counts:', {
+      shops: filterOptions.shops.length,
+      users: filterOptions.users.length,
+      categories: filterOptions.categories.length,
+      models: filterOptions.models.length
+    });
+
+    res.status(200).json({
+      success: true,
+      data: filterOptions
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching filter options:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching filter options',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
+// Autocomplete endpoints
+const getStoresAutocomplete = async (req, res) => {
+  try {
+    const { q: query, limit = 20 } = req.query;
+
+    if (!query || query.length < 2) {
+      return res.json({ results: [], total: 0 });
+    }
+
+    const searchRegex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+
+    const results = await SurveyResponse.aggregate([
+      {
+        $match: {
+          $or: [
+            { shopName: { $regex: searchRegex } },
+            { leader: { $regex: searchRegex } }
+          ]
+        }
+      },
+      {
+        $group: {
+          _id: '$shopName',
+          leader: { $first: '$leader' },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1, _id: 1 } },
+      { $limit: parseInt(limit) }
+    ]);
+
+    res.json({
+      results: results.map(item => ({
+        id: item._id,
+        name: item._id,
+        leader: item.leader,
+        surveyCount: item.count
+      })),
+      total: results.length
+    });
+  } catch (error) {
+    console.error('❌ Error in stores autocomplete:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const getUsersAutocomplete = async (req, res) => {
+  try {
+    const { q: query, limit = 20 } = req.query;
+
+    if (!query || query.length < 2) {
+      return res.json({ results: [], total: 0 });
+    }
+
+    const searchRegex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+
+    const results = await SurveyResponse.aggregate([
+      {
+        $match: {
+          submittedBy: { $regex: searchRegex }
+        }
+      },
+      {
+        $group: {
+          _id: '$submittedBy',
+          count: { $sum: 1 },
+          lastSubmission: { $max: '$submittedAt' }
+        }
+      },
+      { $sort: { count: -1, _id: 1 } },
+      { $limit: parseInt(limit) }
+    ]);
+
+    res.json({
+      results: results.map(item => ({
+        id: item._id,
+        name: item._id,
+        surveyCount: item.count,
+        lastSubmission: item.lastSubmission
+      })),
+      total: results.length
+    });
+  } catch (error) {
+    console.error('❌ Error in users autocomplete:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const getModelsAutocomplete = async (req, res) => {
+  try {
+    const { q: query, limit = 20 } = req.query;
+
+    if (!query || query.length < 2) {
+      return res.json({ results: [], total: 0 });
+    }
+
+    const searchRegex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+
+    const results = await SurveyResponse.aggregate([
+      { $unwind: '$responses' },
+      {
+        $match: {
+          'responses.model': { $regex: searchRegex }
+        }
+      },
+      {
+        $group: {
+          _id: '$responses.model',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1, _id: 1 } },
+      { $limit: parseInt(limit) }
+    ]);
+
+    res.json({
+      results: results.map(item => ({
+        id: item._id,
+        name: item._id,
+        usageCount: item.count
+      })),
+      total: results.length
+    });
+  } catch (error) {
+    console.error('❌ Error in models autocomplete:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const getCategoriesAutocomplete = async (req, res) => {
+  try {
+    const { q: query, limit = 20 } = req.query;
+
+    if (!query || query.length < 2) {
+      return res.json({ results: [], total: 0 });
+    }
+
+    const searchRegex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+
+    const results = await ModelPosm.aggregate([
+      {
+        $match: {
+          'category': { $regex: searchRegex }
+        }
+      },
+      {
+        $group: {
+          _id: '$category',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1, _id: 1 } },
+      { $limit: parseInt(limit) }
+    ]);
+
+    res.json({
+      results: results.map(item => ({
+        id: item._id,
+        name: item._id,
+        usageCount: item.count
+      })),
+      total: results.length
+    });
+  } catch (error) {
+    console.error('❌ Error in categories autocomplete:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   getLeaders,
   getShopsByLeader,
@@ -1533,4 +1818,9 @@ module.exports = {
   getPosmByModel,
   getShopAutocomplete,
   getSearchSuggestions,
+  getFilterOptions,
+  getStoresAutocomplete,
+  getUsersAutocomplete,
+  getModelsAutocomplete,
+  getCategoriesAutocomplete,
 };

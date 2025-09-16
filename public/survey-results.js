@@ -1,3 +1,306 @@
+// AutocompleteFilter class for search-enabled multi-select filters
+class AutocompleteFilter {
+  constructor(containerId, options, parentApp) {
+    this.container = document.getElementById(containerId);
+    this.apiEndpoint = options.apiEndpoint;
+    this.placeholder = options.placeholder;
+    this.parentApp = parentApp;
+    this.selectedItems = new Map(); // id -> {id, name, ...}
+    this.debounceTimer = null;
+    this.minChars = 2;
+    this.maxResults = 20;
+    this.isOpen = false;
+    this.highlightedIndex = -1;
+    this.currentResults = [];
+
+    if (this.container) {
+      this.render();
+      this.bindEvents();
+    }
+  }
+
+  render() {
+    this.container.innerHTML = `
+      <div class="autocomplete-input-container">
+        <input
+          type="text"
+          class="autocomplete-input"
+          placeholder="${this.placeholder}"
+          autocomplete="off"
+        />
+        <div class="autocomplete-loading" style="display: none;">
+          <div class="spinner"></div>
+        </div>
+      </div>
+      <div class="autocomplete-dropdown" style="display: none;"></div>
+      <div class="selected-tags-container"></div>
+    `;
+  }
+
+  bindEvents() {
+    const input = this.container.querySelector('.autocomplete-input');
+    const dropdown = this.container.querySelector('.autocomplete-dropdown');
+
+    // Input events
+    input.addEventListener('input', (e) => this.handleInput(e));
+    input.addEventListener('focus', () => this.handleFocus());
+    input.addEventListener('blur', (e) => this.handleBlur(e));
+    input.addEventListener('keydown', (e) => this.handleKeydown(e));
+
+    // Click outside to close
+    document.addEventListener('click', (e) => {
+      if (!this.container.contains(e.target)) {
+        this.closeDropdown();
+      }
+    });
+  }
+
+  handleInput(e) {
+    const query = e.target.value.trim();
+
+    if (query.length >= this.minChars) {
+      this.debouncedSearch(query);
+    } else {
+      this.closeDropdown();
+    }
+  }
+
+  handleFocus() {
+    const input = this.container.querySelector('.autocomplete-input');
+    const query = input.value.trim();
+    if (query.length >= this.minChars) {
+      this.debouncedSearch(query);
+    }
+  }
+
+  handleBlur(e) {
+    // Delay to allow clicking on dropdown items
+    setTimeout(() => {
+      if (!this.container.contains(document.activeElement)) {
+        this.closeDropdown();
+      }
+    }, 150);
+  }
+
+  handleKeydown(e) {
+    if (!this.isOpen) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        this.highlightNext();
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        this.highlightPrevious();
+        break;
+      case 'Enter':
+        e.preventDefault();
+        this.selectHighlighted();
+        break;
+      case 'Escape':
+        e.preventDefault();
+        this.closeDropdown();
+        break;
+    }
+  }
+
+  debouncedSearch(query) {
+    clearTimeout(this.debounceTimer);
+    this.debounceTimer = setTimeout(() => {
+      this.search(query);
+    }, 300);
+  }
+
+  async search(query) {
+    try {
+      this.showLoading();
+
+      const searchUrl = `${this.apiEndpoint}?q=${encodeURIComponent(query)}&limit=${this.maxResults}`;
+
+      console.group(`🔍 Autocomplete Search: ${this.apiEndpoint.split('/').pop()}`);
+      console.log('Query:', query);
+      console.log('Search URL:', searchUrl);
+
+      const response = await this.parentApp.makeAuthenticatedRequest(searchUrl);
+
+      console.log('📡 API Response:', response);
+      console.log('Response Type:', typeof response);
+
+      // Handle different response formats
+      let results = [];
+      if (response && response.results) {
+        results = response.results;
+        console.log('✅ Found results in response.results');
+      } else if (Array.isArray(response)) {
+        results = response;
+        console.log('✅ Response is direct array');
+      } else if (response && response.data && Array.isArray(response.data)) {
+        results = response.data;
+        console.log('✅ Found results in response.data');
+      } else if (response && typeof response === 'object') {
+        // Try to find array in response object
+        const possibleArrays = Object.values(response).filter(val => Array.isArray(val));
+        if (possibleArrays.length > 0) {
+          results = possibleArrays[0];
+          console.log('✅ Found array in response object');
+        } else {
+          console.log('⚠️ No arrays found in response object');
+        }
+      } else {
+        console.log('❌ Unexpected response format');
+      }
+
+      console.log('📋 Final Results:', results);
+      console.log('Results Count:', results.length);
+      console.groupEnd();
+
+      this.currentResults = results;
+      this.renderDropdown(results);
+      this.openDropdown();
+
+    } catch (error) {
+      console.error('❌ Search error:', error);
+      console.error('Error details:', error.message, error.stack);
+
+      // Show error in dropdown
+      const dropdown = this.container.querySelector('.autocomplete-dropdown');
+      if (dropdown) {
+        dropdown.innerHTML = `<div class="autocomplete-error">Lỗi tìm kiếm: ${error.message}</div>`;
+        this.openDropdown();
+      }
+    } finally {
+      this.hideLoading();
+    }
+  }
+
+  renderDropdown(results) {
+    const dropdown = this.container.querySelector('.autocomplete-dropdown');
+
+    if (results.length === 0) {
+      dropdown.innerHTML = '<div class="autocomplete-empty">Không tìm thấy kết quả</div>';
+      return;
+    }
+
+    dropdown.innerHTML = results.map((item, index) => `
+      <div class="autocomplete-option" data-index="${index}" data-id="${item.id}">
+        <div class="autocomplete-option-title">${item.name}</div>
+        ${item.leader ? `<div class="autocomplete-option-subtitle">Leader: ${item.leader}</div>` : ''}
+        ${item.surveyCount ? `<div class="autocomplete-option-subtitle">${item.surveyCount} surveys</div>` : ''}
+        ${item.usageCount ? `<div class="autocomplete-option-subtitle">${item.usageCount} times used</div>` : ''}
+      </div>
+    `).join('');
+
+    // Add click events
+    dropdown.querySelectorAll('.autocomplete-option').forEach(option => {
+      option.addEventListener('click', () => {
+        const index = parseInt(option.dataset.index);
+        this.selectItem(this.currentResults[index]);
+      });
+    });
+  }
+
+  selectItem(item) {
+    if (!this.selectedItems.has(item.id)) {
+      this.selectedItems.set(item.id, item);
+      this.renderSelectedTags();
+      this.parentApp.updateSelectedFilters();
+
+      // Automatically apply filters when item is selected
+      this.parentApp.applyFiltersAutomatically();
+    }
+
+    // Clear input and close dropdown
+    const input = this.container.querySelector('.autocomplete-input');
+    input.value = '';
+    this.closeDropdown();
+  }
+
+  selectHighlighted() {
+    if (this.highlightedIndex >= 0 && this.currentResults[this.highlightedIndex]) {
+      this.selectItem(this.currentResults[this.highlightedIndex]);
+    }
+  }
+
+  highlightNext() {
+    this.highlightedIndex = Math.min(this.highlightedIndex + 1, this.currentResults.length - 1);
+    this.updateHighlight();
+  }
+
+  highlightPrevious() {
+    this.highlightedIndex = Math.max(this.highlightedIndex - 1, 0);
+    this.updateHighlight();
+  }
+
+  updateHighlight() {
+    const options = this.container.querySelectorAll('.autocomplete-option');
+    options.forEach((option, index) => {
+      option.classList.toggle('highlighted', index === this.highlightedIndex);
+    });
+  }
+
+  renderSelectedTags() {
+    const container = this.container.querySelector('.selected-tags-container');
+
+    container.innerHTML = Array.from(this.selectedItems.values()).map(item => `
+      <div class="selected-tag">
+        <span>${item.name}</span>
+        <button class="selected-tag-remove" data-id="${item.id}" type="button">×</button>
+      </div>
+    `).join('');
+
+    // Add remove events
+    container.querySelectorAll('.selected-tag-remove').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.target.dataset.id;
+        this.selectedItems.delete(id);
+        this.renderSelectedTags();
+        this.parentApp.updateSelectedFilters();
+
+        // Automatically apply filters when item is removed
+        this.parentApp.applyFiltersAutomatically();
+      });
+    });
+  }
+
+  clearAll() {
+    this.selectedItems.clear();
+    this.renderSelectedTags();
+    this.parentApp.updateSelectedFilters();
+
+    // Automatically apply filters when all items are cleared
+    this.parentApp.applyFiltersAutomatically();
+  }
+
+  getSelectedValues() {
+    return Array.from(this.selectedItems.values()).map(item => item.name);
+  }
+
+  openDropdown() {
+    const dropdown = this.container.querySelector('.autocomplete-dropdown');
+    dropdown.style.display = 'block';
+    this.isOpen = true;
+    this.highlightedIndex = -1;
+  }
+
+  closeDropdown() {
+    const dropdown = this.container.querySelector('.autocomplete-dropdown');
+    dropdown.style.display = 'none';
+    this.isOpen = false;
+    this.highlightedIndex = -1;
+  }
+
+  showLoading() {
+    const loading = this.container.querySelector('.autocomplete-loading');
+    loading.style.display = 'block';
+  }
+
+  hideLoading() {
+    const loading = this.container.querySelector('.autocomplete-loading');
+    loading.style.display = 'none';
+  }
+}
+
 class SurveyResultsApp {
   constructor() {
     this.responses = [];
@@ -13,6 +316,24 @@ class SurveyResultsApp {
     this.pagination = null;
     this.selectionMode = 'survey'; // 'survey' or 'model'
     this.selectedModels = new Set(); // Track selected individual models (format: "surveyId:modelIndex")
+
+    // Filter-related properties (sidebar removed)
+    this.filterOptions = {
+      shops: [],
+      users: [],
+      categories: [],
+      models: []
+    };
+    this.selectedFilters = {
+      shops: [],
+      users: [],
+      categories: [],
+      models: []
+    };
+
+    // Autocomplete filters
+    this.autocompleteFilters = {};
+
     this.init();
   }
 
@@ -24,6 +345,8 @@ class SurveyResultsApp {
     }
 
     this.bindEvents();
+    this.initializeAdvancedFilters();
+    this.loadFilterOptions();
     this.loadResponses();
     this.initNavigation();
   }
@@ -112,6 +435,26 @@ class SurveyResultsApp {
         return null;
       }
 
+      // Auto-parse JSON for autocomplete endpoints, keep raw Response for others
+      const contentType = response.headers.get('content-type');
+      const isJsonResponse = contentType && contentType.includes('application/json');
+      const isAutocompleteEndpoint = url.includes('-autocomplete');
+
+      // Parse JSON automatically for autocomplete endpoints
+      if (response.ok && isJsonResponse && isAutocompleteEndpoint) {
+        try {
+          const data = await response.json();
+          console.log(`📋 Auto-parsed JSON response from ${url}:`, data);
+          return data;
+        } catch (parseError) {
+          console.error('Failed to parse JSON response:', parseError);
+          console.log('Response was:', response);
+          return response; // Fallback to raw response
+        }
+      }
+
+      // For all other endpoints, return raw response (existing behavior)
+      console.log(`📡 Raw response from ${url}:`, response);
       return response;
     } catch (error) {
       console.error('API request failed:', error);
@@ -204,6 +547,379 @@ class SurveyResultsApp {
     if (selectionModeToggle) {
       selectionModeToggle.addEventListener('change', () => this.toggleSelectionMode());
     }
+
+    // Advanced filters event listeners
+    this.bindAdvancedFiltersEvents();
+  }
+
+  // Advanced filters methods
+  initializeAdvancedFilters() {
+    console.log('🔧 Initializing advanced filters...');
+
+    // No sidebar state needed - filters are always visible
+    console.log('✅ Advanced filters initialized');
+  }
+
+  bindAdvancedFiltersEvents() {
+    // No global buttons needed - filters apply automatically
+    console.log('✅ Advanced filters events bound (automatic filtering)');
+
+    // Select all checkboxes
+    ['shops', 'users', 'categories', 'models'].forEach(type => {
+      const selectAllBtn = document.getElementById(`selectAll${type.charAt(0).toUpperCase() + type.slice(1)}`);
+      if (selectAllBtn) {
+        selectAllBtn.addEventListener('change', (e) => this.handleSelectAll(type, e.target.checked));
+      }
+    });
+
+    // Window resize handler
+    window.addEventListener('resize', () => this.handleWindowResize());
+  }
+
+  async loadFilterOptions() {
+    try {
+      console.log('📊 Initializing autocomplete filters...');
+
+      // Test API endpoints first
+      await this.testApiEndpoints();
+
+      // Initialize autocomplete filters
+      this.autocompleteFilters = {
+        shops: new AutocompleteFilter('shopAutocomplete', {
+          apiEndpoint: '/api/stores-autocomplete',
+          placeholder: '🔍 Tìm kiếm cửa hàng...'
+        }, this),
+
+        users: new AutocompleteFilter('userAutocomplete', {
+          apiEndpoint: '/api/users-autocomplete',
+          placeholder: '🔍 Tìm kiếm người dùng...'
+        }, this),
+
+        categories: new AutocompleteFilter('categoryAutocomplete', {
+          apiEndpoint: '/api/categories-autocomplete',
+          placeholder: '🔍 Tìm kiếm danh mục...'
+        }, this),
+
+        models: new AutocompleteFilter('modelAutocomplete', {
+          apiEndpoint: '/api/models-autocomplete',
+          placeholder: '🔍 Tìm kiếm model...'
+        }, this)
+      };
+
+      console.log('✅ Autocomplete filters initialized');
+    } catch (error) {
+      console.error('❌ Error initializing autocomplete filters:', error);
+    }
+  }
+
+  // Test API endpoints to debug connection issues
+  async testApiEndpoints() {
+    console.group('🧪 API Endpoints Testing');
+
+    const endpoints = [
+      '/api/stores-autocomplete?q=cao&limit=5',
+      '/api/users-autocomplete?q=test&limit=5',
+      '/api/categories-autocomplete?q=test&limit=5',
+      '/api/models-autocomplete?q=test&limit=5'
+    ];
+
+    for (const endpoint of endpoints) {
+      console.group(`🔍 Testing: ${endpoint}`);
+      try {
+        // Test raw fetch first to see actual response
+        const token = localStorage.getItem('accessToken');
+        console.log('Using token:', token ? 'Present' : 'Missing');
+
+        const rawResponse = await fetch(endpoint, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        console.log('Raw Response Status:', rawResponse.status);
+        console.log('Raw Response OK:', rawResponse.ok);
+        console.log('Raw Response Headers:', [...rawResponse.headers.entries()]);
+
+        if (rawResponse.ok) {
+          const textContent = await rawResponse.text();
+          console.log('Raw Response Text:', textContent.substring(0, 200) + '...');
+
+          try {
+            const jsonData = JSON.parse(textContent);
+            console.log('Parsed JSON:', jsonData);
+          } catch (parseError) {
+            console.log('JSON Parse Error:', parseError.message);
+          }
+        }
+
+        // Now test through our authenticated request
+        console.log('--- Testing via makeAuthenticatedRequest ---');
+        const authResponse = await this.makeAuthenticatedRequest(endpoint);
+        console.log('Auth Response Type:', typeof authResponse);
+        console.log('Auth Response:', authResponse);
+
+        console.log('✅ Test completed for', endpoint);
+      } catch (error) {
+        console.error('❌ Test failed for', endpoint, ':', error.message);
+      }
+      console.groupEnd();
+    }
+    console.groupEnd();
+  }
+
+  // Update selected filters from autocomplete components
+  updateSelectedFilters() {
+    console.group('🔄 Updating Selected Filters');
+
+    // Update selected filters based on autocomplete selections
+    Object.keys(this.autocompleteFilters).forEach(filterType => {
+      const autocomplete = this.autocompleteFilters[filterType];
+      if (autocomplete) {
+        const selectedValues = autocomplete.getSelectedValues();
+        const selectedCount = autocomplete.selectedItems.size;
+
+        console.log(`📊 ${filterType}:`, {
+          values: selectedValues,
+          count: selectedCount,
+          selectedItems: Array.from(autocomplete.selectedItems.values())
+        });
+
+        this.selectedFilters[filterType] = selectedValues;
+      } else {
+        console.log(`❌ No autocomplete filter found for: ${filterType}`);
+        this.selectedFilters[filterType] = [];
+      }
+    });
+
+    console.log('📊 Final selectedFilters:', this.selectedFilters);
+    console.groupEnd();
+  }
+
+  // Sidebar methods removed - filters are now always visible
+
+  handleWindowResize() {
+    // No sidebar visibility updates needed - filters are always visible
+  }
+
+
+  clearFilterSection(type) {
+    // Clear autocomplete filter
+    if (this.autocompleteFilters[type]) {
+      this.autocompleteFilters[type].clearAll();
+    }
+    this.selectedFilters[type] = [];
+  }
+
+  applyFiltersAutomatically() {
+    console.group('🔄 Auto-applying Filters');
+
+    // Update selected filters and reload data automatically
+    this.updateSelectedFilters();
+
+    const filterCount = Object.values(this.selectedFilters)
+      .reduce((total, arr) => total + arr.length, 0);
+
+    console.log('📊 Selected Filters:', this.selectedFilters);
+    console.log('📊 Filter Summary:', this.getFilterSummary());
+    console.log('📊 Total Active Filters:', filterCount);
+
+    // Test filter value formats before applying
+    if (filterCount > 0) {
+      this.testFilterValueFormats();
+      this.showNotification(`🔍 Applying ${filterCount} filter(s)...`, 'info', 2000);
+    }
+
+    console.log('🔄 Triggering loadResponses...');
+
+    this.currentPage = 1;
+
+    // Add promise handling for better error tracking
+    this.loadResponses().then(() => {
+      console.log('✅ Filter application completed successfully');
+      console.groupEnd();
+    }).catch((error) => {
+      console.error('❌ Filter application failed:', error);
+      this.showNotification('❌ Lỗi khi áp dụng bộ lọc', 'error', 3000);
+      console.groupEnd();
+    });
+  }
+
+  // Helper method to summarize active filters
+  getFilterSummary() {
+    const summary = {};
+    Object.keys(this.selectedFilters).forEach(key => {
+      if (this.selectedFilters[key].length > 0) {
+        summary[key] = this.selectedFilters[key];
+      }
+    });
+    return summary;
+  }
+
+  // Test and debug filter value formats
+  testFilterValueFormats() {
+    console.group('🧪 Testing Filter Value Formats');
+    console.log('📋 Current selectedFilters:', this.selectedFilters);
+
+    // Test what values are being sent vs what backend expects
+    Object.keys(this.selectedFilters).forEach(filterType => {
+      if (this.selectedFilters[filterType].length > 0) {
+        console.log(`🔍 ${filterType} values:`, this.selectedFilters[filterType]);
+        console.log(`   Expected by backend: ${this.getBackendFieldMapping(filterType)}`);
+
+        // Check for common issues
+        const values = this.selectedFilters[filterType];
+        const hasEmptyValues = values.some(val => !val || val.trim() === '');
+        const hasUndefinedValues = values.some(val => val === 'undefined' || val === undefined);
+
+        if (hasEmptyValues || hasUndefinedValues) {
+          console.warn(`⚠️ Problematic values in ${filterType}:`, {
+            emptyValues: hasEmptyValues,
+            undefinedValues: hasUndefinedValues,
+            values: values
+          });
+        }
+      }
+    });
+    console.groupEnd();
+  }
+
+  // Get backend field mapping for debugging
+  getBackendFieldMapping(filterType) {
+    const mapping = {
+      'shops': 'shopName (string match)',
+      'users': 'submittedBy (exact match)',
+      'models': 'responses.model (string match)',
+      'categories': 'responses.posm.category (exact match in array)'
+    };
+    return mapping[filterType] || 'Unknown field';
+  }
+
+  // Validate response data structure and content
+  validateResponseData(responseData) {
+    console.group('📊 Response Data Validation');
+    console.log('📈 Response summary:', {
+      totalResponses: responseData.data?.length || responseData.responses?.length || 0,
+      totalPages: responseData.pagination?.totalPages || responseData.totalPages || 0,
+      currentPage: responseData.pagination?.currentPage || responseData.currentPage || 0,
+      hasFilters: Object.values(this.selectedFilters).some(arr => arr.length > 0),
+      responseStructure: {
+        hasData: !!responseData.data,
+        hasPagination: !!responseData.pagination,
+        hasResponses: !!responseData.responses,
+        hasTotal: !!responseData.total
+      }
+    });
+
+    // If filters are applied but we get all results, that's suspicious
+    const hasActiveFilters = Object.values(this.selectedFilters).some(arr => arr.length > 0);
+    const resultCount = responseData.data?.length || responseData.responses?.length || 0;
+    const totalCount = responseData.pagination?.total || responseData.total || resultCount;
+
+    if (hasActiveFilters && resultCount > 0) {
+      console.log('🔍 Filter effectiveness check:');
+      console.log(`   Results returned: ${resultCount}`);
+      console.log(`   Total available: ${totalCount}`);
+
+      if (resultCount === totalCount) {
+        console.warn('⚠️ POTENTIAL ISSUE: Filters applied but got all results');
+        console.log('🔍 This suggests filters may not be working correctly');
+      } else {
+        console.log('✅ Filters appear to be working - result count reduced');
+      }
+    }
+
+    // Verify filter application success
+    this.verifyFilterApplication(responseData);
+
+    console.groupEnd();
+  }
+
+  // Verify that returned data matches filter criteria
+  verifyFilterApplication(responseData) {
+    const hasActiveFilters = Object.values(this.selectedFilters).some(arr => arr.length > 0);
+
+    if (!hasActiveFilters) {
+      console.log('✅ No filters active - showing all results');
+      return true;
+    }
+
+    console.group('🔍 Filter Application Verification');
+
+    // Get the actual response data
+    const responses = responseData.data || responseData.responses || [];
+    const sampleResponses = responses.slice(0, 3);
+
+    console.log('📋 Sample responses to verify:', sampleResponses.map(r => ({
+      shopName: r.shopName,
+      submittedBy: r.submittedBy,
+      models: r.responses?.map(resp => resp.model) || []
+    })));
+
+    // Log what we expect vs what we got
+    console.log('🎯 Expected criteria:', this.selectedFilters);
+
+    // Check each active filter type
+    Object.keys(this.selectedFilters).forEach(filterType => {
+      if (this.selectedFilters[filterType].length > 0) {
+        console.log(`🔎 Verifying ${filterType} filter:`, this.selectedFilters[filterType]);
+
+        const expectedValues = this.selectedFilters[filterType];
+        let matchCount = 0;
+
+        sampleResponses.forEach((response, index) => {
+          let fieldValue = null;
+
+          switch (filterType) {
+            case 'shops':
+              fieldValue = response.shopName;
+              break;
+            case 'users':
+              fieldValue = response.submittedBy;
+              break;
+            case 'models':
+              fieldValue = response.responses?.map(r => r.model).join(', ');
+              break;
+            case 'categories':
+              fieldValue = response.responses?.map(r => r.posm?.category).filter(Boolean).join(', ');
+              break;
+          }
+
+          const hasMatch = expectedValues.some(expected =>
+            fieldValue && fieldValue.toLowerCase().includes(expected.toLowerCase())
+          );
+
+          if (hasMatch) matchCount++;
+
+          console.log(`   Sample ${index + 1}: ${fieldValue} - ${hasMatch ? '✅ Match' : '❌ No match'}`);
+        });
+
+        if (matchCount === 0 && sampleResponses.length > 0) {
+          console.warn(`⚠️ No matches found for ${filterType} filter in sample data!`);
+        }
+      }
+    });
+
+    console.groupEnd();
+    return true;
+  }
+
+  // Legacy method maintained for compatibility
+  applyAdvancedFilters() {
+    this.applyFiltersAutomatically();
+  }
+
+  clearAdvancedFilters() {
+    console.log('🗑️ Clearing all advanced filters');
+
+    // Clear all selected filters
+    Object.keys(this.selectedFilters).forEach(type => {
+      this.clearFilterSection(type);
+    });
+
+    // Reload responses
+    this.currentPage = 1;
+    this.loadResponses();
   }
 
   // Loading overlay methods
@@ -362,16 +1078,71 @@ class SurveyResultsApp {
         params.append('dateTo', dateToFilter.value);
       }
 
-      console.log('Loading responses with params:', params.toString());
+      // Add sidebar filter parameters
+      console.group('🔗 Building Filter Parameters');
+      console.log('📋 Raw selectedFilters:', this.selectedFilters);
 
+      // Validate filter values before sending
+      Object.keys(this.selectedFilters).forEach(filterType => {
+        if (this.selectedFilters[filterType].length > 0) {
+          console.log(`📎 Processing ${filterType}:`, this.selectedFilters[filterType]);
+
+          // Check if values look correct (not empty, not undefined)
+          const invalidValues = this.selectedFilters[filterType].filter(val =>
+            !val || val.trim() === '' || val === 'undefined'
+          );
+
+          if (invalidValues.length > 0) {
+            console.warn(`⚠️ Invalid values detected in ${filterType}:`, invalidValues);
+          }
+
+          console.log(`📎 Adding ${filterType} filters:`, this.selectedFilters[filterType]);
+
+          this.selectedFilters[filterType].forEach(value => {
+            params.append(filterType, value);
+            console.log(`   ➡️ ${filterType}=${value}`);
+          });
+        } else {
+          console.log(`⚪ No filters for ${filterType}`);
+        }
+      });
+
+      console.log('📋 Final URL params:', params.toString());
+      console.log('🌐 Full request URL:', `/api/responses?${params}`);
+      console.groupEnd();
+
+      console.log('Loading responses with params:', params.toString());
+      console.log('Active sidebar filters:', this.selectedFilters);
+
+      console.log('🌐 Making API request to:', `/api/responses?${params}`);
       const response = await this.makeAuthenticatedRequest(`/api/responses?${params}`);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      console.log('📡 Received response:', response);
+      console.log('Response type:', typeof response);
+
+      let responseData;
+
+      // Handle both parsed JSON and raw Response objects
+      if (response && response.ok !== undefined) {
+        // It's a raw Response object
+        console.log('📄 Processing raw Response object');
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+        }
+        responseData = await response.json();
+        console.log('📋 Parsed response data:', responseData);
+      } else if (response && typeof response === 'object') {
+        // It's already parsed JSON data
+        console.log('📋 Using pre-parsed JSON data');
+        responseData = response;
+      } else {
+        console.error('❌ Invalid response format:', response);
+        throw new Error('Invalid response format received');
       }
 
-      const responseData = await response.json();
+      // Validate response data
+      this.validateResponseData(responseData);
 
       // Handle new paginated response format
       if (responseData.data && responseData.pagination) {
@@ -512,59 +1283,210 @@ class SurveyResultsApp {
       return '<p class="no-data">Không có dữ liệu model</p>';
     }
 
-    return responses
-      .map((modelResponse, modelIndex) => {
-        const posmTags = modelResponse.allSelected
-          ? '<span class="posm-tag all-selected">TẤT CẢ POSM</span>'
-          : modelResponse.posmSelections
-              .map((posm) => `<span class="posm-tag">${posm.posmCode}</span>`)
-              .join('');
+    // Initialize pagination state for this survey if needed
+    if (!this.modelPagination) {
+      this.modelPagination = {};
+    }
+    if (!this.modelPagination[surveyId]) {
+      this.modelPagination[surveyId] = {
+        currentPage: 1,
+        itemsPerPage: 12,
+        viewMode: 'grid'
+      };
+    }
 
-        const images =
-          modelResponse.images && modelResponse.images.length > 0
-            ? modelResponse.images
-                .map(
-                  (img) =>
-                    `<img src="${img}" alt="POSM Image" style="max-width:100px;max-height:80px;margin:5px;border-radius:5px;cursor:pointer;" onclick="window.open('${img}')">`
-                )
-                .join('')
-            : '';
+    const pagination = this.modelPagination[surveyId];
+    const totalModels = responses.length;
+    const totalPages = Math.ceil(totalModels / pagination.itemsPerPage);
+    const startIndex = (pagination.currentPage - 1) * pagination.itemsPerPage;
+    const endIndex = Math.min(startIndex + pagination.itemsPerPage, totalModels);
+    const currentPageModels = responses.slice(startIndex, endIndex);
 
-        const modelKey = `${surveyId}:${modelIndex}`;
-        const isModelSelected = this.selectedModels.has(modelKey);
-
-        // Show model selection controls only in model mode
-        const modelControls =
-          this.selectionMode === 'model'
-            ? `
-          <div class="model-controls">
-            <input type="checkbox" ${isModelSelected ? 'checked' : ''} 
-                   onchange="surveyResultsApp.toggleModelSelection('${surveyId}', ${modelIndex})"
-                   onclick="event.stopPropagation()"
-                   class="model-checkbox">
-            <button class="model-delete-btn" 
-                    onclick="event.stopPropagation(); surveyResultsApp.showDeleteModelDialog('${surveyId}', ${modelIndex}, '${this.escapeHtml(modelResponse.model)}')" 
-                    title="Xóa model này">
-              🗑️
+    // Generate the grid header with controls
+    const gridHeader = `
+      <div class="models-grid-header">
+        <div class="models-count">
+          ${totalModels} model${totalModels !== 1 ? 's' : ''}
+          ${totalModels > pagination.itemsPerPage ?
+            `(trang ${pagination.currentPage}/${totalPages})` : ''}
+        </div>
+        <div class="grid-controls">
+          <div class="view-toggle">
+            <button class="${pagination.viewMode === 'grid' ? 'active' : ''}"
+                    onclick="surveyResultsApp.setModelViewMode('${surveyId}', 'grid')">
+              📱 Grid
+            </button>
+            <button class="${pagination.viewMode === 'list' ? 'active' : ''}"
+                    onclick="surveyResultsApp.setModelViewMode('${surveyId}', 'list')">
+              📋 List
             </button>
           </div>
-        `
-            : '';
+          ${totalModels > 12 ? `
+          <div class="pagination-controls">
+            <select onchange="surveyResultsApp.setModelPageSize('${surveyId}', this.value)">
+              <option value="12" ${pagination.itemsPerPage === 12 ? 'selected' : ''}>12/trang</option>
+              <option value="24" ${pagination.itemsPerPage === 24 ? 'selected' : ''}>24/trang</option>
+              <option value="48" ${pagination.itemsPerPage === 48 ? 'selected' : ''}>48/trang</option>
+            </select>
+            <div class="pagination-nav">
+              <button onclick="surveyResultsApp.setModelPage('${surveyId}', ${pagination.currentPage - 1})"
+                      ${pagination.currentPage === 1 ? 'disabled' : ''}>‹</button>
+              <span class="pagination-info">${pagination.currentPage}/${totalPages}</span>
+              <button onclick="surveyResultsApp.setModelPage('${surveyId}', ${pagination.currentPage + 1})"
+                      ${pagination.currentPage === totalPages ? 'disabled' : ''}>›</button>
+            </div>
+          </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
 
-        return `
-                <div class="model-response ${isModelSelected ? 'selected' : ''}">
-                    <div class="model-header">
-                        <div class="model-title">
-                            ${modelResponse.model} (Số lượng: ${modelResponse.quantity || 1})
-                        </div>
-                        ${modelControls}
-                    </div>
-                    <div class="posm-selections">${posmTags}</div>
-                    ${images ? `<div class="response-images" style="margin-top:10px;">${images}</div>` : ''}
-                </div>
-            `;
+    // Generate models HTML
+    const modelsHtml = currentPageModels
+      .map((modelResponse, modelIndex) => {
+        const actualIndex = startIndex + modelIndex;
+        const posmTags = this.renderPosmTags(modelResponse);
+        const images = this.renderModelImages(modelResponse, pagination.viewMode);
+        const modelKey = `${surveyId}:${actualIndex}`;
+        const isModelSelected = this.selectedModels.has(modelKey);
+
+        if (pagination.viewMode === 'grid') {
+          return this.renderModelCard(modelResponse, surveyId, actualIndex, posmTags, images, isModelSelected);
+        } else {
+          return this.renderModelListItem(modelResponse, surveyId, actualIndex, posmTags, images, isModelSelected);
+        }
       })
       .join('');
+
+    // Wrap in appropriate container
+    const containerClass = pagination.viewMode === 'grid' ? 'models-grid' : 'models-list';
+
+    return `
+      <div class="models-grid-container">
+        ${gridHeader}
+        <div class="${containerClass}">
+          ${modelsHtml}
+        </div>
+      </div>
+    `;
+  }
+
+  renderPosmTags(modelResponse) {
+    return modelResponse.allSelected
+      ? '<span class="posm-tag all-selected">TẤT CẢ POSM</span>'
+      : modelResponse.posmSelections
+          .map((posm) => `<span class="posm-tag">${posm.posmCode}</span>`)
+          .join('');
+  }
+
+  renderModelImages(modelResponse, viewMode) {
+    if (!modelResponse.images || modelResponse.images.length === 0) {
+      return viewMode === 'grid'
+        ? '<div class="no-images-placeholder">📷 Không có hình ảnh</div>'
+        : '';
+    }
+
+    if (viewMode === 'grid') {
+      return this.renderGridImages(modelResponse.images);
+    } else {
+      return modelResponse.images
+        .map((img) =>
+          `<img src="${img}" alt="POSM Image" style="max-width:100px;max-height:80px;margin:5px;border-radius:5px;cursor:pointer;" onclick="openImageLightbox('${img}')">`
+        )
+        .join('');
+    }
+  }
+
+  renderGridImages(images) {
+    const maxDisplay = 4;
+    const displayImages = images.slice(0, maxDisplay);
+    const remainingCount = images.length - maxDisplay;
+
+    let gridClass = 'model-card-images';
+    if (images.length === 1) gridClass += ' single-image';
+    else if (images.length === 3) gridClass += ' three-images';
+
+    const imageElements = displayImages.map((img, index) => {
+      if (index === maxDisplay - 1 && remainingCount > 0) {
+        return `
+          <div class="image-thumb-overlay" data-count="${remainingCount}">
+            <img src="${img}" alt="POSM Image" class="image-thumb" onclick="openImageLightbox('${img}')">
+          </div>
+        `;
+      } else {
+        return `<img src="${img}" alt="POSM Image" class="image-thumb" onclick="openImageLightbox('${img}')">`;
+      }
+    }).join('');
+
+    return `<div class="${gridClass}">${imageElements}</div>`;
+  }
+
+  renderModelCard(modelResponse, surveyId, modelIndex, posmTags, images, isModelSelected) {
+    const modelControls = this.selectionMode === 'model'
+      ? `
+        <div class="model-card-controls">
+          <input type="checkbox" ${isModelSelected ? 'checked' : ''}
+                 onchange="surveyResultsApp.toggleModelSelection('${surveyId}', ${modelIndex})"
+                 onclick="event.stopPropagation()"
+                 class="model-checkbox">
+          <button class="model-edit-btn"
+                  onclick="event.stopPropagation(); surveyResultsApp.editModel('${surveyId}', ${modelIndex})"
+                  title="Chỉnh sửa model">
+            ✏️
+          </button>
+          <button class="model-delete-btn"
+                  onclick="event.stopPropagation(); surveyResultsApp.showDeleteModelDialog('${surveyId}', ${modelIndex}, '${this.escapeHtml(modelResponse.model)}')"
+                  title="Xóa model này">
+            🗑️
+          </button>
+        </div>
+      `
+      : '';
+
+    return `
+      <div class="model-card ${isModelSelected ? 'selected' : ''}">
+        <div class="model-card-header">
+          <div>
+            <div class="model-card-title">${modelResponse.model}</div>
+            ${modelControls}
+          </div>
+          <div class="model-quantity-badge">${modelResponse.quantity || 1}</div>
+        </div>
+        <div class="model-card-posm">${posmTags}</div>
+        ${images}
+      </div>
+    `;
+  }
+
+  renderModelListItem(modelResponse, surveyId, modelIndex, posmTags, images, isModelSelected) {
+    const modelControls = this.selectionMode === 'model'
+      ? `
+        <div class="model-controls">
+          <input type="checkbox" ${isModelSelected ? 'checked' : ''}
+                 onchange="surveyResultsApp.toggleModelSelection('${surveyId}', ${modelIndex})"
+                 onclick="event.stopPropagation()"
+                 class="model-checkbox">
+          <button class="model-delete-btn"
+                  onclick="event.stopPropagation(); surveyResultsApp.showDeleteModelDialog('${surveyId}', ${modelIndex}, '${this.escapeHtml(modelResponse.model)}')"
+                  title="Xóa model này">
+            🗑️
+          </button>
+        </div>
+      `
+      : '';
+
+    return `
+      <div class="model-response ${isModelSelected ? 'selected' : ''}">
+        <div class="model-header">
+          <div class="model-title">
+            ${modelResponse.model} (Số lượng: ${modelResponse.quantity || 1})
+          </div>
+          ${modelControls}
+        </div>
+        <div class="posm-selections">${posmTags}</div>
+        ${images ? `<div class="response-images" style="margin-top:10px;">${images}</div>` : ''}
+      </div>
+    `;
   }
 
   renderPagination() {
@@ -1126,12 +2048,15 @@ class SurveyResultsApp {
       searchSuggestions.innerHTML = '';
     }
 
+    // Clear sidebar autocomplete filters
+    this.clearAdvancedFilters();
+
     // Reset to first page and reload data
     this.currentPage = 1;
     this.loadResponses(1);
 
     // Show notification
-    this.showNotification('✅ Đã xóa tìm kiếm và bộ lọc ngày', 'success', 3000);
+    this.showNotification('✅ Đã xóa tất cả bộ lọc', 'success', 3000);
   }
 
   // Enhanced confirmation dialog for bulk delete
@@ -1391,6 +2316,82 @@ class SurveyResultsApp {
     this.updateBulkDeleteButton();
     // Re-render only this model to update selection state
     this.renderResponses();
+  }
+
+  // Grid view mode controls
+  setModelViewMode(surveyId, viewMode) {
+    if (!this.modelPagination) {
+      this.modelPagination = {};
+    }
+    if (!this.modelPagination[surveyId]) {
+      this.modelPagination[surveyId] = {
+        currentPage: 1,
+        itemsPerPage: 12,
+        viewMode: 'grid'
+      };
+    }
+    this.modelPagination[surveyId].viewMode = viewMode;
+    this.renderResponses();
+  }
+
+  setModelPageSize(surveyId, pageSize) {
+    if (!this.modelPagination) {
+      this.modelPagination = {};
+    }
+    if (!this.modelPagination[surveyId]) {
+      this.modelPagination[surveyId] = {
+        currentPage: 1,
+        itemsPerPage: 12,
+        viewMode: 'grid'
+      };
+    }
+
+    const pagination = this.modelPagination[surveyId];
+    pagination.itemsPerPage = parseInt(pageSize);
+
+    // Adjust current page if needed
+    const survey = this.responses.find(r => r._id === surveyId);
+    if (survey && survey.responses) {
+      const totalModels = survey.responses.length;
+      const totalPages = Math.ceil(totalModels / pagination.itemsPerPage);
+      if (pagination.currentPage > totalPages) {
+        pagination.currentPage = Math.max(1, totalPages);
+      }
+    }
+
+    this.renderResponses();
+  }
+
+  setModelPage(surveyId, page) {
+    if (!this.modelPagination) {
+      this.modelPagination = {};
+    }
+    if (!this.modelPagination[surveyId]) {
+      this.modelPagination[surveyId] = {
+        currentPage: 1,
+        itemsPerPage: 12,
+        viewMode: 'grid'
+      };
+    }
+
+    const survey = this.responses.find(r => r._id === surveyId);
+    if (survey && survey.responses) {
+      const totalModels = survey.responses.length;
+      const totalPages = Math.ceil(totalModels / this.modelPagination[surveyId].itemsPerPage);
+
+      if (page >= 1 && page <= totalPages) {
+        this.modelPagination[surveyId].currentPage = page;
+        this.renderResponses();
+      }
+    }
+  }
+
+  // Edit model method (placeholder)
+  editModel(surveyId, modelIndex) {
+    // This could open a modal or navigate to an edit page
+    console.log(`Edit model ${modelIndex} in survey ${surveyId}`);
+    // For now, just show a notification
+    this.showNotification('Model editing feature coming soon!', 'info');
   }
 
   // Delete individual model dialog
@@ -2216,10 +3217,60 @@ class SurveyResultsApp {
   }
 }
 
+// Global function to open external dashboard
+function openExternalDashboard() {
+  // Replace this URL with your actual dashboard link
+  const dashboardUrl = 'https://posm-dashboard-production.up.railway.app/';
+  window.open(dashboardUrl, '_blank');
+}
+
+// Image Lightbox Functions
+function openImageLightbox(imageSrc) {
+  const lightbox = document.getElementById('imageLightbox');
+  const lightboxImage = document.getElementById('lightboxImage');
+
+  lightboxImage.src = imageSrc;
+  lightbox.style.display = 'flex';
+
+  // Prevent body scrolling when lightbox is open
+  document.body.style.overflow = 'hidden';
+}
+
+function closeImageLightbox() {
+  const lightbox = document.getElementById('imageLightbox');
+  lightbox.style.display = 'none';
+
+  // Restore body scrolling
+  document.body.style.overflow = '';
+}
+
 // Global instance of SurveyResultsApp
 let surveyResultsApp;
 
 // Initialize the survey results app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   surveyResultsApp = new SurveyResultsApp();
+
+  // Initialize lightbox event listeners
+  const lightbox = document.getElementById('imageLightbox');
+  const lightboxClose = document.querySelector('.lightbox-close');
+
+  if (lightbox && lightboxClose) {
+    // Close lightbox when clicking on overlay
+    lightbox.addEventListener('click', (e) => {
+      if (e.target === lightbox) {
+        closeImageLightbox();
+      }
+    });
+
+    // Close lightbox when clicking close button
+    lightboxClose.addEventListener('click', closeImageLightbox);
+
+    // Close lightbox when pressing Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && lightbox.style.display === 'flex') {
+        closeImageLightbox();
+      }
+    });
+  }
 });

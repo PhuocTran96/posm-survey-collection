@@ -61,6 +61,43 @@ router.get(
   requireAdmin,
   surveyController.getSearchSuggestions
 );
+router.get(
+  '/filter-options',
+  verifyToken,
+  updateActivity,
+  requireAdmin,
+  surveyController.getFilterOptions
+);
+
+// Autocomplete endpoints
+router.get(
+  '/stores-autocomplete',
+  verifyToken,
+  updateActivity,
+  requireAdmin,
+  surveyController.getStoresAutocomplete
+);
+router.get(
+  '/users-autocomplete',
+  verifyToken,
+  updateActivity,
+  requireAdmin,
+  surveyController.getUsersAutocomplete
+);
+router.get(
+  '/models-autocomplete',
+  verifyToken,
+  updateActivity,
+  requireAdmin,
+  surveyController.getModelsAutocomplete
+);
+router.get(
+  '/categories-autocomplete',
+  verifyToken,
+  updateActivity,
+  requireAdmin,
+  surveyController.getCategoriesAutocomplete
+);
 
 // Protected routes for survey submission
 router.post(

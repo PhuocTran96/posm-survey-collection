@@ -110,6 +110,12 @@ const initializeData = async () => {
   try {
     await loadStoresData();
     await loadModelPosmData();
+
+    // Debug: Log sample categories for testing
+    const sampleCategories = await ModelPosm.distinct('category');
+    console.log('🏷️ Available categories:', sampleCategories.slice(0, 5));
+    console.log('📊 Total categories:', sampleCategories.length);
+
     console.log('🎉 All data initialization completed');
   } catch (error) {
     console.error('❌ Data initialization failed:', error);

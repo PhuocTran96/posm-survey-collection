@@ -16,9 +16,7 @@
     "lint": "eslint src --ext .js --max-warnings=0",
     "lint:fix": "eslint src --ext .js --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "build:posm-matrix": "webpack --config webpack.config.js --mode production",
-    "build:posm-matrix:dev": "webpack --config webpack.config.js --mode development --watch"
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "ag-grid-community": "^31.0.0",

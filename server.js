@@ -178,9 +178,6 @@ app.get('/store-management.html', protectAdminPage, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'store-management.html'));
 });
 
-app.get('/progress-dashboard.html', protectAdminPage, (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'progress-dashboard.html'));
-});
 
 // Static files (CSS, JS, images) - these should be served last
 app.use(

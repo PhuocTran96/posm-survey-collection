@@ -72,7 +72,7 @@ const uploadStores = async (req, res) => {
 
     const options = {
       clearExisting: req.body.clearExisting === 'true',
-      skipDuplicates: req.body.skipDuplicates !== 'false',
+      updateMode: req.body.updateMode || 'upsert', // Default to upsert
     };
 
     if (options.clearExisting) {
@@ -87,44 +87,25 @@ const uploadStores = async (req, res) => {
     for (const row of csvData) {
       lineCount++;
 
-      // Extract column values
       const storeIdValue = row.store_id;
-      const storeCodeValue = row.store_code;
-      const storeNameValue = row.store_name;
-      const channelValue = row.channel;
-      const hcValue = row.hc;
-      const regionValue = row.region;
-      const provinceValue = row.province;
-      const mcpValue = row.mcp;
-
-      if (
-        !storeIdValue ||
-        !storeNameValue ||
-        !channelValue ||
-        hcValue === undefined ||
-        !regionValue ||
-        !provinceValue ||
-        !mcpValue
-      ) {
-        errors.push(
-          `Row ${lineCount}: Missing required fields (store_id, store_name, channel, hc, region, province, mcp)`
-        );
+      if (!storeIdValue) {
+        errors.push(`Row ${lineCount}: Missing required field 'store_id'`);
         continue;
       }
 
-      const storeDoc = {
-        store_id: storeIdValue.trim(),
-        store_code: storeCodeValue?.trim() || null,
-        store_name: storeNameValue.trim(),
-        channel: channelValue.trim(),
-        hc: parseInt(hcValue) || 0,
-        region: regionValue.trim(),
-        province: provinceValue.trim(),
-        mcp: mcpValue.trim().toUpperCase(),
-        isActive: true,
-        createdBy: 'csv-import',
-        updatedBy: 'csv-import',
-      };
+      // Build the document with only the fields present in the CSV row
+      const storeDoc = { store_id: storeIdValue.trim() };
+      if (row.store_code) storeDoc.store_code = row.store_code.trim();
+      if (row.store_name) storeDoc.store_name = row.store_name.trim();
+      if (row.channel) storeDoc.channel = row.channel.trim();
+      if (row.hc) storeDoc.hc = parseInt(row.hc) || 0;
+      if (row.region) storeDoc.region = row.region.trim();
+      if (row.province) storeDoc.province = row.province.trim();
+      if (row.mcp) storeDoc.mcp = row.mcp.trim().toUpperCase();
+      if (row.leader) storeDoc.leader = row.leader.trim();
+      if (row.TDS) storeDoc.TDS = row.TDS.trim();
+      
+      storeDoc.updatedBy = 'csv-import';
 
       storeData.push(storeDoc);
     }
@@ -136,77 +117,65 @@ const uploadStores = async (req, res) => {
         errors,
       });
     }
-
-    // Remove duplicates if requested
-    let finalData = storeData;
-    if (options.skipDuplicates) {
-      const uniqueData = [];
-      const seen = new Set();
-
-      for (const item of storeData) {
-        const key = `${item.store_id}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          uniqueData.push(item);
-        }
-      }
-
-      const duplicatesCount = storeData.length - uniqueData.length;
-      if (duplicatesCount > 0) {
-        console.log(`⚠️ Removed ${duplicatesCount} duplicate stores`);
-      }
-
-      finalData = uniqueData;
-    }
-
-    // Upload to database
+    
+    // The rest of the logic remains the same as uploadPOSM for upserting
     let uploadedCount = 0;
+    let updatedCount = 0;
     let errorCount = 0;
     const batchSize = 100;
 
-    for (let i = 0; i < finalData.length; i += batchSize) {
-      const batch = finalData.slice(i, i + batchSize);
+    for (let i = 0; i < storeData.length; i += batchSize) {
+      const batch = storeData.slice(i, i + batchSize);
 
-      try {
-        const result = await Store.insertMany(batch, {
-          ordered: false,
-          rawResult: true,
-        });
+      if (options.updateMode === 'upsert') {
+        let batchUploaded = 0;
+        let batchUpdated = 0;
 
-        uploadedCount += result.insertedCount || batch.length;
-        console.log(`✅ Uploaded batch ${Math.floor(i / batchSize) + 1}: ${batch.length} stores`);
-      } catch (error) {
-        if (error.code === 11000) {
-          // Handle duplicate key errors
-          const insertedCount = error.result?.nInserted || 0;
-          uploadedCount += insertedCount;
-          errorCount += batch.length - insertedCount;
-          console.log(
-            `⚠️ Batch ${Math.floor(i / batchSize) + 1}: ${insertedCount} inserted, ${batch.length - insertedCount} duplicates skipped`
+        for (const item of batch) {
+          const result = await Store.updateOne(
+            { store_id: item.store_id },
+            { $set: item, $setOnInsert: { createdBy: 'csv-import', isActive: true } },
+            { upsert: true }
           );
-        } else {
-          console.error(
-            `❌ Error uploading batch ${Math.floor(i / batchSize) + 1}:`,
-            error.message
-          );
-          errorCount += batch.length;
+
+          if (result.upsertedCount > 0) {
+            batchUploaded++;
+          } else if (result.modifiedCount > 0) {
+            batchUpdated++;
+          }
+        }
+        uploadedCount += batchUploaded;
+        updatedCount += batchUpdated;
+        console.log(`✅ Batch ${Math.floor(i / batchSize) + 1}: ${batchUploaded} new, ${batchUpdated} updated`);
+      } else { // Original insertMany logic
+        try {
+            const result = await Store.insertMany(batch, { ordered: false, rawResult: true });
+            uploadedCount += result.insertedCount || batch.length;
+            console.log(`✅ Uploaded batch ${Math.floor(i / batchSize) + 1}: ${batch.length} stores`);
+        } catch (error) {
+            if (error.code === 11000) {
+                const insertedCount = error.result?.nInserted || 0;
+                uploadedCount += insertedCount;
+                errorCount += batch.length - insertedCount;
+                console.log(`⚠️ Batch ${Math.floor(i / batchSize) + 1}: ${insertedCount} inserted, ${batch.length - insertedCount} duplicates skipped`);
+            } else {
+                console.error(`❌ Error uploading batch ${Math.floor(i / batchSize) + 1}:`, error.message);
+                errorCount += batch.length;
+            }
         }
       }
     }
 
     const totalStores = await Store.countDocuments();
-    const uniqueChannels = await Store.distinct('channel');
-    const uniqueRegions = await Store.distinct('region');
 
     res.json({
       success: true,
       message: 'Stores uploaded successfully',
       stats: {
         uploaded: uploadedCount,
+        updated: updatedCount,
         errors: errorCount,
         totalInDatabase: totalStores,
-        uniqueChannels: uniqueChannels.length,
-        uniqueRegions: uniqueRegions.length,
         parseErrors: errors,
       },
     });

@@ -50,6 +50,16 @@ const storeSchema = new mongoose.Schema(
       enum: ['Y', 'N'],
       default: 'N',
     },
+    leader: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+    TDS: {
+      type: String,
+      trim: true,
+      index: true,
+    },
     isActive: {
       type: Boolean,
       default: true,

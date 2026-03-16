@@ -1,0 +1,170 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// User model with role hierarchy
+model User {
+  id                String   @id @default(cuid())
+  userid            String   @unique
+  username          String
+  loginid           String   @unique
+  password          String
+  role              String   @default("user") // admin, PRT, TDS, TDL, user
+  leader            String?
+  isActive          Boolean  @default(true)
+  isSuperAdmin      Boolean  @default(false)
+  lastLogin         DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  createdBy         String   @default("system")
+  updatedBy         String   @default("system")
+
+  // Relations
+  assignedStores    Store[]            @relation("UserStores")
+  surveyResponses   SurveyResponse[]   @relation("UserSurveys")
+  displays          Display[]          @relation("UserDisplays")
+
+  @@index([userid])
+  @@index([username])
+  @@index([loginid])
+  @@index([role])
+  @@index([isActive])
+  @@index([leader])
+}
+
+// Store model for retail locations
+model Store {
+  id          String   @id @default(cuid())
+  storeId     String   @unique
+  storeCode   String?
+  storeName   String
+  channel     String
+  hc          Int      @default(0)
+  region      String
+  province    String
+  mcp         String   @default("N") // Y or N
+  tdl         String?  // TDL code
+  tds         String?  // TDS code
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String   @default("system")
+  updatedBy   String   @default("system")
+
+  // Relations
+  assignedUsers    User[]             @relation("UserStores")
+  displays         Display[]          @relation("StoreDisplays")
+  surveyResponses  SurveyResponse[]   @relation("StoreSurveys")
+
+  @@index([storeId])
+  @@index([storeCode])
+  @@index([storeName])
+  @@index([channel])
+  @@index([region])
+  @@index([province])
+  @@index([isActive])
+}
+
+// Model POSM mapping - defines which POSM items belong to which model
+model ModelPosm {
+  id        String   @id @default(cuid())
+  model     String
+  posm      String
+  posmName  String
+  category  String?
+  project   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([model, posm])
+  @@index([model])
+}
+
+// Display tracking - whether a model is displayed at a store
+model Display {
+  id          String   @id @default(cuid())
+  storeId     String
+  model       String
+  isDisplayed Boolean  @default(false)
+  userId      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String   @default("system")
+  updatedBy   String   @default("system")
+
+  // Relations
+  store       Store    @relation("StoreDisplays", fields: [storeId], references: [storeId])
+  user        User?    @relation("UserDisplays", fields: [userId], references: [id])
+
+  @@unique([storeId, model])
+  @@index([storeId])
+  @@index([model])
+  @@index([isDisplayed])
+}
+
+// Survey Response - captures survey submissions
+model SurveyResponse {
+  id              String   @id @default(cuid())
+  leader          String
+  shopName        String
+  storeId         String?
+  submittedById   String?
+  submittedBy     String   @default("anonymous")
+  submittedByRole String   @default("unknown")
+  submittedAt     DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  store           Store?   @relation("StoreSurveys", fields: [storeId], references: [storeId])
+  user            User?    @relation("UserSurveys", fields: [submittedById], references: [id])
+
+  // JSON field for responses
+  responses       String   // JSON string containing survey responses
+
+  @@index([leader])
+  @@index([shopName])
+  @@index([storeId])
+  @@index([submittedAt])
+}
+
+// Session for NextAuth compatibility
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+}
+
+// Account for NextAuth compatibility
+model Account {
+  id                String   @id @default(cuid())
+  userId            String
+  providerType      String
+  providerId        String
+  providerAccountId String
+  refreshToken      String?
+  accessToken       String?
+  accessTokenExpires DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([providerId, providerAccountId])
+}
+
+// Verification token for NextAuth
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}

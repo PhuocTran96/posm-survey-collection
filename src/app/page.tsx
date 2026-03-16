@@ -289,6 +289,10 @@ export default function Home() {
   const [showShopDropdown, setShowShopDropdown] = useState(false);
   const [allStores, setAllStores] = useState<Store[]>([]);
 
+  // Model autocomplete state
+  const [modelSearch, setModelSearch] = useState('');
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
+
   // Import/Export state
   const storeImportRef = useRef<HTMLInputElement>(null);
   const userImportRef = useRef<HTMLInputElement>(null);
@@ -1084,23 +1088,49 @@ export default function Home() {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg">Select Models</CardTitle>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <ScrollArea className="h-48">
-                    <div className="p-2 space-y-1">
-                      {Object.keys(modelGroups).map((model) => (
-                        <Button
-                          key={model}
-                          variant="ghost"
-                          className="w-full justify-start text-left h-auto py-3"
-                          onClick={() => addModelToSurvey(model)}
-                          disabled={surveyForm.responses.some((r) => r.model === model)}
-                        >
-                          <Plus className="h-4 w-4 mr-2 shrink-0" />
-                          <span className="truncate">{model}</span>
-                        </Button>
-                      ))}
-                    </div>
-                  </ScrollArea>
+                <CardContent>
+                  <div className="relative">
+                    <Input
+                      placeholder="Search models..."
+                      value={modelSearch}
+                      onChange={(e) => {
+                        setModelSearch(e.target.value);
+                        setShowModelDropdown(true);
+                      }}
+                      onFocus={() => setShowModelDropdown(true)}
+                    />
+                    {showModelDropdown && (
+                      <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                        {Object.keys(modelGroups)
+                          .filter(model => model.toLowerCase().includes(modelSearch.toLowerCase()))
+                          .map((model) => (
+                            <button
+                              key={model}
+                              type="button"
+                              className={`w-full px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-between ${
+                                surveyForm.responses.some((r) => r.model === model) ? 'opacity-50 cursor-not-allowed' : ''
+                              }`}
+                              onClick={() => {
+                                if (!surveyForm.responses.some((r) => r.model === model)) {
+                                  addModelToSurvey(model);
+                                  setModelSearch('');
+                                  setShowModelDropdown(false);
+                                }
+                              }}
+                              disabled={surveyForm.responses.some((r) => r.model === model)}
+                            >
+                              <span className="truncate">{model}</span>
+                              {surveyForm.responses.some((r) => r.model === model) && (
+                                <Badge variant="secondary" className="ml-2">Added</Badge>
+                              )}
+                            </button>
+                          ))}
+                        {Object.keys(modelGroups).filter(model => model.toLowerCase().includes(modelSearch.toLowerCase())).length === 0 && (
+                          <div className="px-3 py-2 text-sm text-muted-foreground">No models found</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
@@ -1873,24 +1903,49 @@ export default function Home() {
                       <Separator />
 
                       <div>
-                        <Label className="mb-2 block">Add Models</Label>
-                        <ScrollArea className="h-[200px] border rounded-lg p-2">
-                          <div className="space-y-1">
-                            {Object.keys(modelGroups).map((model) => (
-                              <Button
-                                key={model}
-                                variant="ghost"
-                                size="sm"
-                                className="w-full justify-start"
-                                onClick={() => addModelToSurvey(model)}
-                                disabled={surveyForm.responses.some((r) => r.model === model)}
-                              >
-                                <Plus className="h-4 w-4 mr-2" />
-                                {model}
-                              </Button>
-                            ))}
-                          </div>
-                        </ScrollArea>
+                        <Label className="mb-2 block">Search Models</Label>
+                        <div className="relative">
+                          <Input
+                            placeholder="Type to search models..."
+                            value={modelSearch}
+                            onChange={(e) => {
+                              setModelSearch(e.target.value);
+                              setShowModelDropdown(true);
+                            }}
+                            onFocus={() => setShowModelDropdown(true)}
+                          />
+                          {showModelDropdown && (
+                            <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                              {Object.keys(modelGroups)
+                                .filter(model => model.toLowerCase().includes(modelSearch.toLowerCase()))
+                                .map((model) => (
+                                  <button
+                                    key={model}
+                                    type="button"
+                                    className={`w-full px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-between ${
+                                      surveyForm.responses.some((r) => r.model === model) ? 'opacity-50 cursor-not-allowed' : ''
+                                    }`}
+                                    onClick={() => {
+                                      if (!surveyForm.responses.some((r) => r.model === model)) {
+                                        addModelToSurvey(model);
+                                        setModelSearch('');
+                                        setShowModelDropdown(false);
+                                      }
+                                    }}
+                                    disabled={surveyForm.responses.some((r) => r.model === model)}
+                                  >
+                                    <span className="truncate text-sm">{model}</span>
+                                    {surveyForm.responses.some((r) => r.model === model) && (
+                                      <Badge variant="secondary" className="ml-2 text-xs">Added</Badge>
+                                    )}
+                                  </button>
+                                ))}
+                              {Object.keys(modelGroups).filter(model => model.toLowerCase().includes(modelSearch.toLowerCase())).length === 0 && (
+                                <div className="px-3 py-2 text-sm text-muted-foreground">No models found</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       {surveyForm.responses.length > 0 && (

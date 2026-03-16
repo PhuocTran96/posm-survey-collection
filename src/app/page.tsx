@@ -357,6 +357,11 @@ export default function Home() {
         page: surveyPage.toString(),
         limit: '10',
       });
+      // Pass user ID and admin status for filtering
+      if (session.user) {
+        params.append('submittedById', session.user.id);
+        params.append('isAdmin', session.user.role === 'admin' ? 'true' : 'false');
+      }
       const res = await fetch(`/api/surveys?${params}`);
       const data = await res.json();
       setSurveys(data.surveys);
@@ -403,38 +408,18 @@ export default function Home() {
   const handleExportStores = async () => {
     try {
       const res = await fetch('/api/stores/export');
-      const data = await res.json();
-
-      // Create xlsx file using openpyxl via a Python script
-      const response = await fetch('/api/generate-xlsx', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filename: 'stores_export',
-          data: data.stores,
-          headers: ['Store ID', 'Store Code', 'Store Name', 'Channel', 'HC', 'Region', 'Province', 'MCP', 'TDL', 'TDS', 'Status', 'Created At'],
-        }),
-      });
-
-      if (response.ok) {
-        const blob = await response.blob();
+      
+      if (res.ok) {
+        const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'stores_export.xlsx';
+        a.download = 'stores.xlsx';
         a.click();
         window.URL.revokeObjectURL(url);
         toast({ title: 'Success', description: 'Stores exported successfully' });
       } else {
-        // Fallback: download as JSON
-        const blob = new Blob([JSON.stringify(data.stores, null, 2)], { type: 'application/json' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'stores_export.json';
-        a.click();
-        window.URL.revokeObjectURL(url);
-        toast({ title: 'Success', description: 'Stores exported as JSON' });
+        toast({ title: 'Error', description: 'Failed to export stores', variant: 'destructive' });
       }
     } catch (error) {
       console.error('Error exporting stores:', error);
@@ -446,49 +431,50 @@ export default function Home() {
   const handleExportUsers = async () => {
     try {
       const res = await fetch('/api/users/export');
-      const data = await res.json();
-
-      // Download as JSON (xlsx generation would need a separate endpoint)
-      const blob = new Blob([JSON.stringify(data.users, null, 2)], { type: 'application/json' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'users_export.json';
-      a.click();
-      window.URL.revokeObjectURL(url);
-      toast({ title: 'Success', description: 'Users exported successfully' });
+      
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'users.xlsx';
+        a.click();
+        window.URL.revokeObjectURL(url);
+        toast({ title: 'Success', description: 'Users exported successfully' });
+      } else {
+        toast({ title: 'Error', description: 'Failed to export users', variant: 'destructive' });
+      }
     } catch (error) {
       console.error('Error exporting users:', error);
       toast({ title: 'Error', description: 'Failed to export users', variant: 'destructive' });
     }
   };
 
-  // Import stores from file
+  // Import stores from xlsx file
   const handleImportStores = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     setImporting(true);
     try {
-      const text = await file.text();
-      const stores = JSON.parse(text);
-
-      if (!Array.isArray(stores)) {
-        toast({ title: 'Error', description: 'Invalid file format', variant: 'destructive' });
-        return;
-      }
+      const formData = new FormData();
+      formData.append('file', file);
 
       const res = await fetch('/api/stores/import', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stores }),
+        body: formData,
       });
 
       const result = await res.json();
-      toast({
-        title: 'Import Complete',
-        description: `Success: ${result.success}, Failed: ${result.failed}${result.errors?.length ? `\nErrors: ${result.errors.slice(0, 3).join(', ')}...` : ''}`,
-      });
+      
+      if (result.error) {
+        toast({ title: 'Error', description: result.error, variant: 'destructive' });
+      } else {
+        toast({
+          title: 'Import Complete',
+          description: `Success: ${result.success}, Failed: ${result.failed}${result.errors?.length ? `\nErrors: ${result.errors.slice(0, 3).join(', ')}...` : ''}`,
+        });
+      }
 
       fetchStores();
       fetchDashboard();
@@ -500,32 +486,31 @@ export default function Home() {
     if (storeImportRef.current) storeImportRef.current.value = '';
   };
 
-  // Import users from file
+  // Import users from xlsx file
   const handleImportUsers = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     setImporting(true);
     try {
-      const text = await file.text();
-      const users = JSON.parse(text);
-
-      if (!Array.isArray(users)) {
-        toast({ title: 'Error', description: 'Invalid file format', variant: 'destructive' });
-        return;
-      }
+      const formData = new FormData();
+      formData.append('file', file);
 
       const res = await fetch('/api/users/import', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ users }),
+        body: formData,
       });
 
       const result = await res.json();
-      toast({
-        title: 'Import Complete',
-        description: `Success: ${result.success}, Failed: ${result.failed}${result.errors?.length ? `\nErrors: ${result.errors.slice(0, 3).join(', ')}...` : ''}`,
-      });
+      
+      if (result.error) {
+        toast({ title: 'Error', description: result.error, variant: 'destructive' });
+      } else {
+        toast({
+          title: 'Import Complete',
+          description: `Success: ${result.success}, Failed: ${result.failed}${result.errors?.length ? `\nErrors: ${result.errors.slice(0, 3).join(', ')}...` : ''}`,
+        });
+      }
 
       fetchUsers();
       fetchDashboard();
@@ -778,7 +763,6 @@ export default function Home() {
     setSurveyForm((prev) => ({
       ...prev,
       responses: [
-        ...prev.responses,
         {
           model,
           quantity: 1,
@@ -790,6 +774,7 @@ export default function Home() {
           allSelected: false,
           images: [],
         },
+        ...prev.responses, // New models added at the top
       ],
     }));
   };
@@ -1022,7 +1007,7 @@ export default function Home() {
             </div>
           ) : (
             /* Survey Form - Mobile First */
-            <div className="space-y-4">
+            <div className="space-y-4 pb-24">{/* Add padding at bottom for sticky submit button */}
               <Card className="shadow-md">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
@@ -1247,15 +1232,17 @@ export default function Home() {
                 </Card>
               ))}
 
-              {/* Submit Button */}
+              {/* Submit Button - Sticky at bottom */}
               {surveyForm.responses.length > 0 && (
-                <Button
-                  className="w-full h-14 text-lg bg-emerald-600 hover:bg-emerald-700"
-                  onClick={handleCreateSurvey}
-                >
-                  <CheckCircle className="h-6 w-6 mr-2" />
-                  Submit Survey
-                </Button>
+                <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-slate-900 border-t shadow-lg z-50">
+                  <Button
+                    className="w-full h-14 text-lg bg-emerald-600 hover:bg-emerald-700"
+                    onClick={handleCreateSurvey}
+                  >
+                    <CheckCircle className="h-6 w-6 mr-2" />
+                    Submit Survey
+                  </Button>
+                </div>
               )}
             </div>
           )}
@@ -1399,7 +1386,7 @@ export default function Home() {
         )}
 
         {/* Main content */}
-        <main className="flex-1 p-4 lg:p-6 min-h-[calc(100vh-60px)]">
+        <main className="flex-1 p-4 lg:p-6 lg:ml-0 min-h-[calc(100vh-60px)] overflow-x-hidden">
           {/* Dashboard Tab */}
           {activeTab === 'dashboard' && dashboardData && (
             <div className="space-y-6">
@@ -1575,7 +1562,7 @@ export default function Home() {
                   <input
                     ref={storeImportRef}
                     type="file"
-                    accept=".json"
+                    accept=".xlsx,.xls"
                     className="hidden"
                     onChange={handleImportStores}
                   />
@@ -1764,7 +1751,13 @@ export default function Home() {
               </div>
 
               {/* Stores Table */}
-              <Card>
+              <Card className="shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Store List</CardTitle>
+                  <CardDescription>
+                    {storeTotal} stores registered in the system
+                  </CardDescription>
+                </CardHeader>
                 <CardContent className="p-0">
                   <div className="overflow-x-auto">
                     <Table>
@@ -2168,7 +2161,7 @@ export default function Home() {
                   <input
                     ref={userImportRef}
                     type="file"
-                    accept=".json"
+                    accept=".xlsx,.xls"
                     className="hidden"
                     onChange={handleImportUsers}
                   />
@@ -2322,7 +2315,13 @@ export default function Home() {
               </div>
 
               {/* Users Table */}
-              <Card>
+              <Card className="shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">User List</CardTitle>
+                  <CardDescription>
+                    {userTotal} users registered in the system
+                  </CardDescription>
+                </CardHeader>
                 <CardContent className="p-0">
                   <div className="overflow-x-auto">
                     <Table>

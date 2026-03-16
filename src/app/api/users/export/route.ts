@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { readFile, unlink } from 'fs/promises';
+import path from 'path';
+
+const execAsync = promisify(exec);
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,7 +30,6 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Convert to structure for xlsx
     const data = users.map((user) => ({
       'User ID': user.userid,
       'Username': user.username,
@@ -32,14 +37,24 @@ export async function GET(request: NextRequest) {
       'Role': user.role,
       'Leader': user.leader || '',
       'Status': user.isActive ? 'Active' : 'Inactive',
-      'Super Admin': user.isSuperAdmin ? 'Yes' : 'No',
-      'Assigned Stores': user._count.assignedStores,
-      'Survey Responses': user._count.surveyResponses,
-      'Last Login': user.lastLogin ? user.lastLogin.toISOString() : '',
       'Created At': user.createdAt.toISOString(),
     }));
 
-    return NextResponse.json({ users: data, total: users.length });
+    const outputPath = path.join('/tmp', `users_${Date.now()}.xlsx`);
+    const scriptPath = path.join(process.cwd(), 'scripts', 'generate_xlsx.py');
+    
+    await execAsync(`python3 "${scriptPath}" users '${JSON.stringify(data)}' "${outputPath}"`);
+    
+    const fileBuffer = await readFile(outputPath);
+    
+    await unlink(outputPath).catch(() => {});
+    
+    return new NextResponse(fileBuffer, {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': 'attachment; filename="users.xlsx"',
+      },
+    });
   } catch (error) {
     console.error('Error exporting users:', error);
     return NextResponse.json({ error: 'Failed to export users' }, { status: 500 });

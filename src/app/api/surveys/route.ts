@@ -10,8 +10,15 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || '';
     const leader = searchParams.get('leader') || '';
     const storeId = searchParams.get('storeId') || '';
+    const submittedById = searchParams.get('submittedById') || '';
+    const isAdmin = searchParams.get('isAdmin') === 'true';
 
     const where: Record<string, unknown> = {};
+
+    // If not admin and submittedById is provided, filter by user
+    if (!isAdmin && submittedById) {
+      where.submittedById = submittedById;
+    }
 
     if (search) {
       where.OR = [

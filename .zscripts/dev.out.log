@@ -2222,3 +2222,10 @@ Import traces:
  GET / 500 in 242ms (compile: 233ms, render: 8ms)
 ✓ Compiled in 134ms
  GET / 200 in 476ms (compile: 210ms, render: 266ms)
+==========================================
+[2026-03-16 15:38:20] Starting: bun install
+==========================================
+[BUN] Installing dependencies...
+[0.17ms] ".env"
+bun install v1.3.10 (30e609e0)
+error: Failed to link uuid: EEXIST
